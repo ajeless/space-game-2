@@ -1,5 +1,6 @@
 import type { BattleState, PlotSubmission, ShipInstanceId } from "../contracts.js";
 import { validateBattleState, validatePlotSubmission } from "../validation.js";
+import { buildPlannedShots } from "./planned_shots.js";
 import { runSubTick } from "./sub_tick.js";
 import type { ResolveTurnInput, ResolveTurnOutput, TurnEndedEvent } from "./types.js";
 
@@ -67,11 +68,13 @@ export function resolve(input: ResolveTurnInput): ResolveTurnOutput {
   const validatedPlots = validatePlotsByShip(validatedState, input.plots_by_ship);
   const nextState = cloneBattleState(validatedState);
   const sortedShipIds = Object.keys(validatedPlots).sort();
+  const plannedShots = buildPlannedShots(validatedState, validatedPlots, sortedShipIds);
   const context = {
     current_state: validatedState,
     next_state: nextState,
     plots_by_ship: validatedPlots,
     sorted_ship_ids: sortedShipIds,
+    planned_shots: plannedShots,
     seed: input.seed
   };
   const events = [];
