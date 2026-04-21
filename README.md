@@ -60,6 +60,12 @@ The sequence in which capabilities are added matters. These are the ordering com
 - [Resolver design](docs/design/resolver_design.md)
 - [Ship definition format](docs/design/ship_definition_format.md)
 - [SSD layout](docs/design/ssd_layout.md)
+- [v0.1 tuning baseline](docs/design/v0_1_tuning_baseline.md)
+
+## Audience docs
+
+- [Developer: layout and hit model](docs/developer/layout_and_hit_model.md)
+- [Player: ship layout and damage](docs/player/ship_layout_and_damage.md)
 
 ## Research questions (deferred)
 
