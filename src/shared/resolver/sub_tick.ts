@@ -16,26 +16,36 @@ export function runSubTick(context: ResolverContext, subTick: number): SubTickRe
   });
   let state = dynamicsOutput.state;
 
-  state = runSensingPhase({
+  const sensingOutput = runSensingPhase({
     state,
     plotsByShip: context.plots_by_ship,
+    plannedShots: context.planned_shots,
     subTick
   });
+  state = sensingOutput.state;
 
   const eventsPhaseOutput = runEventsPhase({
     state,
     plotsByShip: context.plots_by_ship,
+    sensing: sensingOutput.snapshot,
+    seed: context.seed,
     subTick
   });
 
-  state = runStateUpdatesPhase({
+  const stateUpdatesOutput = runStateUpdatesPhase({
     state: eventsPhaseOutput.state,
     plotsByShip: context.plots_by_ship,
     events: eventsPhaseOutput.events,
     subTick
   });
+  state = stateUpdatesOutput.state;
 
-  const newEvents: ResolverEvent[] = [...intentEvents, ...dynamicsOutput.events, ...eventsPhaseOutput.events];
+  const newEvents: ResolverEvent[] = [
+    ...intentEvents,
+    ...dynamicsOutput.events,
+    ...eventsPhaseOutput.events,
+    ...stateUpdatesOutput.events
+  ];
 
   return {
     state,

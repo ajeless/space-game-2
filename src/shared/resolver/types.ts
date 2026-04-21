@@ -95,11 +95,37 @@ export interface ResolveTurnOutput {
   events: ResolverEvent[];
 }
 
+export interface PlannedWeaponShot {
+  actor_ship_id: ShipInstanceId;
+  target_ship_id: ShipInstanceId;
+  mount_id: SystemId;
+  fire_sub_tick: number;
+  predicted_bearing_sweep_degrees: number;
+  predicted_hit_probability: number;
+}
+
+export interface SensedWeaponReading {
+  actor_ship_id: ShipInstanceId;
+  target_ship_id: ShipInstanceId;
+  mount_id: SystemId;
+  sub_tick: number;
+  effective_charge_pips: number;
+  base_damage: number;
+  hit_probability: number;
+  mount_position: Vector2;
+  target_position: Vector2;
+}
+
+export interface SensingSnapshot {
+  weapon_readings: SensedWeaponReading[];
+}
+
 export interface ResolverContext {
   current_state: BattleState;
   next_state: BattleState;
   plots_by_ship: Record<ShipInstanceId, PlotSubmission>;
   sorted_ship_ids: ShipInstanceId[];
+  planned_shots: Record<string, PlannedWeaponShot>;
   seed: string;
 }
 
