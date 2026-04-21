@@ -27,19 +27,40 @@ describe("resolver skeleton", () => {
 
     expect(inputState.turn_number).toBe(1);
     expect(result.next_state.turn_number).toBe(2);
-    expect(result.next_state.ships.alpha_ship?.pose.position).toEqual(state.ships.alpha_ship?.pose.position);
-    expect(result.events).toHaveLength(3);
+    expect(result.next_state.ships.alpha_ship?.pose.heading_degrees).toBeCloseTo(15, 10);
+    expect(result.next_state.ships.bravo_ship?.pose.heading_degrees).toBeCloseTo(195, 10);
+    expect(result.next_state.ships.alpha_ship?.pose.position.y ?? 0).toBeLessThan(
+      state.ships.alpha_ship?.pose.position.y ?? 0
+    );
+    expect(result.next_state.ships.alpha_ship?.pose.position.x ?? 0).toBeGreaterThan(
+      state.ships.alpha_ship?.pose.position.x ?? 0
+    );
+    expect(result.next_state.ships.bravo_ship?.pose.position.y ?? 0).toBeGreaterThan(
+      state.ships.bravo_ship?.pose.position.y ?? 0
+    );
+    expect(result.next_state.ships.bravo_ship?.pose.position.x ?? 0).toBeLessThan(
+      state.ships.bravo_ship?.pose.position.x ?? 0
+    );
+    const thrustEvents = result.events.filter((event) => event.type === "thrust_applied");
+
+    expect(thrustEvents).toHaveLength(120);
+    expect(result.events).toHaveLength(123);
     expect(result.events[0]).toMatchObject({
       sub_tick: 0,
       type: "plot_committed",
       actor: "alpha_ship"
     });
-    expect(result.events[1]).toMatchObject({
+    expect(result.events[2]).toMatchObject({
       sub_tick: 0,
-      type: "plot_committed",
+      type: "thrust_applied",
+      actor: "alpha_ship"
+    });
+    expect(result.events[3]).toMatchObject({
+      sub_tick: 0,
+      type: "thrust_applied",
       actor: "bravo_ship"
     });
-    expect(result.events[2]).toMatchObject({
+    expect(result.events[result.events.length - 1]).toMatchObject({
       sub_tick: 60,
       type: "turn_ended",
       details: {
