@@ -14,6 +14,8 @@ import {
   getShipConfig,
   getSystemStateAndEffects,
   isWorldPointVisibleInTacticalCamera,
+  setPlotDraftDesiredEndHeading,
+  setPlotDraftWorldThrust,
   summarizePlotDraft,
   TACTICAL_CAMERA_MODES,
   TACTICAL_ZOOM_PRESETS,
@@ -66,6 +68,12 @@ let plotDraft: PlotDraft | null = null;
 let selectedSystemId: SystemId | null = null;
 let tacticalCameraSelection: TacticalCameraSelection = createDefaultTacticalCameraSelection();
 const messages: string[] = [];
+type TacticalDragHandleId = "thrust" | "heading";
+type ActiveTacticalDrag = {
+  handle_id: TacticalDragHandleId;
+  pointer_id: number;
+};
+let activeTacticalDrag: ActiveTacticalDrag | null = null;
 
 function logMessage(message: string): void {
   messages.unshift(message);
@@ -87,6 +95,12 @@ const TACTICAL_VIEWPORT = {
   velocityProjectionDistance: 120000,
   markerInsetPx: 22,
   scaleBarTargetPx: 112
+} as const;
+
+const TACTICAL_PLOT_HANDLES = {
+  thrustRadiusPx: 72,
+  headingRadiusPx: 44,
+  deadzonePx: 8
 } as const;
 
 const SCHEMATIC_VIEWPORT = {
@@ -241,6 +255,61 @@ function getPlayerPlotSummary(
   plotDraft = summary.draft;
 
   return summary;
+}
+
+function getPlayerTacticalAuthoringContext():
+  | {
+      sessionValue: MatchSessionView;
+      displayed: NonNullable<ReturnType<typeof getDisplayedShipContext>>;
+      plotSummary: PlotDraftSummary;
+      plotPreview: PlotPreview;
+      camera: TacticalCamera;
+    }
+  | null {
+  if (!session || !identity) {
+    return null;
+  }
+
+  const displayed = getDisplayedShipContext(session, identity);
+  const plotSummary = getPlayerPlotSummary(session, identity);
+
+  if (!displayed || !plotSummary) {
+    return null;
+  }
+
+  const plotPreview = buildPlotPreview(session.battle_state, plotSummary.draft);
+  const camera = getTacticalCamera(session, plotPreview, displayed.ship.ship_instance_id);
+
+  if (!camera) {
+    return null;
+  }
+
+  return {
+    sessionValue: session,
+    displayed,
+    plotSummary,
+    plotPreview,
+    camera
+  };
+}
+
+function getSvgViewportPoint(svg: SVGSVGElement, clientX: number, clientY: number): Vector2 {
+  const bounds = svg.getBoundingClientRect();
+
+  return {
+    x: ((clientX - bounds.left) / bounds.width) * TACTICAL_VIEWPORT.width,
+    y: ((clientY - bounds.top) / bounds.height) * TACTICAL_VIEWPORT.height
+  };
+}
+
+function getTacticalPointerPoint(clientX: number, clientY: number): Vector2 | null {
+  const svg = root.querySelector<SVGSVGElement>("[data-tactical-viewport]");
+
+  if (!svg) {
+    return null;
+  }
+
+  return getSvgViewportPoint(svg, clientX, clientY);
 }
 
 function getSelectedSystemContext(
@@ -423,6 +492,80 @@ function updatePlotDraft(mutator: (draft: PlotDraft) => PlotDraft): void {
   plotDraft = summarizePlotDraft(session.battle_state, plotDraft).draft;
   render();
 }
+
+function applyTacticalDrag(clientX: number, clientY: number): void {
+  if (!activeTacticalDrag) {
+    return;
+  }
+
+  const context = getPlayerTacticalAuthoringContext();
+  const pointer = getTacticalPointerPoint(clientX, clientY);
+
+  if (!context || !pointer) {
+    return;
+  }
+
+  if (activeTacticalDrag.handle_id === "thrust") {
+    const shipAnchor = worldToTacticalViewport(context.camera, context.displayed.ship.pose.position);
+    const delta = {
+      x: pointer.x - shipAnchor.x,
+      y: pointer.y - shipAnchor.y
+    };
+    const distance = Math.hypot(delta.x, delta.y);
+    const scale = distance <= TACTICAL_PLOT_HANDLES.deadzonePx ? 0 : Math.min(1, distance / TACTICAL_PLOT_HANDLES.thrustRadiusPx);
+    const direction = distance > 0 ? { x: delta.x / distance, y: delta.y / distance } : { x: 0, y: 0 };
+
+    updatePlotDraft((draft) =>
+      setPlotDraftWorldThrust(context.sessionValue.battle_state, draft, {
+        x: direction.x * scale,
+        y: -direction.y * scale
+      })
+    );
+
+    return;
+  }
+
+  const ghostAnchor = worldToTacticalViewport(context.camera, context.plotPreview.projected_pose.position);
+  const delta = {
+    x: pointer.x - ghostAnchor.x,
+    y: pointer.y - ghostAnchor.y
+  };
+  const distance = Math.hypot(delta.x, delta.y);
+
+  if (distance <= TACTICAL_PLOT_HANDLES.deadzonePx) {
+    return;
+  }
+
+  const desiredHeadingDegrees = normalizeDegrees((Math.atan2(delta.x, -delta.y) * 180) / Math.PI);
+
+  updatePlotDraft((draft) => setPlotDraftDesiredEndHeading(context.sessionValue.battle_state, draft, desiredHeadingDegrees));
+}
+
+function clearActiveTacticalDrag(pointerId?: number): void {
+  if (!activeTacticalDrag || (pointerId !== undefined && activeTacticalDrag.pointer_id !== pointerId)) {
+    return;
+  }
+
+  activeTacticalDrag = null;
+  document.body.classList.remove("is-plot-dragging");
+}
+
+function handleGlobalTacticalPointerMove(event: PointerEvent): void {
+  if (!activeTacticalDrag || activeTacticalDrag.pointer_id !== event.pointerId) {
+    return;
+  }
+
+  event.preventDefault();
+  applyTacticalDrag(event.clientX, event.clientY);
+}
+
+function handleGlobalTacticalPointerEnd(event: PointerEvent): void {
+  clearActiveTacticalDrag(event.pointerId);
+}
+
+window.addEventListener("pointermove", handleGlobalTacticalPointerMove);
+window.addEventListener("pointerup", handleGlobalTacticalPointerEnd);
+window.addEventListener("pointercancel", handleGlobalTacticalPointerEnd);
 
 function localToSchematic(point: Vector2): Vector2 {
   return {
@@ -1087,6 +1230,94 @@ function renderPreviewGhost(sessionValue: MatchSessionView, camera: TacticalCame
   `;
 }
 
+function renderPlotInteractionHandles(
+  sessionValue: MatchSessionView,
+  camera: TacticalCamera,
+  plotSummary: PlotDraftSummary | null,
+  plotPreview: PlotPreview | null
+): string {
+  if (!plotSummary || !plotPreview) {
+    return "";
+  }
+
+  const ship = sessionValue.battle_state.ships[plotPreview.ship_instance_id];
+
+  if (!ship) {
+    return "";
+  }
+
+  if (!isWorldPointVisibleInTacticalCamera(camera, ship.pose.position, 42)) {
+    return "";
+  }
+
+  const shipAnchor = worldToTacticalViewport(camera, ship.pose.position);
+  const thrustHandle = {
+    x: shipAnchor.x + plotSummary.world_thrust_fraction.x * TACTICAL_PLOT_HANDLES.thrustRadiusPx,
+    y: shipAnchor.y - plotSummary.world_thrust_fraction.y * TACTICAL_PLOT_HANDLES.thrustRadiusPx
+  };
+  const headingAnchor = worldToTacticalViewport(camera, plotPreview.projected_pose.position);
+  const headingVector = getHeadingVector(plotPreview.desired_end_heading_degrees, TACTICAL_PLOT_HANDLES.headingRadiusPx);
+  const headingHandle = {
+    x: headingAnchor.x + headingVector.x,
+    y: headingAnchor.y + headingVector.y
+  };
+
+  return `
+    <g class="plot-handles">
+      <g class="plot-handles__thrust">
+        <circle
+          class="plot-handles__guide-ring"
+          cx="${shipAnchor.x.toFixed(2)}"
+          cy="${shipAnchor.y.toFixed(2)}"
+          r="${TACTICAL_PLOT_HANDLES.thrustRadiusPx}"
+        />
+        <line
+          class="plot-handles__vector"
+          x1="${shipAnchor.x.toFixed(2)}"
+          y1="${shipAnchor.y.toFixed(2)}"
+          x2="${thrustHandle.x.toFixed(2)}"
+          y2="${thrustHandle.y.toFixed(2)}"
+        />
+        <circle
+          class="plot-handles__grip plot-handles__grip--thrust"
+          cx="${thrustHandle.x.toFixed(2)}"
+          cy="${thrustHandle.y.toFixed(2)}"
+          r="10"
+          data-plot-drag-handle="thrust"
+        />
+        <text class="plot-handles__label" x="${shipAnchor.x.toFixed(2)}" y="${(shipAnchor.y + TACTICAL_PLOT_HANDLES.thrustRadiusPx + 22).toFixed(2)}">
+          burn vector
+        </text>
+      </g>
+      <g class="plot-handles__heading">
+        <circle
+          class="plot-handles__guide-ring plot-handles__guide-ring--heading"
+          cx="${headingAnchor.x.toFixed(2)}"
+          cy="${headingAnchor.y.toFixed(2)}"
+          r="${TACTICAL_PLOT_HANDLES.headingRadiusPx}"
+        />
+        <line
+          class="plot-handles__vector plot-handles__vector--heading"
+          x1="${headingAnchor.x.toFixed(2)}"
+          y1="${headingAnchor.y.toFixed(2)}"
+          x2="${headingHandle.x.toFixed(2)}"
+          y2="${headingHandle.y.toFixed(2)}"
+        />
+        <circle
+          class="plot-handles__grip plot-handles__grip--heading"
+          cx="${headingHandle.x.toFixed(2)}"
+          cy="${headingHandle.y.toFixed(2)}"
+          r="9"
+          data-plot-drag-handle="heading"
+        />
+        <text class="plot-handles__label" x="${headingAnchor.x.toFixed(2)}" y="${(headingAnchor.y + TACTICAL_PLOT_HANDLES.headingRadiusPx + 20).toFixed(2)}">
+          end heading
+        </text>
+      </g>
+    </g>
+  `;
+}
+
 function renderWeaponCue(sessionValue: MatchSessionView, camera: TacticalCamera, plotPreview: PlotPreview): string {
   return plotPreview.weapon_cues
     .map((cue) => {
@@ -1139,7 +1370,8 @@ function renderPlotPreviewOverlay(
   sessionValue: MatchSessionView,
   camera: TacticalCamera,
   plotPreview: PlotPreview | null,
-  focusedMountId: SystemId | null
+  focusedMountId: SystemId | null,
+  plotSummary: PlotDraftSummary | null
 ): string {
   if (!plotPreview) {
     return "";
@@ -1158,6 +1390,7 @@ function renderPlotPreviewOverlay(
       ${renderPreviewPath(camera, focusedPreview)}
       ${renderWeaponCue(sessionValue, camera, focusedPreview)}
       ${renderPreviewGhost(sessionValue, camera, focusedPreview)}
+      ${renderPlotInteractionHandles(sessionValue, camera, plotSummary, focusedPreview)}
     </g>
   `;
 }
@@ -1314,6 +1547,7 @@ function renderTacticalCameraControls(camera: TacticalCamera | null): string {
 function renderTacticalViewport(
   sessionValue: MatchSessionView | null,
   identityValue: SessionIdentity | null,
+  plotSummary: PlotDraftSummary | null,
   plotPreview: PlotPreview | null,
   selectedSystemContext: ReturnType<typeof getSelectedSystemContext>,
   camera: TacticalCamera | null
@@ -1392,11 +1626,15 @@ function renderTacticalViewport(
     }
   }
 
-  const overlay = renderPlotPreviewOverlay(sessionValue, camera, plotPreview, focusedMountId);
+  const overlay = renderPlotPreviewOverlay(sessionValue, camera, plotPreview, focusedMountId, plotSummary);
 
   return `
     <div class="tactical-board">
-      <svg viewBox="0 0 ${TACTICAL_VIEWPORT.width} ${TACTICAL_VIEWPORT.height}" aria-label="Tactical viewport">
+      <svg
+        viewBox="0 0 ${TACTICAL_VIEWPORT.width} ${TACTICAL_VIEWPORT.height}"
+        aria-label="Tactical viewport"
+        data-tactical-viewport
+      >
         <defs>
           <clipPath id="tactical-plot-clip">
             <rect
@@ -1479,7 +1717,14 @@ function render(): void {
   const selectedSystemContext = getSelectedSystemContext(sessionValue, identity);
   const plotPreview = sessionValue && plotSummary ? buildPlotPreview(sessionValue.battle_state, plotSummary.draft) : null;
   const camera = getTacticalCamera(sessionValue, plotPreview, displayed?.ship.ship_instance_id ?? null);
-  const tacticalViewport = renderTacticalViewport(sessionValue, identity, plotPreview, selectedSystemContext, camera);
+  const tacticalViewport = renderTacticalViewport(
+    sessionValue,
+    identity,
+    plotSummary,
+    plotPreview,
+    selectedSystemContext,
+    camera
+  );
   const schematicViewport = renderSchematicViewport(sessionValue, identity, plotSummary, selectedSystemContext, plotPreview);
   const readoutStrip = renderReadoutStrip(sessionValue, identity);
   const actionStripControls = renderActionStripControls(sessionValue, identity, plotSummary);
@@ -1519,10 +1764,10 @@ function render(): void {
               <h2>${cameraMode?.label ?? "Shared sensor plot"}</h2>
             </div>
             <div class="tactical-panel__header-right">
-              <div class="tactical-panel__meta">
-                <span>${selectedSystemContext?.system.type === "weapon_mount" ? "Aim mode overlays the selected mount only." : "Heading is separate from drift."}</span>
+            <div class="tactical-panel__meta">
+                <span>${selectedSystemContext?.system.type === "weapon_mount" ? "Aim mode overlays the selected mount only." : "Drag burn and end-heading handles directly on the plot."}</span>
                 <span>${cameraZoom ? `Zoom ${cameraZoom.label}.` : ""} Dashed geometry is your current draft preview.</span>
-              </div>
+            </div>
               ${renderTacticalCameraControls(camera)}
             </div>
           </div>
@@ -1636,6 +1881,24 @@ function render(): void {
             : weapon
         )
       }));
+    });
+  });
+
+  document.querySelectorAll<SVGElement>("[data-plot-drag-handle]").forEach((element) => {
+    element.addEventListener("pointerdown", (event) => {
+      const handleId = element.getAttribute("data-plot-drag-handle") as TacticalDragHandleId | null;
+
+      if (!handleId) {
+        return;
+      }
+
+      event.preventDefault();
+      activeTacticalDrag = {
+        handle_id: handleId,
+        pointer_id: event.pointerId
+      };
+      document.body.classList.add("is-plot-dragging");
+      applyTacticalDrag(event.clientX, event.clientY);
     });
   });
 

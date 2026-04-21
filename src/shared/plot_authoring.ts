@@ -62,6 +62,12 @@ function normalizeDegrees(angle: number): number {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
+function getShortestSignedAngleDelta(fromDegrees: number, toDegrees: number): number {
+  const delta = (toDegrees - fromDegrees + 540) % 360 - 180;
+
+  return delta === -180 ? 180 : delta;
+}
+
 function clampUnitVector(vector: Vector2): Vector2 {
   const clamped = {
     x: clamp(vector.x, -1, 1),
@@ -174,6 +180,23 @@ function transformLocalThrustToWorld(localThrust: Vector2, headingDegrees: numbe
   };
 }
 
+export function transformWorldThrustToLocal(worldThrust: Vector2, headingDegrees: number): Vector2 {
+  const radians = (headingDegrees * Math.PI) / 180;
+  const forward = {
+    x: Math.sin(radians),
+    y: Math.cos(radians)
+  };
+  const starboard = {
+    x: Math.cos(radians),
+    y: -Math.sin(radians)
+  };
+
+  return {
+    x: worldThrust.x * starboard.x + worldThrust.y * starboard.y,
+    y: worldThrust.x * forward.x + worldThrust.y * forward.y
+  };
+}
+
 export function getPlotAuthoringContext(state: BattleState, shipInstanceId: ShipInstanceId): PlotAuthoringContext {
   const ship = state.ships[shipInstanceId];
 
@@ -247,6 +270,35 @@ export function normalizePlotDraft(state: BattleState, draft: PlotDraft): PlotDr
       };
     })
   };
+}
+
+export function setPlotDraftDesiredEndHeading(
+  state: BattleState,
+  draft: PlotDraft,
+  desiredEndHeadingDegrees: number
+): PlotDraft {
+  const context = getPlotAuthoringContext(state, draft.ship_instance_id);
+  const desiredHeading = normalizeDegrees(
+    Number.isFinite(desiredEndHeadingDegrees) ? desiredEndHeadingDegrees : context.current_heading_degrees
+  );
+
+  return normalizePlotDraft(state, {
+    ...draft,
+    heading_delta_degrees: getShortestSignedAngleDelta(context.current_heading_degrees, desiredHeading)
+  });
+}
+
+export function setPlotDraftWorldThrust(state: BattleState, draft: PlotDraft, worldThrustFraction: Vector2): PlotDraft {
+  const context = getPlotAuthoringContext(state, draft.ship_instance_id);
+  const localThrust = transformWorldThrustToLocal(clampUnitVector(worldThrustFraction), context.current_heading_degrees);
+
+  return normalizePlotDraft(state, {
+    ...draft,
+    thrust_input: {
+      lateral_fraction: localThrust.x,
+      axial_fraction: localThrust.y
+    }
+  });
 }
 
 export function summarizePlotDraft(state: BattleState, draft: PlotDraft): PlotDraftSummary {

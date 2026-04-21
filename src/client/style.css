@@ -34,6 +34,11 @@ body {
   color: var(--text-0);
 }
 
+body.is-plot-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
 #app {
   height: 100vh;
   padding: 10px;
@@ -874,6 +879,50 @@ body {
 
 .plot-preview__cue--warn .plot-preview__target-reticle {
   stroke: rgba(236, 126, 116, 0.88);
+}
+
+.plot-handles__guide-ring {
+  fill: none;
+  stroke: rgba(125, 176, 218, 0.2);
+  stroke-width: 1.2;
+  stroke-dasharray: 5 5;
+}
+
+.plot-handles__guide-ring--heading {
+  stroke: rgba(242, 200, 121, 0.26);
+}
+
+.plot-handles__vector {
+  stroke: rgba(125, 213, 154, 0.9);
+  stroke-width: 2;
+}
+
+.plot-handles__vector--heading {
+  stroke: rgba(242, 200, 121, 0.92);
+}
+
+.plot-handles__grip {
+  cursor: grab;
+  stroke-width: 2;
+}
+
+.plot-handles__grip--thrust {
+  fill: rgba(125, 213, 154, 0.18);
+  stroke: rgba(125, 213, 154, 0.96);
+}
+
+.plot-handles__grip--heading {
+  fill: rgba(242, 200, 121, 0.16);
+  stroke: rgba(242, 200, 121, 0.98);
+}
+
+.plot-handles__label {
+  fill: var(--text-1);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-anchor: middle;
+  text-transform: uppercase;
 }
 
 .tactical-scale-bar__line,

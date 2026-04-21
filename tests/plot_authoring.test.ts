@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlotSubmissionFromDraft,
   createPlotDraft,
+  setPlotDraftDesiredEndHeading,
+  setPlotDraftWorldThrust,
   summarizePlotDraft,
   validateBattleState,
   validatePlotSubmission
@@ -81,5 +83,34 @@ describe("plot authoring", () => {
       1,
       10
     );
+  });
+
+  it("maps a desired end heading into the existing delta-based draft model", async () => {
+    const state = await readBattleStateFixture();
+    const draft = createPlotDraft(state, "alpha_ship");
+    state.ships.alpha_ship!.pose.heading_degrees = 350;
+
+    const updated = setPlotDraftDesiredEndHeading(state, draft, 20);
+    const summary = summarizePlotDraft(state, updated);
+
+    expect(summary.draft.heading_delta_degrees).toBe(30);
+    expect(summary.desired_end_heading_degrees).toBe(20);
+  });
+
+  it("maps a world-space burn vector into local thrust input", async () => {
+    const state = await readBattleStateFixture();
+    const draft = createPlotDraft(state, "alpha_ship");
+    state.ships.alpha_ship!.pose.heading_degrees = 90;
+
+    const updated = setPlotDraftWorldThrust(state, draft, {
+      x: 1,
+      y: 0
+    });
+    const summary = summarizePlotDraft(state, updated);
+
+    expect(summary.draft.thrust_input.axial_fraction).toBeCloseTo(1, 10);
+    expect(summary.draft.thrust_input.lateral_fraction).toBeCloseTo(0, 10);
+    expect(summary.world_thrust_fraction.x).toBeCloseTo(1, 10);
+    expect(summary.world_thrust_fraction.y).toBeCloseTo(0, 10);
   });
 });
