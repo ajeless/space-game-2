@@ -1,9 +1,11 @@
 import "./style.css";
+import { getAvailableReactorPips, getShipConfig, getSystemStateAndEffects } from "../shared/index.js";
 import type { MatchSessionView, ServerToClientMessage, SessionIdentity } from "../shared/index.js";
 import type {
   BattleBoundary,
   PlotSubmission,
   ShipConfig,
+  ShipSystemConfig,
   ShipInstanceId,
   ShipRuntimeState,
   Vector2
@@ -131,9 +133,331 @@ const TACTICAL_VIEWPORT = {
   velocityProjectionDistance: 120000
 } as const;
 
+const SCHEMATIC_VIEWPORT = {
+  width: 420,
+  height: 620,
+  centerX: 210,
+  centerY: 320,
+  scalePx: 220,
+  systemWidth: 116,
+  systemHeight: 42
+} as const;
+
 function normalizeDegrees(angle: number): number {
   const normalized = angle % 360;
   return normalized < 0 ? normalized + 360 : normalized;
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value)}%`;
+}
+
+function formatRole(identityValue: SessionIdentity | null): string {
+  if (!identityValue) {
+    return "...";
+  }
+
+  return `${identityValue.role}${identityValue.slot_id ? ` · ${identityValue.slot_id}` : ""}`;
+}
+
+function getDisplayedShipContext(
+  sessionValue: MatchSessionView | null,
+  identityValue: SessionIdentity | null
+):
+  | {
+      participant: MatchSessionView["battle_state"]["match_setup"]["participants"][number];
+      ship: ShipRuntimeState;
+      shipConfig: ShipConfig;
+    }
+  | null {
+  if (!sessionValue) {
+    return null;
+  }
+
+  const preferredShipId =
+    identityValue?.role === "player" && identityValue.ship_instance_id
+      ? identityValue.ship_instance_id
+      : sessionValue.battle_state.match_setup.participants[0]?.ship_instance_id;
+  const participant = sessionValue.battle_state.match_setup.participants.find(
+    (candidate) => candidate.ship_instance_id === preferredShipId
+  );
+
+  if (!participant) {
+    return null;
+  }
+
+  const ship = sessionValue.battle_state.ships[participant.ship_instance_id];
+
+  if (!ship) {
+    return null;
+  }
+
+  return {
+    participant,
+    ship,
+    shipConfig: getShipConfig(sessionValue.battle_state, ship)
+  };
+}
+
+function getOpponentStatusLabel(sessionValue: MatchSessionView | null, identityValue: SessionIdentity | null): string {
+  if (!sessionValue || !identityValue || identityValue.role !== "player" || !identityValue.ship_instance_id) {
+    return "observer";
+  }
+
+  const opponent = sessionValue.battle_state.match_setup.participants.find(
+    (participant) => participant.ship_instance_id !== identityValue.ship_instance_id
+  );
+
+  if (!opponent) {
+    return "no contact";
+  }
+
+  const opponentShip = sessionValue.battle_state.ships[opponent.ship_instance_id];
+
+  if (opponentShip?.status === "destroyed") {
+    return `${opponent.slot_id} destroyed`;
+  }
+
+  if (opponentShip?.status === "disengaged") {
+    return `${opponent.slot_id} disengaged`;
+  }
+
+  if (!sessionValue.occupied_slot_ids.includes(opponent.slot_id)) {
+    return `${opponent.slot_id} disconnected`;
+  }
+
+  if (sessionValue.pending_plot_ship_ids.includes(opponent.ship_instance_id)) {
+    return `${opponent.slot_id} ready`;
+  }
+
+  return `${opponent.slot_id} plotting`;
+}
+
+function getPhaseLabel(sessionValue: MatchSessionView | null): string {
+  if (!sessionValue) {
+    return "CONNECTING";
+  }
+
+  if (sessionValue.last_resolution) {
+    return "PLOT PHASE";
+  }
+
+  return "PLOT PHASE";
+}
+
+function localToSchematic(point: Vector2): Vector2 {
+  return {
+    x: SCHEMATIC_VIEWPORT.centerX + point.x * SCHEMATIC_VIEWPORT.scalePx,
+    y: SCHEMATIC_VIEWPORT.centerY + point.y * SCHEMATIC_VIEWPORT.scalePx
+  };
+}
+
+function getSystemShortLabel(system: ShipSystemConfig): string {
+  const explicit = system.render?.short_label;
+
+  if (explicit) {
+    return explicit;
+  }
+
+  const label = system.render?.label ?? system.id.replaceAll("_", " ");
+  const firstWord = label.split(" ")[0];
+
+  return firstWord ? firstWord.toUpperCase() : system.id.toUpperCase();
+}
+
+function renderHeadingCompass(headingDegrees: number): string {
+  const normalized = normalizeDegrees(headingDegrees);
+
+  return `
+    <div class="heading-compass">
+      <svg viewBox="0 0 84 84" aria-label="Heading compass">
+        <circle class="heading-compass__ring" cx="42" cy="42" r="31" />
+        <line class="heading-compass__north" x1="42" y1="7" x2="42" y2="19" />
+        <line class="heading-compass__north" x1="42" y1="65" x2="42" y2="77" />
+        <line class="heading-compass__north" x1="7" y1="42" x2="19" y2="42" />
+        <line class="heading-compass__north" x1="65" y1="42" x2="77" y2="42" />
+        <g transform="rotate(${normalized.toFixed(2)} 42 42)">
+          <path class="heading-compass__needle" d="M42 14 L49 38 L42 33 L35 38 Z" />
+        </g>
+      </svg>
+      <div class="heading-compass__value">heading ${normalized.toFixed(0).padStart(3, "0")}°</div>
+    </div>
+  `;
+}
+
+function renderSchematicHull(shipConfig: ShipConfig): string {
+  const points = shipConfig.hull.silhouette
+    .map((point) => {
+      const projected = localToSchematic(point);
+
+      return `${projected.x.toFixed(2)},${projected.y.toFixed(2)}`;
+    })
+    .join(" ");
+  const nose = localToSchematic({ x: 0, y: -0.5 });
+  const tail = localToSchematic({ x: 0, y: 0.6 });
+
+  return `
+    <polygon class="ssd-hull__shape" points="${points}" />
+    <line class="ssd-hull__spine" x1="${nose.x.toFixed(2)}" y1="${nose.y.toFixed(2)}" x2="${tail.x.toFixed(
+      2
+    )}" y2="${tail.y.toFixed(2)}" />
+  `;
+}
+
+function renderSchematicSystem(
+  state: MatchSessionView["battle_state"],
+  ship: ShipRuntimeState,
+  system: ShipSystemConfig
+): string {
+  const stateAndEffects = getSystemStateAndEffects(state, ship, system.id);
+  const runtimeSystem = ship.systems[system.id];
+
+  if (!runtimeSystem) {
+    return "";
+  }
+
+  const position = localToSchematic(system.ssd_position ?? system.physical_position);
+  const x = position.x - SCHEMATIC_VIEWPORT.systemWidth / 2;
+  const y = position.y - SCHEMATIC_VIEWPORT.systemHeight / 2;
+  const integrityPercent = (runtimeSystem.current_integrity / system.max_integrity) * 100;
+
+  return `
+    <g class="ssd-system ssd-system--${system.type} ssd-system--${stateAndEffects.state_label}">
+      <rect class="ssd-system__body" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${
+        SCHEMATIC_VIEWPORT.systemWidth
+      }" height="${SCHEMATIC_VIEWPORT.systemHeight}" rx="12" />
+      <text class="ssd-system__label" x="${position.x.toFixed(2)}" y="${(position.y - 4).toFixed(2)}">
+        ${getSystemShortLabel(system)}
+      </text>
+      <text class="ssd-system__meta" x="${position.x.toFixed(2)}" y="${(position.y + 12).toFixed(2)}">
+        ${stateAndEffects.state_label.toUpperCase()} · ${formatPercent(integrityPercent)}
+      </text>
+    </g>
+  `;
+}
+
+function renderSchematicViewport(sessionValue: MatchSessionView | null, identityValue: SessionIdentity | null): string {
+  const displayed = getDisplayedShipContext(sessionValue, identityValue);
+
+  if (!displayed || !sessionValue) {
+    return "<p>Waiting for ship telemetry before drawing the schematic.</p>";
+  }
+
+  const { participant, ship, shipConfig } = displayed;
+  const hullPercent = (ship.hull.current_integrity / shipConfig.hull.max_integrity) * 100;
+  const reactorPips = getAvailableReactorPips(sessionValue.battle_state, ship);
+  const mount = shipConfig.systems.find((system) => system.type === "weapon_mount");
+  const mountState = mount ? getSystemStateAndEffects(sessionValue.battle_state, ship, mount.id).state_label : "offline";
+  const systems = [...shipConfig.systems]
+    .sort((left, right) => left.physical_position.y - right.physical_position.y)
+    .map((system) => renderSchematicSystem(sessionValue.battle_state, ship, system))
+    .join("");
+
+  return `
+    <section class="schematic-shell">
+      <div class="schematic-shell__header">
+        <div>
+          <span class="section-kicker">${participant.slot_id.toUpperCase()}</span>
+          <h2>${shipConfig.name}</h2>
+          <p>${ship.ship_instance_id} · fixed-orientation SSD shell</p>
+        </div>
+        ${renderHeadingCompass(ship.pose.heading_degrees)}
+      </div>
+      <div class="ssd-viewport">
+        <div class="ssd-status-grid">
+          <article class="status-tile">
+            <span>Hull</span>
+            <strong>${formatPercent(hullPercent)}</strong>
+          </article>
+          <article class="status-tile">
+            <span>Reactor</span>
+            <strong>${reactorPips} pips</strong>
+          </article>
+          <article class="status-tile">
+            <span>Mount</span>
+            <strong>${mountState.toUpperCase()}</strong>
+          </article>
+        </div>
+        <svg viewBox="0 0 ${SCHEMATIC_VIEWPORT.width} ${SCHEMATIC_VIEWPORT.height}" aria-label="Ship schematic">
+          <rect class="ssd-viewport__frame" x="10" y="10" width="${SCHEMATIC_VIEWPORT.width - 20}" height="${
+            SCHEMATIC_VIEWPORT.height - 20
+          }" rx="24" />
+          ${renderSchematicHull(shipConfig)}
+          ${systems}
+        </svg>
+      </div>
+    </section>
+  `;
+}
+
+function renderReadoutStrip(sessionValue: MatchSessionView | null, identityValue: SessionIdentity | null): string {
+  const displayed = getDisplayedShipContext(sessionValue, identityValue);
+
+  if (!displayed || !sessionValue) {
+    return `
+      <div class="readout-strip">
+        <div class="readout-chip"><span>Heading</span><strong>...</strong></div>
+        <div class="readout-chip"><span>Velocity</span><strong>...</strong></div>
+        <div class="readout-chip"><span>Status</span><strong>...</strong></div>
+      </div>
+    `;
+  }
+
+  const { ship, shipConfig } = displayed;
+  const availablePips = getAvailableReactorPips(sessionValue.battle_state, ship);
+  const speed = Math.hypot(ship.pose.velocity.x, ship.pose.velocity.y);
+
+  return `
+    <div class="readout-strip">
+      <div class="readout-chip">
+        <span>Heading</span>
+        <strong>${formatNumber(ship.pose.heading_degrees)}°</strong>
+      </div>
+      <div class="readout-chip">
+        <span>Velocity</span>
+        <strong>${formatNumber(speed)}</strong>
+      </div>
+      <div class="readout-chip">
+        <span>Hull</span>
+        <strong>${ship.hull.current_integrity} / ${shipConfig.hull.max_integrity}</strong>
+      </div>
+      <div class="readout-chip">
+        <span>Reactor</span>
+        <strong>${availablePips} pips</strong>
+      </div>
+      <div class="readout-chip">
+        <span>Status</span>
+        <strong>${ship.status.toUpperCase()}</strong>
+      </div>
+    </div>
+  `;
+}
+
+function renderContactReport(sessionValue: MatchSessionView | null): string {
+  const cards =
+    sessionValue?.battle_state.match_setup.participants
+      .map((participant) => {
+        const ship = sessionValue.battle_state.ships[participant.ship_instance_id];
+
+        if (!ship) {
+          return "";
+        }
+
+        return `
+          <article class="contact-card">
+            <h3>${participant.slot_id.toUpperCase()} · ${participant.ship_instance_id}</h3>
+            <dl class="kv">
+              <dt>Heading</dt><dd>${formatNumber(ship.pose.heading_degrees)}°</dd>
+              <dt>Position</dt><dd>${formatNumber(ship.pose.position.x)}, ${formatNumber(ship.pose.position.y)}</dd>
+              <dt>Velocity</dt><dd>${formatNumber(ship.pose.velocity.x)}, ${formatNumber(ship.pose.velocity.y)}</dd>
+              <dt>Status</dt><dd>${ship.status}</dd>
+            </dl>
+          </article>
+        `;
+      })
+      .join("") ?? "<p>No contact data yet.</p>";
+
+  return `<div class="contact-grid">${cards}</div>`;
 }
 
 function getRectangleBoundary(sessionValue: MatchSessionView): RectangleBoundary | null {
@@ -380,30 +704,11 @@ function buildPresetPlot(presetId: PlotPresetId): PlotSubmission {
 
 function render(): void {
   const sessionValue = session;
+  const displayed = getDisplayedShipContext(sessionValue, identity);
   const tacticalViewport = renderTacticalViewport(sessionValue, identity);
-  const shipCards =
-    sessionValue?.battle_state.match_setup.participants
-      .map((participant) => {
-        const ship = sessionValue.battle_state.ships[participant.ship_instance_id];
-
-        if (!ship) {
-          return "";
-        }
-
-        return `
-          <article class="card">
-            <h3>${participant.slot_id.toUpperCase()} · ${participant.ship_instance_id}</h3>
-            <dl class="kv">
-              <dt>Heading</dt><dd>${formatNumber(ship.pose.heading_degrees)}°</dd>
-              <dt>Position</dt><dd>${formatNumber(ship.pose.position.x)}, ${formatNumber(ship.pose.position.y)}</dd>
-              <dt>Velocity</dt><dd>${formatNumber(ship.pose.velocity.x)}, ${formatNumber(ship.pose.velocity.y)}</dd>
-              <dt>Status</dt><dd>${ship.status}</dd>
-            </dl>
-          </article>
-        `;
-      })
-      .join("") ?? "<p>No session state yet.</p>";
-
+  const schematicViewport = renderSchematicViewport(sessionValue, identity);
+  const readoutStrip = renderReadoutStrip(sessionValue, identity);
+  const contactReport = renderContactReport(sessionValue);
   const resolutionLines =
     sessionValue?.last_resolution?.events
       .slice(-8)
@@ -419,45 +724,62 @@ function render(): void {
     identity?.role === "player"
       ? PLOT_PRESETS.map(
           (preset) => `
-            <button class="button" data-preset="${preset.id}">
+            <button class="action-button" data-preset="${preset.id}">
               <span>${preset.label}</span>
               <small>${preset.description}</small>
             </button>
           `
         ).join("")
-      : "<p>Open a second browser session to claim the other player slot. Additional sessions join as spectators.</p>";
+      : "<p class=\"action-strip__note\">Open a second browser session to claim the other player slot. Additional sessions join as spectators.</p>";
 
   root.innerHTML = `
-    <main class="shell">
-      <header class="shell__header">
-        <div>
-          <h1 class="shell__title">space_game_2 tactical loop</h1>
-          <p class="shell__subtitle">Preset plots now flow through the live host session and shared resolver.</p>
+    <main class="bridge-shell">
+      <header class="mission-bar">
+        <div class="mission-bar__mode">${getPhaseLabel(sessionValue)}</div>
+        <div class="mission-bar__meta">
+          <span>Turn ${sessionValue?.battle_state.turn_number ?? "..."}</span>
+          <span>${health?.rulesId ?? "..."}</span>
+          <span>${formatRole(identity)}</span>
         </div>
-        <span class="${wsState === "connected" ? "status--ok" : "status--warn"}">WS: ${wsState}</span>
+        <div class="mission-bar__status">
+          <span>Opponent ${getOpponentStatusLabel(sessionValue, identity)}</span>
+          <span class="${wsState === "connected" ? "status--ok" : "status--warn"}">WS ${wsState}</span>
+        </div>
       </header>
-      <section class="shell__body">
-        <article class="panel">
-          <h2>Session</h2>
-          <dl class="kv">
-            <dt>Match</dt><dd>${health?.matchId ?? "..."}</dd>
-            <dt>Rules</dt><dd>${health?.rulesId ?? "..."}</dd>
-            <dt>Turn</dt><dd>${sessionValue?.battle_state.turn_number ?? "..."}</dd>
-            <dt>Role</dt><dd>${identity ? `${identity.role}${identity.slot_id ? ` · ${identity.slot_id}` : ""}` : "..."}</dd>
-            <dt>Ship</dt><dd>${identity?.ship_instance_id ?? "unassigned"}</dd>
-            <dt>Pending</dt><dd>${sessionValue?.pending_plot_ship_ids.join(", ") || "none"}</dd>
-            <dt>Occupied Slots</dt><dd>${sessionValue?.occupied_slot_ids.join(", ") || "none"}</dd>
-          </dl>
+      <div class="bridge-shell__subline">
+        <span>Match ${health?.matchId ?? "..."}</span>
+        <span>Displayed ship ${displayed?.ship.ship_instance_id ?? "..."}</span>
+        <span>Pending ${sessionValue?.pending_plot_ship_ids.join(", ") || "none"}</span>
+      </div>
+      <section class="bridge-main">
+        <article class="bridge-panel bridge-panel--schematic">
+          ${schematicViewport}
         </article>
-        <article class="panel">
-          <h2>Plot Presets</h2>
-          <div class="button-grid">${presetButtons}</div>
-        </article>
-        <article class="panel panel--wide">
-          <h2>Tactical View</h2>
+        <article class="bridge-panel bridge-panel--tactical">
+          <div class="tactical-panel__header">
+            <div>
+              <span class="section-kicker">Tactical View</span>
+              <h2>Shared sensor plot</h2>
+            </div>
+            <p>Both ships remain visible here. The SSD stays fixed-orientation on the left.</p>
+          </div>
           ${tacticalViewport}
         </article>
-        <article class="panel">
+      </section>
+      <section class="action-strip">
+        <div class="action-strip__readouts">
+          ${readoutStrip}
+        </div>
+        <div class="action-strip__controls">
+          <div class="action-strip__label">
+            <span class="section-kicker">Temporary Plot Controls</span>
+            <p>Preset plotting stays in place until direct SSD controls land.</p>
+          </div>
+          <div class="action-strip__buttons">${presetButtons}</div>
+        </div>
+      </section>
+      <section class="console-grid">
+        <article class="console-panel">
           <h2>Last Resolution</h2>
           ${
             sessionValue?.last_resolution
@@ -468,11 +790,11 @@ function render(): void {
               : "<p>No turn has resolved yet.</p>"
           }
         </article>
-        <article class="panel panel--wide">
-          <h2>Ship State</h2>
-          <div class="card-grid">${shipCards}</div>
+        <article class="console-panel">
+          <h2>Contact Report</h2>
+          ${contactReport}
         </article>
-        <article class="panel panel--wide">
+        <article class="console-panel console-panel--wide">
           <h2>Message Log</h2>
           <ul class="log-list">
             ${
