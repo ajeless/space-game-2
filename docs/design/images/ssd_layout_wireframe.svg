@@ -1,0 +1,201 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" role="img" aria-labelledby="title desc">
+  <title id="title">v0.1 SSD layout wireframe</title>
+  <desc id="desc">Wireframe showing the v0.1 SSD layout: golden ratio split with ship schematic on the left and tactical viewport on the right. Thin top bar shows phase, turn, and timer. Bottom strip combines movement readouts and action buttons. Ship schematic shows hull silhouette with systems placed as buttons - forward mount, reactor, bridge, drive. Tactical viewport shows self and enemy ships with velocity arrows, reachable-region envelopes, and a thrust plot. Dark theme throughout.</desc>
+
+  <style>
+    .panel-bg { fill: #232320; stroke: #3A3A37; stroke-width: 0.5; }
+    .panel-border { stroke: #3A3A37; stroke-width: 0.5; fill: none; }
+    .viewport-bg { fill: #0F0F0F; stroke: #3A3A37; stroke-width: 0.5; }
+    .tactical-bg { fill: #0A0A0A; stroke: #3A3A37; stroke-width: 0.5; }
+    .label-tiny { font-family: sans-serif; font-size: 10px; fill: #888780; letter-spacing: 0.04em; font-weight: 500; }
+    .label-secondary { font-family: sans-serif; font-size: 10px; fill: #9A9890; }
+    .label-body { font-family: sans-serif; font-size: 12px; fill: #D3D1C7; }
+    .label-readout { font-family: monospace; font-size: 11px; fill: #D3D1C7; font-weight: 500; }
+    .hull { fill: #3C3A38; stroke: #8A8680; stroke-width: 1; }
+    .structural { stroke: #5F5E5A; stroke-width: 0.3; fill: none; opacity: 0.6; }
+    .grid-line { stroke: #888780; stroke-width: 0.5; opacity: 0.12; }
+    .frame-tick { stroke: #888780; stroke-width: 0.6; opacity: 0.5; }
+    .system-mount { fill: #4A3818; stroke: #BA7517; stroke-width: 0.8; }
+    .system-reactor { fill: #142940; stroke: #2563A8; stroke-width: 0.8; }
+    .system-bridge { fill: #142D25; stroke: #1D7A5C; stroke-width: 0.8; }
+    .system-drive { fill: #2C2A28; stroke: #6A6864; stroke-width: 0.8; }
+    .system-label { font-family: sans-serif; font-size: 8px; font-weight: 500; text-anchor: middle; }
+    .ship-text-self { fill: #85B7EB; font-family: sans-serif; font-weight: 500; }
+    .ship-text-enemy { fill: #F09595; font-family: sans-serif; font-weight: 500; }
+    .button-fill-primary { fill: #185FA5; stroke: #0C447C; stroke-width: 0.5; }
+    .button-fill-secondary { fill: #2C2C2A; stroke: #5F5E5A; stroke-width: 0.5; }
+    .button-text-primary { fill: #FFFFFF; font-family: sans-serif; font-size: 11px; font-weight: 500; }
+    .button-text-secondary { fill: #D3D1C7; font-family: sans-serif; font-size: 11px; }
+    .hotkey { fill: #888780; font-family: monospace; font-size: 10px; }
+    .top-bar-bg { fill: #2C2C2A; stroke: #3A3A37; stroke-width: 0.5; }
+    .top-bar-text { fill: #F1EFE8; font-family: sans-serif; font-size: 12px; font-weight: 500; }
+    .top-bar-subtext { fill: #B4B2A9; font-family: sans-serif; font-size: 10px; }
+    .top-bar-timer { fill: #F1EFE8; font-family: monospace; font-size: 11px; }
+  </style>
+
+  <rect x="0" y="0" width="900" height="620" fill="#1A1A18"/>
+
+  <rect x="20" y="20" width="860" height="28" rx="6" class="top-bar-bg"/>
+  <text x="36" y="38" class="top-bar-text">PLOT PHASE</text>
+  <text x="134" y="38" class="top-bar-subtext">turn 4</text>
+  <text x="720" y="38" class="top-bar-subtext">opponent: plotting</text>
+  <text x="850" y="38" class="top-bar-timer" text-anchor="end">00:45</text>
+
+  <rect x="20" y="56" width="328" height="480" rx="6" class="panel-bg"/>
+
+  <text x="34" y="76" class="label-tiny">CSS MERIDIAN</text>
+  <text x="334" y="76" class="label-secondary" text-anchor="end">heading 012°</text>
+
+  <line x1="34" y1="84" x2="334" y2="84" class="panel-border"/>
+
+  <rect x="34" y="96" width="300" height="408" rx="6" class="viewport-bg"/>
+
+  <g opacity="0.12">
+    <line x1="34" y1="198" x2="334" y2="198" class="grid-line"/>
+    <line x1="34" y1="300" x2="334" y2="300" class="grid-line"/>
+    <line x1="34" y1="402" x2="334" y2="402" class="grid-line"/>
+    <line x1="184" y1="96" x2="184" y2="504" class="grid-line"/>
+  </g>
+
+  <rect x="48" y="112" width="96" height="58" rx="4" fill="#1A1A18" stroke="#3A3A37" stroke-width="0.5"/>
+  <text x="58" y="126" font-family="sans-serif" font-size="9" fill="#888780" letter-spacing="0.04em">HULL</text>
+  <text x="136" y="126" font-family="monospace" font-size="10" fill="#9FE1CB" text-anchor="end" font-weight="500">82%</text>
+  <text x="58" y="142" font-family="sans-serif" font-size="9" fill="#888780" letter-spacing="0.04em">REACTOR</text>
+  <text x="136" y="142" font-family="monospace" font-size="10" fill="#85B7EB" text-anchor="end" font-weight="500">6/8</text>
+  <text x="58" y="158" font-family="sans-serif" font-size="9" fill="#888780" letter-spacing="0.04em">GUN</text>
+  <text x="136" y="158" font-family="monospace" font-size="10" fill="#EF9F27" text-anchor="end" font-weight="500">3 pips</text>
+
+  <g transform="translate(288, 124)">
+    <circle cx="0" cy="0" r="18" fill="#1A1A18" stroke="#5F5E5A" stroke-width="0.6"/>
+    <text x="0" y="-24" font-family="sans-serif" font-size="8" fill="#888780" text-anchor="middle">N</text>
+    <line x1="0" y1="0" x2="4" y2="-13" stroke="#85B7EB" stroke-width="1.6"/>
+    <polygon points="4,-13 0,-10 6,-9" fill="#85B7EB"/>
+    <text x="0" y="34" font-family="monospace" font-size="8" fill="#888780" text-anchor="middle">012°</text>
+  </g>
+
+  <defs>
+    <clipPath id="hull-clip">
+      <path d="M 184 188 L 212 214 L 222 282 L 216 322 L 232 342 L 220 380 L 184 400 L 148 380 L 136 342 L 152 322 L 146 282 L 156 214 Z"/>
+    </clipPath>
+  </defs>
+
+  <path d="M 184 188 L 212 214 L 222 282 L 216 322 L 232 342 L 220 380 L 184 400 L 148 380 L 136 342 L 152 322 L 146 282 L 156 214 Z" class="hull"/>
+
+  <line x1="150" y1="250" x2="218" y2="250" class="structural"/>
+  <line x1="138" y1="310" x2="230" y2="310" class="structural"/>
+  <line x1="152" y1="360" x2="216" y2="360" class="structural"/>
+  <line x1="184" y1="192" x2="184" y2="396" class="structural"/>
+
+  <rect x="168" y="202" width="32" height="22" rx="3" class="system-mount"/>
+  <text x="184" y="216" class="system-label" fill="#FAC775">MOUNT</text>
+
+  <rect x="156" y="258" width="56" height="38" rx="3" class="system-reactor"/>
+  <text x="184" y="273" class="system-label" fill="#85B7EB">REACTOR</text>
+  <text x="184" y="285" font-family="monospace" font-size="8" fill="#5D9EE0" text-anchor="middle">6/8 MW</text>
+
+  <rect x="164" y="306" width="40" height="24" rx="3" class="system-bridge"/>
+  <text x="184" y="321" class="system-label" fill="#5DCAA5">BRIDGE</text>
+
+  <rect x="168" y="340" width="32" height="30" rx="3" class="system-drive"/>
+  <text x="184" y="358" class="system-label" fill="#B4B2A9">DRIVE</text>
+
+  <g clip-path="url(#hull-clip)">
+    <rect x="136" y="312" width="16" height="30" fill="#A32D2D" opacity="0.4"/>
+  </g>
+
+  <text x="44" y="494" font-family="sans-serif" font-size="8" fill="#6A6864" font-style="italic">click system to inspect</text>
+
+  <rect x="358" y="56" width="522" height="480" rx="6" class="panel-bg"/>
+
+  <text x="372" y="76" class="label-tiny">TACTICAL</text>
+  <text x="868" y="76" class="label-secondary" text-anchor="end">range: medium · Z zoom</text>
+
+  <line x1="372" y1="84" x2="868" y2="84" class="panel-border"/>
+
+  <rect x="372" y="96" width="494" height="408" rx="6" class="tactical-bg"/>
+
+  <g opacity="0.1">
+    <line x1="372" y1="198" x2="866" y2="198" class="grid-line"/>
+    <line x1="372" y1="300" x2="866" y2="300" class="grid-line"/>
+    <line x1="372" y1="402" x2="866" y2="402" class="grid-line"/>
+    <line x1="495" y1="96" x2="495" y2="504" class="grid-line"/>
+    <line x1="619" y1="96" x2="619" y2="504" class="grid-line"/>
+    <line x1="742" y1="96" x2="742" y2="504" class="grid-line"/>
+  </g>
+
+  <g opacity="0.4">
+    <line x1="372" y1="300" x2="392" y2="300" class="frame-tick"/>
+    <line x1="846" y1="300" x2="866" y2="300" class="frame-tick"/>
+    <line x1="619" y1="96" x2="619" y2="116" class="frame-tick"/>
+    <line x1="619" y1="484" x2="619" y2="504" class="frame-tick"/>
+  </g>
+
+  <ellipse cx="742" cy="180" rx="74" ry="42" fill="none" stroke="#E24B4A" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.45"/>
+  <line x1="722" y1="200" x2="758" y2="162" stroke="#F09595" stroke-width="1.6"/>
+  <polygon points="758,162 751,164 753,169" fill="#F09595"/>
+  <polygon points="716,203 726,207 728,196" fill="none" stroke="#F09595" stroke-width="1.4"/>
+  <text x="716" y="234" class="ship-text-enemy" text-anchor="end" font-size="11">ENEMY</text>
+
+  <ellipse cx="506" cy="362" rx="84" ry="48" fill="none" stroke="#378ADD" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.45"/>
+
+  <path d="M 484 388 Q 500 368 534 332" stroke="#85B7EB" stroke-width="0.6" stroke-dasharray="1 2" opacity="0.6" fill="none"/>
+  <circle cx="534" cy="332" r="5" fill="none" stroke="#85B7EB" stroke-width="0.8" stroke-dasharray="1 1" opacity="0.6"/>
+  <text x="544" y="336" fill="#85B7EB" opacity="0.7" font-family="sans-serif" font-size="9">ghost</text>
+
+  <line x1="472" y1="400" x2="520" y2="368" stroke="#85B7EB" stroke-width="1.6"/>
+  <polygon points="520,368 513,370 515,375" fill="#85B7EB"/>
+  <polygon points="466,404 476,408 478,397" fill="none" stroke="#85B7EB" stroke-width="1.4"/>
+  <text x="518" y="438" class="ship-text-self" text-anchor="middle" font-size="11">SELF</text>
+
+  <g>
+    <path d="M 484 388 L 510 372 L 534 394 L 502 412 Z" fill="none" stroke="#EF9F27" stroke-width="1"/>
+    <circle cx="534" cy="394" r="5" fill="#EF9F27"/>
+    <circle cx="484" cy="388" r="4" fill="none" stroke="#EF9F27" stroke-width="1"/>
+    <circle cx="510" cy="372" r="4" fill="none" stroke="#EF9F27" stroke-width="1"/>
+    <text x="552" y="399" fill="#EF9F27" font-family="sans-serif" font-size="9" font-weight="500">drag</text>
+  </g>
+
+  <g transform="translate(566, 472)">
+    <line x1="0" y1="0" x2="84" y2="0" stroke="#888780" stroke-width="0.5"/>
+    <line x1="0" y1="-3" x2="0" y2="3" stroke="#888780" stroke-width="0.5"/>
+    <line x1="84" y1="-3" x2="84" y2="3" stroke="#888780" stroke-width="0.5"/>
+    <text x="42" y="14" font-family="sans-serif" font-size="9" fill="#888780" text-anchor="middle">250 km</text>
+  </g>
+
+  <g transform="translate(750, 448)">
+    <rect x="0" y="0" width="110" height="50" fill="#0F0F0F" stroke="#3A3A37" stroke-width="0.5" rx="3"/>
+    <text x="8" y="14" font-family="sans-serif" font-size="8" fill="#888780" letter-spacing="0.04em">LEGEND</text>
+    <line x1="8" y1="24" x2="22" y2="24" stroke="#85B7EB" stroke-width="0.8" stroke-dasharray="3 2"/>
+    <text x="26" y="27" font-family="sans-serif" font-size="8" fill="#D3D1C7">reachable</text>
+    <line x1="8" y1="35" x2="22" y2="35" stroke="#EF9F27" stroke-width="0.8"/>
+    <text x="26" y="38" font-family="sans-serif" font-size="8" fill="#D3D1C7">thrust plot</text>
+  </g>
+
+  <rect x="20" y="544" width="860" height="40" rx="6" class="panel-bg"/>
+
+  <text x="36" y="562" font-family="sans-serif" font-size="9" fill="#888780" letter-spacing="0.04em">MOVEMENT</text>
+  <text x="36" y="576" font-family="sans-serif" font-size="10" fill="#B4B2A9">thrust </text>
+  <text x="75" y="576" class="label-readout">0.6/1.8</text>
+  <text x="136" y="576" font-family="sans-serif" font-size="10" fill="#B4B2A9">velocity </text>
+  <text x="183" y="576" class="label-readout">2.1</text>
+  <text x="216" y="576" font-family="sans-serif" font-size="10" fill="#B4B2A9">heading </text>
+  <text x="260" y="576" class="label-readout">012°</text>
+
+  <rect x="588" y="556" width="66" height="22" rx="3" class="button-fill-secondary"/>
+  <text x="601" y="571" class="button-text-secondary">Clear</text>
+  <text x="640" y="571" class="hotkey">C</text>
+
+  <rect x="664" y="556" width="66" height="22" rx="3" class="button-fill-secondary"/>
+  <text x="679" y="571" class="button-text-secondary">Pass</text>
+  <text x="718" y="571" class="hotkey">P</text>
+
+  <rect x="740" y="556" width="120" height="22" rx="3" class="button-fill-primary"/>
+  <text x="750" y="571" class="button-text-primary">Submit plot</text>
+  <text x="838" y="571" fill="#B5D4F4" font-family="monospace" font-size="10">space</text>
+
+  <rect x="20" y="592" width="860" height="18" rx="4" class="panel-bg"/>
+  <text x="36" y="605" font-family="sans-serif" font-size="9" fill="#888780" letter-spacing="0.04em">LOG</text>
+  <text x="74" y="605" font-family="sans-serif" font-size="10" fill="#B4B2A9">T3 · hit on port drive · hull 91 -> 82</text>
+  <text x="860" y="605" class="hotkey" text-anchor="end">L expand</text>
+
+</svg>
