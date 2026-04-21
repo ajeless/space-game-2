@@ -283,6 +283,131 @@ function getSelectedSystemContext(
   };
 }
 
+type WeaponCue = PlotPreview["weapon_cues"][number];
+
+type WeaponIntentPresentation = {
+  tone: "idle" | "armed" | "warn" | "disabled";
+  banner_label: string;
+  target_label: string;
+  status_label: string;
+  system_meta_label: string;
+  shot_quality_label: string;
+  shot_state_label: string;
+  is_armed: boolean;
+};
+
+function getShipSlotLabel(sessionValue: MatchSessionView, shipInstanceId: ShipInstanceId | null): string {
+  if (!shipInstanceId) {
+    return "NONE";
+  }
+
+  const participant = sessionValue.battle_state.match_setup.participants.find(
+    (candidate) => candidate.ship_instance_id === shipInstanceId
+  );
+
+  return participant ? participant.slot_id.toUpperCase() : shipInstanceId;
+}
+
+function formatShipContactLabel(sessionValue: MatchSessionView, shipInstanceId: ShipInstanceId | null): string {
+  if (!shipInstanceId) {
+    return "none";
+  }
+
+  return `${getShipSlotLabel(sessionValue, shipInstanceId)} · ${shipInstanceId}`;
+}
+
+function isArmedWeaponCue(cue: WeaponCue | null | undefined): boolean {
+  return Boolean(cue && cue.firing_enabled && cue.charge_pips > 0 && cue.target_ship_instance_id !== null);
+}
+
+function getWeaponIntentPresentation(
+  sessionValue: MatchSessionView,
+  weaponDraft: PlotDraft["weapons"][number] | undefined,
+  cue: WeaponCue | null,
+  firingEnabled: boolean
+): WeaponIntentPresentation {
+  const chargePips = weaponDraft?.charge_pips ?? 0;
+  const targetShipInstanceId = weaponDraft?.target_ship_instance_id ?? null;
+  const targetShortLabel = getShipSlotLabel(sessionValue, targetShipInstanceId);
+  const targetLabel = formatShipContactLabel(sessionValue, targetShipInstanceId);
+  const isArmed = firingEnabled && chargePips > 0 && targetShipInstanceId !== null;
+  const shotQualityLabel =
+    cue?.predicted_hit_probability !== null && cue?.predicted_hit_probability !== undefined
+      ? `${Math.round(cue.predicted_hit_probability * 100)}% at T${cue.best_fire_sub_tick}`
+      : isArmed
+        ? "No legal shot"
+        : "Unarmed";
+  const shotStateLabel =
+    !cue || cue.target_in_arc === null || cue.target_in_range === null
+      ? targetShipInstanceId
+        ? "Selected contact only"
+        : "Await contact selection"
+      : `${cue.target_in_arc ? "in arc" : "out of arc"} · ${cue.target_in_range ? "in range" : "out of range"}`;
+
+  if (!firingEnabled) {
+    return {
+      tone: "disabled",
+      banner_label: "MOUNT DISABLED",
+      target_label: "none",
+      status_label: "Disabled",
+      system_meta_label: "DISABLED",
+      shot_quality_label: "Mount offline",
+      shot_state_label: "No fire control",
+      is_armed: false
+    };
+  }
+
+  if (!targetShipInstanceId) {
+    return {
+      tone: "idle",
+      banner_label: "NO CONTACT SELECTED",
+      target_label: "none",
+      status_label: "Await contact",
+      system_meta_label: "SAFE",
+      shot_quality_label: shotQualityLabel,
+      shot_state_label: shotStateLabel,
+      is_armed: false
+    };
+  }
+
+  if (!isArmed) {
+    return {
+      tone: "idle",
+      banner_label: `HOLD FIRE · ${targetShortLabel}`,
+      target_label: targetLabel,
+      status_label: "Standby",
+      system_meta_label: "STBY",
+      shot_quality_label: shotQualityLabel,
+      shot_state_label: shotStateLabel,
+      is_armed: false
+    };
+  }
+
+  if (cue?.predicted_hit_probability !== null && cue?.predicted_hit_probability !== undefined) {
+    return {
+      tone: "armed",
+      banner_label: `ARMED ON ${targetShortLabel} · ${chargePips}P`,
+      target_label: targetLabel,
+      status_label: `${chargePips} pip shot armed`,
+      system_meta_label: `ARM ${chargePips}P`,
+      shot_quality_label: shotQualityLabel,
+      shot_state_label: shotStateLabel,
+      is_armed: true
+    };
+  }
+
+  return {
+    tone: "warn",
+    banner_label: `NO LEGAL SHOT · ${targetShortLabel}`,
+    target_label: targetLabel,
+    status_label: `${chargePips} pip shot blocked`,
+    system_meta_label: "NO SHOT",
+    shot_quality_label: shotQualityLabel,
+    shot_state_label: shotStateLabel,
+    is_armed: false
+  };
+}
+
 function updatePlotDraft(mutator: (draft: PlotDraft) => PlotDraft): void {
   if (!session) {
     return;
@@ -362,7 +487,8 @@ function renderSchematicSystem(
   state: MatchSessionView["battle_state"],
   ship: ShipRuntimeState,
   system: ShipSystemConfig,
-  selectedSystemValue: SystemId | null
+  selectedSystemValue: SystemId | null,
+  weaponIntent: Pick<WeaponIntentPresentation, "is_armed" | "system_meta_label"> | null
 ): string {
   const stateAndEffects = getSystemStateAndEffects(state, ship, system.id);
   const runtimeSystem = ship.systems[system.id];
@@ -380,10 +506,14 @@ function renderSchematicSystem(
     "ssd-system",
     `ssd-system--${system.type}`,
     `ssd-system--${stateAndEffects.state_label}`,
+    weaponIntent?.is_armed ? "ssd-system--armed" : "",
     selectedSystemValue === system.id ? "ssd-system--selected" : ""
   ]
     .filter(Boolean)
     .join(" ");
+  const metaLabel = weaponIntent?.system_meta_label
+    ? `${weaponIntent.system_meta_label} · ${formatPercent(integrityPercent)}`
+    : `${stateAndEffects.state_label.toUpperCase()} · ${formatPercent(integrityPercent)}`;
 
   return `
     <g class="${classes}" data-select-system="${system.id}">
@@ -402,7 +532,7 @@ function renderSchematicSystem(
         ${getSystemShortLabel(system)}
       </text>
       <text class="ssd-system__meta" x="${position.x.toFixed(2)}" y="${(position.y + 12).toFixed(2)}">
-        ${stateAndEffects.state_label.toUpperCase()} · ${formatPercent(integrityPercent)}
+        ${metaLabel}
       </text>
     </g>
   `;
@@ -433,22 +563,18 @@ function renderSchematicControlDeck(
       const weaponDraft = draft.weapons.find((weapon) => weapon.mount_id === selectedSystemContext.system.id);
       const cue = plotPreview?.weapon_cues.find((candidate) => candidate.mount_id === selectedSystemContext.system.id) ?? null;
       const selectedChargePips = weaponDraft?.charge_pips ?? 0;
+      const intent = getWeaponIntentPresentation(
+        sessionValue,
+        weaponDraft,
+        cue,
+        mountContext?.firing_enabled ?? false
+      );
       const chargeOptions = [
         `<option value="0"${selectedChargePips === 0 ? " selected" : ""}>Hold fire</option>`,
         ...(mountContext?.allowed_charge_pips ?? []).map(
           (pips) => `<option value="${pips}"${selectedChargePips === pips ? " selected" : ""}>${pips} pip</option>`
         )
       ].join("");
-      const shotQuality =
-        cue?.predicted_hit_probability !== null && cue?.predicted_hit_probability !== undefined
-          ? `${Math.round(cue.predicted_hit_probability * 100)}% at T${cue.best_fire_sub_tick}`
-          : selectedChargePips > 0
-            ? "No legal shot"
-            : "Unarmed";
-      const shotState =
-        !cue || cue.target_in_arc === null || cue.target_in_range === null
-          ? "Assign charge to evaluate"
-          : `${cue.target_in_arc ? "in arc" : "out of arc"} · ${cue.target_in_range ? "in range" : "out of range"}`;
 
       selectedPanel = `
         <section class="ssd-selected-panel ssd-selected-panel--aim">
@@ -459,6 +585,9 @@ function renderSchematicControlDeck(
             </div>
             <button class="action-button action-button--secondary action-button--compact" data-clear-system-selection>Close</button>
           </div>
+          <div class="ssd-selection-banner ssd-selection-banner--${intent.tone}">
+            ${intent.banner_label}
+          </div>
           <div class="ssd-selected-panel__grid">
             <label class="ssd-inline-field">
               <span>Charge</span>
@@ -468,15 +597,19 @@ function renderSchematicControlDeck(
             </label>
             <div class="ssd-selected-readout">
               <span>Target</span>
-              <strong>${weaponDraft?.target_ship_instance_id ?? "none"}</strong>
+              <strong>${intent.target_label}</strong>
+            </div>
+            <div class="ssd-selected-readout">
+              <span>Fire Control</span>
+              <strong>${intent.status_label}</strong>
             </div>
             <div class="ssd-selected-readout">
               <span>Solution</span>
-              <strong>${shotQuality}</strong>
+              <strong>${intent.shot_quality_label}</strong>
             </div>
             <div class="ssd-selected-readout">
               <span>Arc / Range</span>
-              <strong>${shotState}</strong>
+              <strong>${intent.shot_state_label}</strong>
             </div>
           </div>
           <p class="ssd-control-deck__note">Click an enemy contact in the tactical plot to authorize or withdraw fire for this mount.</p>
@@ -591,9 +724,37 @@ function renderSchematicViewport(
   const reactorPips = getAvailableReactorPips(sessionValue.battle_state, ship);
   const mount = shipConfig.systems.find((system) => system.type === "weapon_mount");
   const mountState = mount ? getSystemStateAndEffects(sessionValue.battle_state, ship, mount.id).state_label : "offline";
+  const weaponIntentByMountId = new Map<SystemId, Pick<WeaponIntentPresentation, "is_armed" | "system_meta_label">>();
+
+  if (plotSummary) {
+    for (const weapon of plotSummary.draft.weapons) {
+      const cue = plotPreview?.weapon_cues.find((candidate) => candidate.mount_id === weapon.mount_id) ?? null;
+      const mountContext = plotSummary.context.weapon_mounts.find((candidate) => candidate.mount_id === weapon.mount_id);
+      const intent = getWeaponIntentPresentation(
+        sessionValue,
+        weapon,
+        cue,
+        mountContext?.firing_enabled ?? false
+      );
+
+      weaponIntentByMountId.set(weapon.mount_id, {
+        is_armed: intent.is_armed,
+        system_meta_label: intent.system_meta_label
+      });
+    }
+  }
+
   const systems = [...shipConfig.systems]
     .sort((left, right) => left.physical_position.y - right.physical_position.y)
-    .map((system) => renderSchematicSystem(sessionValue.battle_state, ship, system, selectedSystemId))
+    .map((system) =>
+      renderSchematicSystem(
+        sessionValue.battle_state,
+        ship,
+        system,
+        selectedSystemId,
+        system.type === "weapon_mount" ? weaponIntentByMountId.get(system.id) ?? null : null
+      )
+    )
     .join("");
 
   return `
@@ -802,6 +963,7 @@ function renderShipGlyph(
   ship: ShipRuntimeState,
   shipConfig: ShipConfig,
   slotLabel: string,
+  targetCue: WeaponCue | null,
   isTargeted: boolean,
   isTargetable: boolean
 ): string {
@@ -824,6 +986,12 @@ function renderShipGlyph(
     .filter(Boolean)
     .join(" ");
   const targetAttribute = isTargetable ? `data-target-ship="${ship.ship_instance_id}"` : "";
+  const targetTag =
+    targetCue && isArmedWeaponCue(targetCue)
+      ? `${targetCue.charge_pips}P · ${
+          targetCue.predicted_hit_probability !== null ? `${Math.round(targetCue.predicted_hit_probability * 100)}%` : "locked"
+        }`
+      : null;
 
   return `
     <g class="${classes}">
@@ -852,9 +1020,19 @@ function renderShipGlyph(
         y2="${(center.y + headingVector.y).toFixed(2)}"
       />
       <circle class="ship-glyph__core" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="4" />
+      ${
+        isTargeted
+          ? `<circle class="ship-glyph__target-ring" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="22" />`
+          : ""
+      }
       <text class="ship-glyph__label" x="${center.x.toFixed(2)}" y="${(center.y - 20).toFixed(2)}">
         ${slotLabel} · ${ship.ship_instance_id}
       </text>
+      ${
+        targetTag
+          ? `<text class="ship-glyph__target-tag" x="${center.x.toFixed(2)}" y="${(center.y + 32).toFixed(2)}">TARGET · ${targetTag}</text>`
+          : ""
+      }
     </g>
   `;
 }
@@ -909,7 +1087,7 @@ function renderPreviewGhost(sessionValue: MatchSessionView, camera: TacticalCame
   `;
 }
 
-function renderWeaponCue(camera: TacticalCamera, plotPreview: PlotPreview): string {
+function renderWeaponCue(sessionValue: MatchSessionView, camera: TacticalCamera, plotPreview: PlotPreview): string {
   return plotPreview.weapon_cues
     .map((cue) => {
       if (cue.target_position === null) {
@@ -924,9 +1102,18 @@ function renderWeaponCue(camera: TacticalCamera, plotPreview: PlotPreview): stri
         .join(" ");
       const mountPoint = worldToTacticalViewport(camera, cue.mount_position);
       const targetPoint = worldToTacticalViewport(camera, cue.target_position);
-      const cueClass = cue.target_in_arc && cue.target_in_range ? "plot-preview__cue--valid" : "plot-preview__cue--warn";
-      const hitText =
-        cue.predicted_hit_probability !== null ? `${Math.round(cue.predicted_hit_probability * 100)}%` : "no shot";
+      const isArmed = isArmedWeaponCue(cue);
+      const cueClass = !isArmed
+        ? "plot-preview__cue--idle"
+        : cue.target_in_arc && cue.target_in_range
+          ? "plot-preview__cue--valid"
+          : "plot-preview__cue--warn";
+      const targetShortLabel = getShipSlotLabel(sessionValue, cue.target_ship_instance_id);
+      const hitText = isArmed
+        ? cue.predicted_hit_probability !== null
+          ? `${Math.round(cue.predicted_hit_probability * 100)}%`
+          : "no shot"
+        : "standby";
 
       return `
         <g class="plot-preview__cue ${cueClass}">
@@ -940,7 +1127,7 @@ function renderWeaponCue(camera: TacticalCamera, plotPreview: PlotPreview): stri
           />
           <circle class="plot-preview__target-reticle" cx="${targetPoint.x.toFixed(2)}" cy="${targetPoint.y.toFixed(2)}" r="18" />
           <text class="plot-preview__target-label" x="${targetPoint.x.toFixed(2)}" y="${(targetPoint.y - 24).toFixed(2)}">
-            ${cue.label} · ${cue.charge_pips}p · ${hitText}
+            ${cue.label} · ${targetShortLabel} · ${cue.charge_pips}p · ${hitText}
           </text>
         </g>
       `;
@@ -969,7 +1156,7 @@ function renderPlotPreviewOverlay(
   return `
     <g class="plot-preview">
       ${renderPreviewPath(camera, focusedPreview)}
-      ${renderWeaponCue(camera, focusedPreview)}
+      ${renderWeaponCue(sessionValue, camera, focusedPreview)}
       ${renderPreviewGhost(sessionValue, camera, focusedPreview)}
     </g>
   `;
@@ -996,6 +1183,7 @@ function renderOffscreenMarker(
   viewpointShip: ShipRuntimeState | null,
   ship: ShipRuntimeState,
   slotLabel: string,
+  targetCue: WeaponCue | null,
   isTargeted: boolean,
   isTargetable: boolean,
   isSelf: boolean
@@ -1019,6 +1207,12 @@ function renderOffscreenMarker(
   ]
     .filter(Boolean)
     .join(" ");
+  const targetStatus =
+    targetCue && isArmedWeaponCue(targetCue)
+      ? `TARGET · ${targetCue.charge_pips}P${
+          targetCue.predicted_hit_probability !== null ? ` · ${Math.round(targetCue.predicted_hit_probability * 100)}%` : ""
+        }`
+      : null;
 
   return `
     <g class="${classes}">
@@ -1041,6 +1235,11 @@ function renderOffscreenMarker(
       >
         ${slotLabel} · ${rangeText}
       </text>
+      ${
+        targetStatus
+          ? `<text class="offscreen-marker__status" x="${labelX.toFixed(2)}" y="${(anchor.y + 20).toFixed(2)}" text-anchor="${labelAnchor}">${targetStatus}</text>`
+          : ""
+      }
     </g>
   `;
 }
@@ -1128,11 +1327,21 @@ function renderTacticalViewport(
   }
 
   const focusedMountId = selectedSystemContext?.system.type === "weapon_mount" ? selectedSystemContext.system.id : null;
-  const targetedShipIds = new Set(
-    plotPreview?.weapon_cues
-      .map((cue) => cue.target_ship_instance_id)
-      .filter((shipId): shipId is string => shipId !== null) ?? []
-  );
+  const emphasizedCues = (focusedMountId === null
+    ? plotPreview?.weapon_cues ?? []
+    : plotPreview?.weapon_cues.filter((cue) => cue.mount_id === focusedMountId) ?? []
+  ).filter((cue) => cue.target_ship_instance_id !== null);
+  const armedCueByTargetShipId = new Map<ShipInstanceId, WeaponCue>();
+
+  for (const cue of emphasizedCues) {
+    if (!isArmedWeaponCue(cue) || cue.target_ship_instance_id === null) {
+      continue;
+    }
+
+    armedCueByTargetShipId.set(cue.target_ship_instance_id, cue);
+  }
+
+  const targetedShipIds = new Set(armedCueByTargetShipId.keys());
   const viewpointShip = camera.viewpoint_ship_instance_id
     ? sessionValue.battle_state.ships[camera.viewpoint_ship_instance_id] ?? null
     : null;
@@ -1148,6 +1357,7 @@ function renderTacticalViewport(
     }
 
     const isSelf = identityValue?.ship_instance_id === ship.ship_instance_id;
+    const targetCue = armedCueByTargetShipId.get(ship.ship_instance_id) ?? null;
     const isTargeted = targetedShipIds.has(ship.ship_instance_id);
     const isTargetable = focusedMountId !== null && !isSelf;
     const visible = isWorldPointVisibleInTacticalCamera(camera, ship.pose.position, 34);
@@ -1161,6 +1371,7 @@ function renderTacticalViewport(
           ship,
           shipConfig,
           participant.slot_id.toUpperCase(),
+          targetCue,
           isTargeted,
           isTargetable
         )
@@ -1172,6 +1383,7 @@ function renderTacticalViewport(
           viewpointShip,
           ship,
           participant.slot_id.toUpperCase(),
+          targetCue,
           isTargeted,
           isTargetable,
           isSelf

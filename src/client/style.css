@@ -408,6 +408,36 @@ body {
   background: rgba(23, 19, 14, 0.84);
 }
 
+.ssd-selection-banner {
+  padding: 7px 9px;
+  border: 1px solid rgba(125, 176, 218, 0.18);
+  color: var(--text-0);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ssd-selection-banner--idle {
+  border-color: rgba(125, 176, 218, 0.2);
+  background: rgba(11, 24, 36, 0.78);
+}
+
+.ssd-selection-banner--armed {
+  border-color: rgba(125, 213, 154, 0.46);
+  background: rgba(16, 41, 32, 0.84);
+}
+
+.ssd-selection-banner--warn {
+  border-color: rgba(242, 200, 121, 0.48);
+  background: rgba(52, 34, 12, 0.82);
+}
+
+.ssd-selection-banner--disabled {
+  border-color: rgba(236, 126, 116, 0.4);
+  background: rgba(44, 20, 18, 0.8);
+}
+
 .ssd-selected-panel__header {
   display: flex;
   justify-content: space-between;
@@ -524,6 +554,15 @@ body {
 
 .ssd-system--selected .ssd-system__meta {
   fill: rgba(242, 200, 121, 0.96);
+}
+
+.ssd-system--armed .ssd-system__body {
+  stroke: rgba(125, 213, 154, 0.96);
+  filter: drop-shadow(0 0 8px rgba(125, 213, 154, 0.18));
+}
+
+.ssd-system--armed .ssd-system__meta {
+  fill: rgba(125, 213, 154, 0.96);
 }
 
 .tactical-panel__header {
@@ -688,6 +727,21 @@ body {
   fill: rgba(236, 126, 116, 0.98);
 }
 
+.ship-glyph__target-ring {
+  fill: none;
+  stroke: rgba(242, 200, 121, 0.94);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+.ship-glyph__target-tag {
+  fill: rgba(242, 200, 121, 0.96);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-anchor: middle;
+}
+
 .offscreen-marker__hit {
   fill: transparent;
 }
@@ -710,6 +764,13 @@ body {
   fill: var(--text-0);
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.offscreen-marker__status {
+  fill: rgba(242, 200, 121, 0.96);
+  font-size: 10px;
+  font-weight: 700;
   letter-spacing: 0.04em;
 }
 
@@ -775,9 +836,18 @@ body {
   stroke: rgba(236, 126, 116, 0.32);
 }
 
+.plot-preview__cue--idle .plot-preview__arc {
+  fill: rgba(125, 176, 218, 0.05);
+  stroke: rgba(125, 176, 218, 0.26);
+}
+
 .plot-preview__target-line {
   stroke-width: 1.6;
   stroke-dasharray: 6 5;
+}
+
+.plot-preview__cue--idle .plot-preview__target-line {
+  stroke: rgba(125, 176, 218, 0.5);
 }
 
 .plot-preview__cue--valid .plot-preview__target-line {
@@ -796,6 +866,10 @@ body {
 
 .plot-preview__cue--valid .plot-preview__target-reticle {
   stroke: rgba(125, 213, 154, 0.88);
+}
+
+.plot-preview__cue--idle .plot-preview__target-reticle {
+  stroke: rgba(125, 176, 218, 0.64);
 }
 
 .plot-preview__cue--warn .plot-preview__target-reticle {
