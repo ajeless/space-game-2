@@ -45,6 +45,7 @@ These rules drive the shapes below:
 3. **Preserve clean seams for future extensions.** Cosmetic layout data is separate from physical data. Hit-resolution strategy is a discriminated object. System behavior is keyed by system `type`.
 4. **Prefer canonical source values over cached derivations.** Runtime integrity is canonical. `operational / degraded / offline` labels are derived from integrity plus rules.
 5. **Version top-level payloads.** Internet-playable peer-hosted builds need a cheap way to reject obviously incompatible JSON.
+6. **Keep planner UI config out of core combat contracts.** Widget choice, labels, camera presets, and similar player-facing concerns belong in a companion planner/UI data layer, not in `MatchRulesConfig` or `BattleState`.
 
 ## Shared primitives and conventions
 
@@ -71,6 +72,10 @@ type ShipStatus = "active" | "destroyed" | "disengaged";
   - normalized hull units, usually around `-0.5 .. +0.5`
 - **World coordinates** use a flat 2D tactical plane. The contract intentionally keeps field names generic (`position`, `velocity`) because turn duration is not fixed yet, so the public fiction-time unit naming for velocity is still deferred.
 - **Angles** use `0` as ship-forward / viewport-up and increase clockwise. This matches the existing mount-bearing examples where `+90` means starboard.
+
+## Companion UI data
+
+This document intentionally does **not** define planner-widget or tactical-camera config. Those concerns are still meant to be data-driven, but they live in a companion UI layer rather than the resolver-facing combat contracts. See `planner_ui_and_tactical_camera.md`.
 
 ## Match rules config
 

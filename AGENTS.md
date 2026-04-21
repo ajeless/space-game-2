@@ -32,6 +32,7 @@ Read these first before changing rules or contracts:
 - Prefer fixtures before complexity. Add or update JSON fixtures before adding non-trivial resolver behavior.
 - Keep `v0.1` scope narrow. Do not add later-slice features unless the current slice explicitly requires them.
 - Keep the shared module pure. No UI, network, filesystem, wall-clock, or process-global state inside resolver-facing code.
+- Keep planner/UI config separate from resolver rules. Widget choice, camera presets, and labels should not leak into combat math contracts.
 - Treat docs as design authority until code exists; once code exists, keep docs and code aligned in the same change.
 
 ## Expected repo layout

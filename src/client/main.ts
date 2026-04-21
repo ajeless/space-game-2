@@ -304,10 +304,10 @@ function renderHeadingCompass(headingDegrees: number): string {
     <div class="heading-compass">
       <svg viewBox="0 0 84 84" aria-label="Heading compass">
         <circle class="heading-compass__ring" cx="42" cy="42" r="31" />
-        <line class="heading-compass__north" x1="42" y1="7" x2="42" y2="19" />
-        <line class="heading-compass__north" x1="42" y1="65" x2="42" y2="77" />
-        <line class="heading-compass__north" x1="7" y1="42" x2="19" y2="42" />
-        <line class="heading-compass__north" x1="65" y1="42" x2="77" y2="42" />
+        <line class="heading-compass__reference" x1="42" y1="7" x2="42" y2="19" />
+        <line class="heading-compass__reference" x1="42" y1="65" x2="42" y2="77" />
+        <line class="heading-compass__reference" x1="7" y1="42" x2="19" y2="42" />
+        <line class="heading-compass__reference" x1="65" y1="42" x2="77" y2="42" />
         <g transform="rotate(${normalized.toFixed(2)} 42 42)">
           <path class="heading-compass__needle" d="M42 14 L49 38 L42 33 L35 38 Z" />
         </g>
@@ -526,7 +526,7 @@ function renderSchematicControlDeck(
           />
         </label>
         <label class="ssd-slider-card">
-          <span>Beam Trim</span>
+          <span>Lateral Burn</span>
           <strong>${formatSignedNumber(draft.thrust_input.lateral_fraction * 100)}%</strong>
           <small>Port to starboard</small>
           <input

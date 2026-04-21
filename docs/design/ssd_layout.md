@@ -9,7 +9,7 @@
 
 ## Summary
 
-The v0.1 interface is a two-panel layout at golden ratio (~38:62) split: ship schematic on the left, tactical viewport on the right. A thin top bar shows the current phase and timer; a bottom strip combines movement, power-allocation, and commit controls. The ship schematic is an interactive control surface where systems are placed on the hull at their physical locations. The tactical viewport is a minimalist sensor-style display showing facing separately from drift. This document captures the *structural* decisions and the core v0.1 interaction model; visual design (colors, typography, exact dimensions) is deferred.
+The v0.1 interface is a two-panel layout at golden ratio (~38:62) split: ship schematic on the left, tactical viewport on the right. A thin top bar shows the current phase and timer; a compact bottom strip carries readouts and commit actions. Most turn-authoring controls live in the schematic pane or in the currently selected system context. The ship schematic is an interactive control surface where systems are placed on the hull at their physical locations. The tactical viewport is a minimalist sensor-style display showing facing separately from drift. This document captures the *structural* decisions and the core v0.1 interaction model; visual design (colors, typography, exact dimensions) is deferred.
 
 ## Reference wireframe
 
@@ -53,9 +53,11 @@ The test: a player who has never seen the UI should be able to point at every cl
 
 A horizontal bar at the very top shows the current phase (PLOT PHASE, AIM MODE, EXECUTE PHASE, etc.), the turn number, the opponent's status (plotting, ready, disconnected), and the plot timer. The bar's background color changes to indicate mode — neutral dark for the default plot phase, amber for aim mode, green for execute phase, and so on. This is how the game communicates mode changes without forcing the player to read text.
 
-### Bottom strip combining readouts, allocation, and actions
+### Bottom strip combining readouts and actions
 
-A horizontal strip below the two main panels combines numeric readouts on the left (drive pips, railgun charge, velocity, heading) with action controls on the right (Clear, Pass, Submit plot). Readouts and buttons are visually distinguished within the strip — readouts flat, buttons bordered. The v0.1 power model is visible and explicit, so the player can see at a glance how many integer pips were committed to drive versus railgun.
+A horizontal strip below the two main panels combines numeric readouts on the left (drive pips, railgun charge, velocity, heading) with action controls on the right (Clear, Pass, Submit plot). Readouts and buttons are visually distinguished within the strip — readouts flat, buttons bordered. The strip should stay compact enough that the SSD pane and tactical viewport dominate the page.
+
+The bottom strip does **not** have to own every plotting widget. In the current v0.1 direction, direct turn-authoring controls can live in the schematic pane so the main screen stays vertically compact and the player can work near the ship systems those controls affect.
 
 The primary action (Submit plot) has visual weight — solid color fill, larger size — so it's obvious what commits the turn.
 
@@ -93,7 +95,7 @@ The schematic viewport's top-left corner contains a small readout panel showing 
 
 ### Heading compass in the corner
 
-The schematic viewport's top-right corner contains a small circular compass showing the ship's current heading relative to "north" (the tactical viewport's up direction). The compass rotates as the ship turns; the schematic does not.
+The schematic viewport's top-right corner contains a small circular compass showing the ship's current heading relative to the tactical viewport's up reference. The compass rotates as the ship turns; the schematic does not.
 
 ## The tactical viewport in detail
 
@@ -107,6 +109,12 @@ This aesthetic choice is load-bearing: it keeps implementation cost low, aligns 
 
 Faint grid lines subdivide the viewport for spatial reference. Frame ticks at top, bottom, and sides mark the edges. These are visual anchors, not interactive elements.
 
+### Player-centered relative scope
+
+The tactical viewport is player-relative by default. The player's ship stays centered, and enemy contacts are shown in relation to it. This is closer to a sensor scope than to a god's-eye map and makes maneuver interpretation easier.
+
+This is a camera choice, not a simulation change. Resolver state still uses absolute world coordinates, real battlefield boundaries still exist, and disengagement is still evaluated in world space.
+
 ### Self and enemy rendering
 
 **Self** is rendered in blue (#85B7EB family). **Enemy** is rendered in red (#F09595 family). The color convention is consistent throughout the UI. Colorblind accessibility is preserved because shape and position also carry meaning (self is the ship whose reachable-region overlaps the player's thrust plot).
@@ -117,6 +125,12 @@ Each ship has:
 - A dashed elliptical reachable region showing where the ship can be at the end of the next turn given its current velocity and committed drive allocation.
 
 Facing and drift are intentionally distinct. The player should be able to read, in under a second, both where a ship is moving and where its bow is pointed.
+
+### Stable zoom presets
+
+The tactical viewport should use discrete zoom levels selected by the player, not continuous autoscaling. In v0.1, a small set of presets such as `close`, `medium`, and `wide` is enough. The chosen zoom should remain stable through plotting and aim mode unless the player explicitly changes it.
+
+This avoids the "rubber scale" problem where small contact motion makes the whole tactical picture feel untrustworthy.
 
 ### Ghost projection and thrust plot
 
@@ -137,6 +151,16 @@ When a weapon mount is selected, the tactical viewport shows:
 - the exact hit percentage for that best shot
 
 If the player hovers along the projected target path, the UI may show how solution quality changes over the turn. The key v0.1 commitment is that the player sees a real exact percentage derived from the same solution-quality model the resolver will use.
+
+### Off-screen contact markers
+
+If an enemy contact lies outside the current zoom window, the viewport shows an edge marker instead of silently dropping the contact or continuously rescaling the camera. The marker should communicate:
+
+- bearing relative to the player's ship
+- range to the contact
+- targetability, when the player is in aim mode
+
+This preserves awareness without destabilizing the display scale.
 
 ### Legend in the viewport corner
 
@@ -161,7 +185,7 @@ Mode state changes are the primary way the game communicates "what can I do righ
 
 - **Exact colors, typography, icon design.** The wireframe uses specific hex values; these are illustrative, not committed.
 - **Ship icon shapes.** Triangles are a placeholder. Faction-distinct silhouettes may replace them in later slices.
-- **Execute-phase camera behavior.** Whether the camera pans/zooms during playback, or stays fixed, is a playtest question.
+- **Execute-phase playback camera behavior.** The core decision is now fixed: no continuous autoscale during plotting or aim mode. What remains open is whether playback should always honor the player's chosen zoom, offer an optional fit mode, or permit replay-only camera movement.
 - **Exact pip-control widget design.** Stepper buttons, drag chips, segmented bars, or another control style are all viable. The structural commitment is to visible integer pips, not to a specific widget.
 - **Hover states for systems and ships.** Strongly implied but not specified. Implementation will need tooltips, cursor changes, etc.
 - **Damage control UI.** Not in v0.1; when introduced, it appears as interactions on systems in the schematic.
@@ -185,6 +209,7 @@ The structure supports, without change:
 - `stack_decision.md` — establishes Canvas 2D + SVG as the rendering stack.
 - `ship_definition_format.md` — the data that drives schematic rendering.
 - `resolver_design.md` — produces the events the tactical view consumes.
+- `planner_ui_and_tactical_camera.md` — data-driven planner controls, camera behavior, and terminology.
 
 ## Related image
 
