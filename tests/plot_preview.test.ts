@@ -57,8 +57,11 @@ describe("plot preview", () => {
       charge_pips: 2,
       effective_charge_pips: 2,
       max_range_km: 220,
+      arc_visual_range_km: 220,
       target_in_arc: true,
       target_in_range: true
     });
+    expect(preview.weapon_cues[0]?.predicted_hit_probability).not.toBeNull();
+    expect(preview.weapon_cues[0]?.best_fire_sub_tick).not.toBeNull();
   });
 });

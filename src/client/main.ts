@@ -18,6 +18,7 @@ import type {
   ShipConfig,
   ShipSystemConfig,
   ShipRuntimeState,
+  SystemId,
   Vector2
 } from "../shared/index.js";
 
@@ -47,6 +48,7 @@ let identity: SessionIdentity | null = null;
 let session: MatchSessionView | null = null;
 let socket: WebSocket | null = null;
 let plotDraft: PlotDraft | null = null;
+let selectedSystemId: SystemId | null = null;
 const messages: string[] = [];
 
 function logMessage(message: string): void {
@@ -169,13 +171,16 @@ function getOpponentStatusLabel(sessionValue: MatchSessionView | null, identityV
   return `${opponent.slot_id} plotting`;
 }
 
-function getPhaseLabel(sessionValue: MatchSessionView | null): string {
+function getPhaseLabel(
+  sessionValue: MatchSessionView | null,
+  selectedSystemContext: ReturnType<typeof getSelectedSystemContext>
+): string {
   if (!sessionValue) {
     return "CONNECTING";
   }
 
-  if (sessionValue.last_resolution) {
-    return "PLOT PHASE";
+  if (selectedSystemContext?.system.type === "weapon_mount") {
+    return "AIM MODE";
   }
 
   return "PLOT PHASE";
@@ -214,6 +219,46 @@ function getPlayerPlotSummary(
   plotDraft = summary.draft;
 
   return summary;
+}
+
+function getSelectedSystemContext(
+  sessionValue: MatchSessionView | null,
+  identityValue: SessionIdentity | null
+):
+  | {
+      ship: ShipRuntimeState;
+      system: ShipSystemConfig;
+      integrity_percent: number;
+      state_label: ReturnType<typeof getSystemStateAndEffects>["state_label"];
+    }
+  | null {
+  if (!sessionValue || !selectedSystemId) {
+    return null;
+  }
+
+  const displayed = getDisplayedShipContext(sessionValue, identityValue);
+
+  if (!displayed) {
+    selectedSystemId = null;
+    return null;
+  }
+
+  const system = displayed.shipConfig.systems.find((candidate) => candidate.id === selectedSystemId);
+  const runtimeSystem = selectedSystemId ? displayed.ship.systems[selectedSystemId] : undefined;
+
+  if (!system || !runtimeSystem) {
+    selectedSystemId = null;
+    return null;
+  }
+
+  const stateAndEffects = getSystemStateAndEffects(sessionValue.battle_state, displayed.ship, system.id);
+
+  return {
+    ship: displayed.ship,
+    system,
+    integrity_percent: (runtimeSystem.current_integrity / system.max_integrity) * 100,
+    state_label: stateAndEffects.state_label
+  };
 }
 
 function updatePlotDraft(mutator: (draft: PlotDraft) => PlotDraft): void {
@@ -294,7 +339,8 @@ function renderSchematicHull(shipConfig: ShipConfig): string {
 function renderSchematicSystem(
   state: MatchSessionView["battle_state"],
   ship: ShipRuntimeState,
-  system: ShipSystemConfig
+  system: ShipSystemConfig,
+  selectedSystemValue: SystemId | null
 ): string {
   const stateAndEffects = getSystemStateAndEffects(state, ship, system.id);
   const runtimeSystem = ship.systems[system.id];
@@ -308,8 +354,26 @@ function renderSchematicSystem(
   const y = position.y - SCHEMATIC_VIEWPORT.systemHeight / 2;
   const integrityPercent = (runtimeSystem.current_integrity / system.max_integrity) * 100;
 
+  const classes = [
+    "ssd-system",
+    `ssd-system--${system.type}`,
+    `ssd-system--${stateAndEffects.state_label}`,
+    selectedSystemValue === system.id ? "ssd-system--selected" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return `
-    <g class="ssd-system ssd-system--${system.type} ssd-system--${stateAndEffects.state_label}">
+    <g class="${classes}">
+      <rect
+        class="ssd-system__hit"
+        x="${x.toFixed(2)}"
+        y="${y.toFixed(2)}"
+        width="${SCHEMATIC_VIEWPORT.systemWidth}"
+        height="${SCHEMATIC_VIEWPORT.systemHeight}"
+        rx="12"
+        data-select-system="${system.id}"
+      />
       <rect class="ssd-system__body" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${
         SCHEMATIC_VIEWPORT.systemWidth
       }" height="${SCHEMATIC_VIEWPORT.systemHeight}" rx="12" />
@@ -326,7 +390,9 @@ function renderSchematicSystem(
 function renderSchematicControlDeck(
   sessionValue: MatchSessionView | null,
   identityValue: SessionIdentity | null,
-  plotSummary: PlotDraftSummary | null
+  plotSummary: PlotDraftSummary | null,
+  selectedSystemContext: ReturnType<typeof getSelectedSystemContext>,
+  plotPreview: PlotPreview | null
 ): string {
   if (!identityValue || identityValue.role !== "player") {
     return "";
@@ -336,59 +402,90 @@ function renderSchematicControlDeck(
     return `<div class="ssd-control-deck__note">Waiting for a playable ship and battle snapshot before enabling plot authoring.</div>`;
   }
 
-  const { context, draft, power, desired_end_heading_degrees: desiredHeading, world_thrust_fraction: worldThrust } =
-    plotSummary;
+  const { context, draft, power, desired_end_heading_degrees: desiredHeading, world_thrust_fraction: worldThrust } = plotSummary;
   const isPending = sessionValue.pending_plot_ship_ids.includes(context.ship_instance_id);
-  const mountCards = context.weapon_mounts
-    .map((mount) => {
-      const weaponDraft = draft.weapons.find((candidate) => candidate.mount_id === mount.mount_id);
+  let selectedPanel = `<div class="ssd-control-deck__note">Select a system on the SSD. Weapon mounts enter aim mode and use tactical contact clicks for fire intent.</div>`;
+
+  if (selectedSystemContext) {
+    if (selectedSystemContext.system.type === "weapon_mount") {
+      const mountContext = context.weapon_mounts.find((mount) => mount.mount_id === selectedSystemContext.system.id);
+      const weaponDraft = draft.weapons.find((weapon) => weapon.mount_id === selectedSystemContext.system.id);
+      const cue = plotPreview?.weapon_cues.find((candidate) => candidate.mount_id === selectedSystemContext.system.id) ?? null;
       const selectedChargePips = weaponDraft?.charge_pips ?? 0;
-      const selectedTarget = weaponDraft?.target_ship_instance_id ?? "";
       const chargeOptions = [
-        `<option value="0"${selectedChargePips === 0 ? " selected" : ""}>Hold</option>`,
-        ...mount.allowed_charge_pips.map(
+        `<option value="0"${selectedChargePips === 0 ? " selected" : ""}>Hold fire</option>`,
+        ...(mountContext?.allowed_charge_pips ?? []).map(
           (pips) => `<option value="${pips}"${selectedChargePips === pips ? " selected" : ""}>${pips} pip</option>`
         )
       ].join("");
-      const targetOptions =
-        mount.target_ship_instance_ids.length > 0
-          ? mount.target_ship_instance_ids
-              .map(
-                (shipInstanceId) =>
-                  `<option value="${shipInstanceId}"${selectedTarget === shipInstanceId ? " selected" : ""}>${shipInstanceId}</option>`
-              )
-              .join("")
-          : "<option value=\"\">No target</option>";
+      const shotQuality =
+        cue?.predicted_hit_probability !== null && cue?.predicted_hit_probability !== undefined
+          ? `${Math.round(cue.predicted_hit_probability * 100)}% at T${cue.best_fire_sub_tick}`
+          : selectedChargePips > 0
+            ? "No legal shot"
+            : "Unarmed";
+      const shotState =
+        !cue || cue.target_in_arc === null || cue.target_in_range === null
+          ? "Assign charge to evaluate"
+          : `${cue.target_in_arc ? "in arc" : "out of arc"} · ${cue.target_in_range ? "in range" : "out of range"}`;
 
-      return `
-        <article class="ssd-mount-card">
-          <div class="ssd-mount-card__header">
-            <strong>${mount.label}</strong>
-            <span class="${mount.firing_enabled ? "status--ok" : "status--warn"}">${
-              mount.firing_enabled ? "online" : "offline"
-            }</span>
+      selectedPanel = `
+        <section class="ssd-selected-panel ssd-selected-panel--aim">
+          <div class="ssd-selected-panel__header">
+            <div>
+              <span class="section-kicker">Aim Mode</span>
+              <strong>${mountContext?.label ?? selectedSystemContext.system.id}</strong>
+            </div>
+            <button class="action-button action-button--secondary action-button--compact" data-clear-system-selection>Close</button>
           </div>
-          <div class="ssd-mount-card__controls">
+          <div class="ssd-selected-panel__grid">
             <label class="ssd-inline-field">
               <span>Charge</span>
-              <select data-plot-mount-charge="${mount.mount_id}" ${!mount.firing_enabled ? "disabled" : ""}>
+              <select data-aim-charge="${selectedSystemContext.system.id}" ${!mountContext?.firing_enabled ? "disabled" : ""}>
                 ${chargeOptions}
               </select>
             </label>
-            <label class="ssd-inline-field">
+            <div class="ssd-selected-readout">
               <span>Target</span>
-              <select
-                data-plot-mount-target="${mount.mount_id}"
-                ${mount.target_ship_instance_ids.length === 0 || !mount.firing_enabled ? "disabled" : ""}
-              >
-                ${targetOptions}
-              </select>
-            </label>
+              <strong>${weaponDraft?.target_ship_instance_id ?? "none"}</strong>
+            </div>
+            <div class="ssd-selected-readout">
+              <span>Solution</span>
+              <strong>${shotQuality}</strong>
+            </div>
+            <div class="ssd-selected-readout">
+              <span>Arc / Range</span>
+              <strong>${shotState}</strong>
+            </div>
           </div>
-        </article>
+          <p class="ssd-control-deck__note">Click an enemy contact in the tactical plot to authorize or withdraw fire for this mount.</p>
+        </section>
       `;
-    })
-    .join("");
+    } else {
+      selectedPanel = `
+        <section class="ssd-selected-panel">
+          <div class="ssd-selected-panel__header">
+            <div>
+              <span class="section-kicker">System Detail</span>
+              <strong>${selectedSystemContext.system.render?.label ?? selectedSystemContext.system.id}</strong>
+            </div>
+            <button class="action-button action-button--secondary action-button--compact" data-clear-system-selection>Close</button>
+          </div>
+          <div class="ssd-selected-panel__grid">
+            <div class="ssd-selected-readout">
+              <span>State</span>
+              <strong>${selectedSystemContext.state_label.toUpperCase()}</strong>
+            </div>
+            <div class="ssd-selected-readout">
+              <span>Integrity</span>
+              <strong>${formatPercent(selectedSystemContext.integrity_percent)}</strong>
+            </div>
+          </div>
+          <p class="ssd-control-deck__note">Non-weapon systems are read-only in v0.1. Weapon mounts enter aim mode.</p>
+        </section>
+      `;
+    }
+  }
 
   return `
     <div class="ssd-control-deck">
@@ -450,7 +547,7 @@ function renderSchematicControlDeck(
           2
         )}, ${formatSignedNumber(worldThrust.y, 2)}</strong></div>
       </div>
-      <div class="ssd-mount-grid">${mountCards || "<div class=\"ssd-control-deck__note\">No controllable mounts.</div>"}</div>
+      ${selectedPanel}
     </div>
   `;
 }
@@ -458,7 +555,9 @@ function renderSchematicControlDeck(
 function renderSchematicViewport(
   sessionValue: MatchSessionView | null,
   identityValue: SessionIdentity | null,
-  plotSummary: PlotDraftSummary | null
+  plotSummary: PlotDraftSummary | null,
+  selectedSystemContext: ReturnType<typeof getSelectedSystemContext>,
+  plotPreview: PlotPreview | null
 ): string {
   const displayed = getDisplayedShipContext(sessionValue, identityValue);
 
@@ -473,7 +572,7 @@ function renderSchematicViewport(
   const mountState = mount ? getSystemStateAndEffects(sessionValue.battle_state, ship, mount.id).state_label : "offline";
   const systems = [...shipConfig.systems]
     .sort((left, right) => left.physical_position.y - right.physical_position.y)
-    .map((system) => renderSchematicSystem(sessionValue.battle_state, ship, system))
+    .map((system) => renderSchematicSystem(sessionValue.battle_state, ship, system, selectedSystemId))
     .join("");
 
   return `
@@ -508,7 +607,7 @@ function renderSchematicViewport(
           ${renderSchematicHull(shipConfig)}
           ${systems}
         </svg>
-        ${renderSchematicControlDeck(sessionValue, identityValue, plotSummary)}
+        ${renderSchematicControlDeck(sessionValue, identityValue, plotSummary, selectedSystemContext, plotPreview)}
       </div>
     </section>
   `;
@@ -672,7 +771,8 @@ function renderShipGlyph(
   shipConfig: ShipConfig,
   slotLabel: string,
   boundary: RectangleBoundary,
-  isTargeted: boolean
+  isTargeted: boolean,
+  isTargetable: boolean
 ): string {
   const center = worldToViewport(ship.pose.position, boundary);
   const hullPoints = getShipHullPoints(shipConfig, center);
@@ -692,9 +792,17 @@ function renderShipGlyph(
   ]
     .filter(Boolean)
     .join(" ");
+  const targetAttribute = isTargetable ? `data-target-ship="${ship.ship_instance_id}"` : "";
 
   return `
     <g class="${classes}">
+      <circle
+        class="ship-glyph__hit ${isTargetable ? "ship-glyph__hit--targetable" : ""}"
+        cx="${center.x.toFixed(2)}"
+        cy="${center.y.toFixed(2)}"
+        r="30"
+        ${targetAttribute}
+      />
       <line
         class="ship-glyph__velocity"
         x1="${center.x.toFixed(2)}"
@@ -773,6 +881,10 @@ function renderPreviewGhost(sessionValue: MatchSessionView, boundary: RectangleB
 function renderWeaponCue(boundary: RectangleBoundary, plotPreview: PlotPreview): string {
   return plotPreview.weapon_cues
     .map((cue) => {
+      if (cue.target_position === null) {
+        return "";
+      }
+
       const polygonPoints = getArcPolygonPoints(cue, 12)
         .map((point) => {
           const projected = worldToViewport(point, boundary);
@@ -782,6 +894,8 @@ function renderWeaponCue(boundary: RectangleBoundary, plotPreview: PlotPreview):
       const mountPoint = worldToViewport(cue.mount_position, boundary);
       const targetPoint = worldToViewport(cue.target_position, boundary);
       const cueClass = cue.target_in_arc && cue.target_in_range ? "plot-preview__cue--valid" : "plot-preview__cue--warn";
+      const hitText =
+        cue.predicted_hit_probability !== null ? `${Math.round(cue.predicted_hit_probability * 100)}%` : "no shot";
 
       return `
         <g class="plot-preview__cue ${cueClass}">
@@ -795,7 +909,7 @@ function renderWeaponCue(boundary: RectangleBoundary, plotPreview: PlotPreview):
           />
           <circle class="plot-preview__target-reticle" cx="${targetPoint.x.toFixed(2)}" cy="${targetPoint.y.toFixed(2)}" r="18" />
           <text class="plot-preview__target-label" x="${targetPoint.x.toFixed(2)}" y="${(targetPoint.y - 24).toFixed(2)}">
-            ${cue.label} · ${cue.charge_pips}p
+            ${cue.label} · ${cue.charge_pips}p · ${hitText}
           </text>
         </g>
       `;
@@ -806,17 +920,26 @@ function renderWeaponCue(boundary: RectangleBoundary, plotPreview: PlotPreview):
 function renderPlotPreviewOverlay(
   sessionValue: MatchSessionView,
   boundary: RectangleBoundary,
-  plotPreview: PlotPreview | null
+  plotPreview: PlotPreview | null,
+  focusedMountId: SystemId | null
 ): string {
   if (!plotPreview) {
     return "";
   }
 
+  const focusedPreview =
+    focusedMountId === null
+      ? plotPreview
+      : {
+          ...plotPreview,
+          weapon_cues: plotPreview.weapon_cues.filter((cue) => cue.mount_id === focusedMountId)
+        };
+
   return `
     <g class="plot-preview">
-      ${renderPreviewPath(boundary, plotPreview)}
-      ${renderWeaponCue(boundary, plotPreview)}
-      ${renderPreviewGhost(sessionValue, boundary, plotPreview)}
+      ${renderPreviewPath(boundary, focusedPreview)}
+      ${renderWeaponCue(boundary, focusedPreview)}
+      ${renderPreviewGhost(sessionValue, boundary, focusedPreview)}
     </g>
   `;
 }
@@ -824,7 +947,8 @@ function renderPlotPreviewOverlay(
 function renderTacticalViewport(
   sessionValue: MatchSessionView | null,
   identityValue: SessionIdentity | null,
-  plotPreview: PlotPreview | null
+  plotPreview: PlotPreview | null,
+  selectedSystemContext: ReturnType<typeof getSelectedSystemContext>
 ): string {
   if (!sessionValue) {
     return "<p>Waiting for the session snapshot before rendering the tactical board.</p>";
@@ -836,7 +960,12 @@ function renderTacticalViewport(
     return "<p>The current battlefield boundary is not yet supported by the tactical viewport.</p>";
   }
 
-  const targetedShipIds = new Set(plotPreview?.weapon_cues.map((cue) => cue.target_ship_instance_id) ?? []);
+  const focusedMountId = selectedSystemContext?.system.type === "weapon_mount" ? selectedSystemContext.system.id : null;
+  const targetedShipIds = new Set(
+    plotPreview?.weapon_cues
+      .map((cue) => cue.target_ship_instance_id)
+      .filter((shipId): shipId is string => shipId !== null) ?? []
+  );
   const ships = sessionValue.battle_state.match_setup.participants
     .map((participant) => {
       const ship = sessionValue.battle_state.ships[participant.ship_instance_id];
@@ -853,11 +982,12 @@ function renderTacticalViewport(
         shipConfig,
         participant.slot_id.toUpperCase(),
         boundary,
-        targetedShipIds.has(ship.ship_instance_id)
+        targetedShipIds.has(ship.ship_instance_id),
+        focusedMountId !== null && identityValue?.ship_instance_id !== ship.ship_instance_id
       );
     })
     .join("");
-  const overlay = renderPlotPreviewOverlay(sessionValue, boundary, plotPreview);
+  const overlay = renderPlotPreviewOverlay(sessionValue, boundary, plotPreview, focusedMountId);
 
   return `
     <div class="tactical-board">
@@ -926,17 +1056,20 @@ function render(): void {
   const sessionValue = session;
   const displayed = getDisplayedShipContext(sessionValue, identity);
   const plotSummary = getPlayerPlotSummary(sessionValue, identity);
+  const selectedSystemContext = getSelectedSystemContext(sessionValue, identity);
   const plotPreview = sessionValue && plotSummary ? buildPlotPreview(sessionValue.battle_state, plotSummary.draft) : null;
-  const tacticalViewport = renderTacticalViewport(sessionValue, identity, plotPreview);
-  const schematicViewport = renderSchematicViewport(sessionValue, identity, plotSummary);
+  const tacticalViewport = renderTacticalViewport(sessionValue, identity, plotPreview, selectedSystemContext);
+  const schematicViewport = renderSchematicViewport(sessionValue, identity, plotSummary, selectedSystemContext, plotPreview);
   const readoutStrip = renderReadoutStrip(sessionValue, identity);
   const actionStripControls = renderActionStripControls(sessionValue, identity, plotSummary);
   const footerStrip = renderFooterStrip(sessionValue);
+  const phaseLabel = getPhaseLabel(sessionValue, selectedSystemContext);
+  const missionBarClass = `mission-bar${selectedSystemContext?.system.type === "weapon_mount" ? " mission-bar--aim" : ""}`;
 
   root.innerHTML = `
     <main class="bridge-shell">
-      <header class="mission-bar">
-        <div class="mission-bar__mode">${getPhaseLabel(sessionValue)}</div>
+      <header class="${missionBarClass}">
+        <div class="mission-bar__mode">${phaseLabel}</div>
         <div class="mission-bar__meta">
           <span>Turn ${sessionValue?.battle_state.turn_number ?? "..."}</span>
           <span>${health?.rulesId ?? "..."}</span>
@@ -963,7 +1096,7 @@ function render(): void {
               <h2>Shared sensor plot</h2>
             </div>
             <div class="tactical-panel__meta">
-              <span>Heading is a 360° reference separate from drift.</span>
+              <span>${selectedSystemContext?.system.type === "weapon_mount" ? "Aim mode overlays the selected mount only." : "Heading is separate from drift."}</span>
               <span>Dashed geometry is your current draft preview.</span>
             </div>
           </div>
@@ -1015,10 +1148,28 @@ function render(): void {
     }));
   });
 
-  document.querySelectorAll<HTMLSelectElement>("[data-plot-mount-charge]").forEach((select) => {
+  document.querySelectorAll<SVGElement>("[data-select-system]").forEach((element) => {
+    element.addEventListener("click", () => {
+      const systemId = element.getAttribute("data-select-system");
+
+      if (!systemId) {
+        return;
+      }
+
+      selectedSystemId = selectedSystemId === systemId ? null : systemId;
+      render();
+    });
+  });
+
+  document.querySelector<HTMLButtonElement>("[data-clear-system-selection]")?.addEventListener("click", () => {
+    selectedSystemId = null;
+    render();
+  });
+
+  document.querySelectorAll<HTMLSelectElement>("[data-aim-charge]").forEach((select) => {
     select.addEventListener("change", (event) => {
       const target = event.currentTarget as HTMLSelectElement;
-      const mountId = target.dataset.plotMountCharge;
+      const mountId = target.dataset.aimCharge;
 
       if (!mountId) {
         return;
@@ -1033,19 +1184,30 @@ function render(): void {
     });
   });
 
-  document.querySelectorAll<HTMLSelectElement>("[data-plot-mount-target]").forEach((select) => {
-    select.addEventListener("change", (event) => {
-      const target = event.currentTarget as HTMLSelectElement;
-      const mountId = target.dataset.plotMountTarget;
+  document.querySelectorAll<SVGElement>("[data-target-ship]").forEach((element) => {
+    element.addEventListener("click", () => {
+      const targetShipId = element.getAttribute("data-target-ship");
+      const selectedMountId =
+        selectedSystemContext?.system.type === "weapon_mount" ? selectedSystemContext.system.id : null;
+      const mountContext = plotSummary?.context.weapon_mounts.find((mount) => mount.mount_id === selectedMountId);
 
-      if (!mountId) {
+      if (!targetShipId || !selectedMountId || !mountContext || !mountContext.firing_enabled) {
         return;
       }
 
       updatePlotDraft((draft) => ({
         ...draft,
         weapons: draft.weapons.map((weapon) =>
-          weapon.mount_id === mountId ? { ...weapon, target_ship_instance_id: target.value || null } : weapon
+          weapon.mount_id === selectedMountId
+            ? {
+                ...weapon,
+                target_ship_instance_id: targetShipId,
+                charge_pips:
+                  weapon.target_ship_instance_id === targetShipId && weapon.charge_pips > 0
+                    ? 0
+                    : Math.max(weapon.charge_pips, mountContext.allowed_charge_pips[0] ?? 0)
+              }
+            : weapon
         )
       }));
     });

@@ -61,6 +61,10 @@ body {
   background: linear-gradient(180deg, rgba(10, 23, 34, 0.98), rgba(9, 20, 31, 0.9));
 }
 
+.mission-bar--aim {
+  background: linear-gradient(180deg, rgba(59, 39, 15, 0.96), rgba(36, 24, 11, 0.92));
+}
+
 .mission-bar__mode {
   padding: 8px 12px;
   border: 1px solid rgba(125, 176, 218, 0.34);
@@ -391,6 +395,57 @@ body {
   font-size: 0.82rem;
 }
 
+.ssd-selected-panel {
+  display: grid;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(125, 176, 218, 0.16);
+  background: rgba(10, 22, 34, 0.84);
+}
+
+.ssd-selected-panel--aim {
+  border-color: rgba(196, 138, 43, 0.28);
+  background: rgba(23, 19, 14, 0.84);
+}
+
+.ssd-selected-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ssd-selected-panel__header strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.95rem;
+}
+
+.ssd-selected-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ssd-selected-readout {
+  display: grid;
+  gap: 4px;
+  padding: 7px 9px;
+  border: 1px solid rgba(125, 176, 218, 0.12);
+  background: rgba(7, 18, 29, 0.72);
+}
+
+.ssd-selected-readout span {
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.67rem;
+}
+
+.ssd-selected-readout strong {
+  font-size: 0.9rem;
+}
+
 .ssd-hull__shape {
   fill: rgba(103, 133, 157, 0.18);
   stroke: rgba(186, 208, 222, 0.42);
@@ -404,6 +459,11 @@ body {
 
 .ssd-system__body {
   stroke-width: 2;
+}
+
+.ssd-system__hit {
+  fill: transparent;
+  cursor: pointer;
 }
 
 .ssd-system__label,
@@ -452,6 +512,15 @@ body {
 .ssd-system--offline .ssd-system__body {
   fill-opacity: 0.38;
   stroke-opacity: 0.48;
+}
+
+.ssd-system--selected .ssd-system__body {
+  stroke: rgba(242, 200, 121, 0.98);
+  filter: drop-shadow(0 0 10px rgba(242, 200, 121, 0.22));
+}
+
+.ssd-system--selected .ssd-system__meta {
+  fill: rgba(242, 200, 121, 0.96);
 }
 
 .tactical-panel__header {
@@ -506,6 +575,14 @@ body {
 .ship-glyph__velocity {
   stroke: rgba(125, 176, 218, 0.45);
   stroke-width: 2;
+}
+
+.ship-glyph__hit {
+  fill: transparent;
+}
+
+.ship-glyph__hit--targetable {
+  cursor: crosshair;
 }
 
 .ship-glyph__hull {
@@ -700,6 +777,11 @@ body {
   background: linear-gradient(180deg, rgba(18, 41, 60, 0.95), rgba(10, 24, 37, 0.95));
 }
 
+.action-button--compact {
+  padding: 7px 9px;
+  font-size: 0.8rem;
+}
+
 .action-button:hover {
   border-color: rgba(125, 176, 218, 0.72);
 }
@@ -765,7 +847,8 @@ body {
   }
 
   .ssd-control-grid,
-  .ssd-mount-card__controls {
+  .ssd-mount-card__controls,
+  .ssd-selected-panel__grid {
     grid-template-columns: 1fr;
   }
 
