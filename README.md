@@ -37,7 +37,7 @@ The first deployable slice. Everything below is required; anything not listed is
 
 - **Two identical ships in space.** Symmetric. Fairness is free when both sides are the same.
 - **Continuous Newtonian movement** with planning UI: velocity arrows, ghost projections, draggable thrust handles, reachable-region envelopes, collision/constraint feedback.
-- **Minimal SSD** with two or three subsystems (reactor, one weapon, hull). Energy allocation exists but is simple. Damage exists but is simple.
+- **Minimal SSD** with four core systems (drive, reactor, bridge, one weapon mount) plus hull tracking. Energy allocation exists but is simple. Damage exists but is simple.
 - **One weapon type** — direct-fire. No seekers, no EW, no point defense.
 - **Full plot-commit-execute-debrief loop.** Even if each phase is thin, all four phases exist.
 - **Win condition.** One ship destroyed, or one ship disengages past a map boundary.
@@ -60,6 +60,7 @@ The sequence in which capabilities are added matters. These are the ordering com
 - [Resolver design](docs/design/resolver_design.md)
 - [Ship definition format](docs/design/ship_definition_format.md)
 - [SSD layout](docs/design/ssd_layout.md)
+- [v0.1 data contracts](docs/design/v0_1_data_contracts.md)
 - [v0.1 tuning baseline](docs/design/v0_1_tuning_baseline.md)
 
 ## Audience docs
