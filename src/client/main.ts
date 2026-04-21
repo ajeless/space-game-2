@@ -1,13 +1,23 @@
 import "./style.css";
 import {
   buildPlotPreview,
+  buildTacticalCamera,
   buildPlotSubmissionFromDraft,
+  clampWorldPointToTacticalViewportEdge,
   createPlotDraft,
+  createDefaultTacticalCameraSelection,
   getArcPolygonPoints,
   getAvailableReactorPips,
+  getTacticalCameraModeDefinition,
+  getTacticalCameraScaleBarWorldUnits,
+  getTacticalZoomPresetDefinition,
   getShipConfig,
   getSystemStateAndEffects,
-  summarizePlotDraft
+  isWorldPointVisibleInTacticalCamera,
+  summarizePlotDraft,
+  TACTICAL_CAMERA_MODES,
+  TACTICAL_ZOOM_PRESETS,
+  worldToTacticalViewport
 } from "../shared/index.js";
 import type { MatchSessionView, ServerToClientMessage, SessionIdentity } from "../shared/index.js";
 import type {
@@ -16,9 +26,14 @@ import type {
   PlotDraftSummary,
   PlotPreview,
   ShipConfig,
+  ShipInstanceId,
   ShipSystemConfig,
   ShipRuntimeState,
   SystemId,
+  TacticalCamera,
+  TacticalCameraModeId,
+  TacticalCameraSelection,
+  TacticalZoomPresetId,
   Vector2
 } from "../shared/index.js";
 
@@ -49,6 +64,7 @@ let session: MatchSessionView | null = null;
 let socket: WebSocket | null = null;
 let plotDraft: PlotDraft | null = null;
 let selectedSystemId: SystemId | null = null;
+let tacticalCameraSelection: TacticalCameraSelection = createDefaultTacticalCameraSelection();
 const messages: string[] = [];
 
 function logMessage(message: string): void {
@@ -68,7 +84,9 @@ const TACTICAL_VIEWPORT = {
   padding: 36,
   hullScalePx: 44,
   headingVectorLengthPx: 28,
-  velocityProjectionDistance: 120000
+  velocityProjectionDistance: 120000,
+  markerInsetPx: 22,
+  scaleBarTargetPx: 112
 } as const;
 
 const SCHEMATIC_VIEWPORT = {
@@ -88,6 +106,10 @@ function normalizeDegrees(angle: number): number {
 
 function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
+}
+
+function formatDistance(value: number): string {
+  return `${Math.round(value)} km`;
 }
 
 function formatRole(identityValue: SessionIdentity | null): string {
@@ -364,7 +386,7 @@ function renderSchematicSystem(
     .join(" ");
 
   return `
-    <g class="${classes}">
+    <g class="${classes}" data-select-system="${system.id}">
       <rect
         class="ssd-system__hit"
         x="${x.toFixed(2)}"
@@ -372,7 +394,6 @@ function renderSchematicSystem(
         width="${SCHEMATIC_VIEWPORT.systemWidth}"
         height="${SCHEMATIC_VIEWPORT.systemHeight}"
         rx="12"
-        data-select-system="${system.id}"
       />
       <rect class="ssd-system__body" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${
         SCHEMATIC_VIEWPORT.systemWidth
@@ -704,19 +725,29 @@ function getRectangleBoundary(sessionValue: MatchSessionView): RectangleBoundary
   return boundary.kind === "rectangle" ? boundary : null;
 }
 
-function worldToViewport(point: Vector2, boundary: RectangleBoundary): Vector2 {
-  const width = boundary.max.x - boundary.min.x;
-  const height = boundary.max.y - boundary.min.y;
-  const drawableWidth = TACTICAL_VIEWPORT.width - TACTICAL_VIEWPORT.padding * 2;
-  const drawableHeight = TACTICAL_VIEWPORT.height - TACTICAL_VIEWPORT.padding * 2;
+function getTacticalCamera(
+  sessionValue: MatchSessionView | null,
+  plotPreview: PlotPreview | null,
+  preferredShipInstanceId: ShipInstanceId | null
+): TacticalCamera | null {
+  if (!sessionValue) {
+    return null;
+  }
 
-  return {
-    x: TACTICAL_VIEWPORT.padding + ((point.x - boundary.min.x) / width) * drawableWidth,
-    y:
-      TACTICAL_VIEWPORT.height -
-      TACTICAL_VIEWPORT.padding -
-      ((point.y - boundary.min.y) / height) * drawableHeight
-  };
+  const boundary = getRectangleBoundary(sessionValue);
+
+  if (!boundary) {
+    return null;
+  }
+
+  return buildTacticalCamera({
+    state: sessionValue.battle_state,
+    boundary,
+    viewport: TACTICAL_VIEWPORT,
+    selection: tacticalCameraSelection,
+    preferred_ship_instance_id: preferredShipInstanceId,
+    plot_preview: plotPreview
+  });
 }
 
 function getHeadingVector(headingDegrees: number, length: number): Vector2 {
@@ -767,22 +798,22 @@ function renderGuideLines(): string {
 function renderShipGlyph(
   sessionValue: MatchSessionView,
   identityValue: SessionIdentity | null,
+  camera: TacticalCamera,
   ship: ShipRuntimeState,
   shipConfig: ShipConfig,
   slotLabel: string,
-  boundary: RectangleBoundary,
   isTargeted: boolean,
   isTargetable: boolean
 ): string {
-  const center = worldToViewport(ship.pose.position, boundary);
+  const center = worldToTacticalViewport(camera, ship.pose.position);
   const hullPoints = getShipHullPoints(shipConfig, center);
   const headingVector = getHeadingVector(ship.pose.heading_degrees, TACTICAL_VIEWPORT.headingVectorLengthPx);
-  const velocityProjection = worldToViewport(
+  const velocityProjection = worldToTacticalViewport(
+    camera,
     {
       x: ship.pose.position.x + ship.pose.velocity.x * TACTICAL_VIEWPORT.velocityProjectionDistance,
       y: ship.pose.position.y + ship.pose.velocity.y * TACTICAL_VIEWPORT.velocityProjectionDistance
-    },
-    boundary
+    }
   );
   const classes = [
     "ship-glyph",
@@ -828,10 +859,10 @@ function renderShipGlyph(
   `;
 }
 
-function renderPreviewPath(boundary: RectangleBoundary, plotPreview: PlotPreview): string {
+function renderPreviewPath(camera: TacticalCamera, plotPreview: PlotPreview): string {
   const points = plotPreview.projected_path
     .map((sample) => {
-      const point = worldToViewport(sample.position, boundary);
+      const point = worldToTacticalViewport(camera, sample.position);
       return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
     })
     .join(" ");
@@ -843,7 +874,7 @@ function renderPreviewPath(boundary: RectangleBoundary, plotPreview: PlotPreview
   return `<polyline class="plot-preview__path" points="${points}" />`;
 }
 
-function renderPreviewGhost(sessionValue: MatchSessionView, boundary: RectangleBoundary, plotPreview: PlotPreview): string {
+function renderPreviewGhost(sessionValue: MatchSessionView, camera: TacticalCamera, plotPreview: PlotPreview): string {
   const ship = sessionValue.battle_state.ships[plotPreview.ship_instance_id];
 
   if (!ship) {
@@ -851,7 +882,7 @@ function renderPreviewGhost(sessionValue: MatchSessionView, boundary: RectangleB
   }
 
   const shipConfig = getShipConfig(sessionValue.battle_state, ship);
-  const center = worldToViewport(plotPreview.projected_pose.position, boundary);
+  const center = worldToTacticalViewport(camera, plotPreview.projected_pose.position);
   const hullPoints = getShipHullPoints(shipConfig, center);
   const headingVector = getHeadingVector(plotPreview.projected_pose.heading_degrees, TACTICAL_VIEWPORT.headingVectorLengthPx);
   const labelY = center.y - 22;
@@ -878,7 +909,7 @@ function renderPreviewGhost(sessionValue: MatchSessionView, boundary: RectangleB
   `;
 }
 
-function renderWeaponCue(boundary: RectangleBoundary, plotPreview: PlotPreview): string {
+function renderWeaponCue(camera: TacticalCamera, plotPreview: PlotPreview): string {
   return plotPreview.weapon_cues
     .map((cue) => {
       if (cue.target_position === null) {
@@ -887,12 +918,12 @@ function renderWeaponCue(boundary: RectangleBoundary, plotPreview: PlotPreview):
 
       const polygonPoints = getArcPolygonPoints(cue, 12)
         .map((point) => {
-          const projected = worldToViewport(point, boundary);
+          const projected = worldToTacticalViewport(camera, point);
           return `${projected.x.toFixed(2)},${projected.y.toFixed(2)}`;
         })
         .join(" ");
-      const mountPoint = worldToViewport(cue.mount_position, boundary);
-      const targetPoint = worldToViewport(cue.target_position, boundary);
+      const mountPoint = worldToTacticalViewport(camera, cue.mount_position);
+      const targetPoint = worldToTacticalViewport(camera, cue.target_position);
       const cueClass = cue.target_in_arc && cue.target_in_range ? "plot-preview__cue--valid" : "plot-preview__cue--warn";
       const hitText =
         cue.predicted_hit_probability !== null ? `${Math.round(cue.predicted_hit_probability * 100)}%` : "no shot";
@@ -919,7 +950,7 @@ function renderWeaponCue(boundary: RectangleBoundary, plotPreview: PlotPreview):
 
 function renderPlotPreviewOverlay(
   sessionValue: MatchSessionView,
-  boundary: RectangleBoundary,
+  camera: TacticalCamera,
   plotPreview: PlotPreview | null,
   focusedMountId: SystemId | null
 ): string {
@@ -937,10 +968,147 @@ function renderPlotPreviewOverlay(
 
   return `
     <g class="plot-preview">
-      ${renderPreviewPath(boundary, focusedPreview)}
-      ${renderWeaponCue(boundary, focusedPreview)}
-      ${renderPreviewGhost(sessionValue, boundary, focusedPreview)}
+      ${renderPreviewPath(camera, focusedPreview)}
+      ${renderWeaponCue(camera, focusedPreview)}
+      ${renderPreviewGhost(sessionValue, camera, focusedPreview)}
     </g>
+  `;
+}
+
+function getBearingDegrees(from: Vector2, to: Vector2): number {
+  return normalizeDegrees((Math.atan2(to.x - from.x, to.y - from.y) * 180) / Math.PI);
+}
+
+function getOffscreenMarkerTextAnchor(camera: TacticalCamera, anchor: Vector2): "start" | "middle" | "end" {
+  if (anchor.x <= camera.drawable.min_x + 40) {
+    return "start";
+  }
+
+  if (anchor.x >= camera.drawable.max_x - 40) {
+    return "end";
+  }
+
+  return "middle";
+}
+
+function renderOffscreenMarker(
+  camera: TacticalCamera,
+  viewpointShip: ShipRuntimeState | null,
+  ship: ShipRuntimeState,
+  slotLabel: string,
+  isTargeted: boolean,
+  isTargetable: boolean,
+  isSelf: boolean
+): string {
+  const anchor = clampWorldPointToTacticalViewportEdge(camera, ship.pose.position, TACTICAL_VIEWPORT.markerInsetPx);
+  const targetAttribute = isTargetable ? `data-target-ship="${ship.ship_instance_id}"` : "";
+  const labelAnchor = getOffscreenMarkerTextAnchor(camera, anchor);
+  const labelX =
+    labelAnchor === "start" ? anchor.x + 18 : labelAnchor === "end" ? anchor.x - 18 : anchor.x;
+  const bearingDegrees = viewpointShip ? getBearingDegrees(viewpointShip.pose.position, ship.pose.position) : 0;
+  const rangeText = viewpointShip
+    ? formatDistance(
+        Math.hypot(ship.pose.position.x - viewpointShip.pose.position.x, ship.pose.position.y - viewpointShip.pose.position.y)
+      )
+    : formatDistance(Math.hypot(ship.pose.position.x - camera.center_world.x, ship.pose.position.y - camera.center_world.y));
+  const classes = [
+    "offscreen-marker",
+    isSelf ? "offscreen-marker--self" : "",
+    isTargeted ? "offscreen-marker--targeted" : "",
+    isTargetable ? "offscreen-marker--targetable" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return `
+    <g class="${classes}">
+      <circle
+        class="offscreen-marker__hit"
+        cx="${anchor.x.toFixed(2)}"
+        cy="${anchor.y.toFixed(2)}"
+        r="24"
+        ${targetAttribute}
+      />
+      <g transform="translate(${anchor.x.toFixed(2)} ${anchor.y.toFixed(2)}) rotate(${bearingDegrees.toFixed(2)})">
+        <path class="offscreen-marker__arrow" d="M-12 -9 L12 0 L-12 9 Z" />
+      </g>
+      <circle class="offscreen-marker__core" cx="${anchor.x.toFixed(2)}" cy="${anchor.y.toFixed(2)}" r="4" />
+      <text
+        class="offscreen-marker__label"
+        x="${labelX.toFixed(2)}"
+        y="${(anchor.y - 16).toFixed(2)}"
+        text-anchor="${labelAnchor}"
+      >
+        ${slotLabel} · ${rangeText}
+      </text>
+    </g>
+  `;
+}
+
+function renderScaleBar(camera: TacticalCamera): string {
+  const worldUnits = getTacticalCameraScaleBarWorldUnits(camera, TACTICAL_VIEWPORT.scaleBarTargetPx);
+
+  if (worldUnits <= 0) {
+    return "";
+  }
+
+  const pixelWidth = worldUnits / camera.world_units_per_px;
+  const right = camera.drawable.max_x - 18;
+  const left = right - pixelWidth;
+  const baseline = camera.drawable.max_y - 16;
+
+  return `
+    <g class="tactical-scale-bar">
+      <line class="tactical-scale-bar__line" x1="${left.toFixed(2)}" y1="${baseline.toFixed(2)}" x2="${right.toFixed(
+        2
+      )}" y2="${baseline.toFixed(2)}" />
+      <line class="tactical-scale-bar__tick" x1="${left.toFixed(2)}" y1="${(baseline - 6).toFixed(2)}" x2="${left.toFixed(
+        2
+      )}" y2="${(baseline + 6).toFixed(2)}" />
+      <line class="tactical-scale-bar__tick" x1="${right.toFixed(2)}" y1="${(baseline - 6).toFixed(2)}" x2="${right.toFixed(
+        2
+      )}" y2="${(baseline + 6).toFixed(2)}" />
+      <text class="tactical-scale-bar__label" x="${((left + right) / 2).toFixed(2)}" y="${(baseline - 10).toFixed(2)}">
+        ${formatDistance(worldUnits)}
+      </text>
+    </g>
+  `;
+}
+
+function renderTacticalCameraControls(camera: TacticalCamera | null): string {
+  const modeMarkup = TACTICAL_CAMERA_MODES.map((mode) => {
+    const active = tacticalCameraSelection.mode_id === mode.id;
+
+    return `<button class="camera-toggle ${active ? "camera-toggle--active" : ""}" data-camera-mode="${
+      mode.id
+    }">${mode.short_label}</button>`;
+  }).join("");
+  const zoomMarkup = TACTICAL_ZOOM_PRESETS.map((preset) => {
+    const active = tacticalCameraSelection.zoom_preset_id === preset.id;
+
+    return `<button class="camera-toggle ${active ? "camera-toggle--active" : ""}" data-camera-zoom="${
+      preset.id
+    }">${preset.short_label}</button>`;
+  }).join("");
+
+  return `
+    <div class="camera-controls">
+      <div class="camera-controls__group">
+        <span class="camera-controls__label">View</span>
+        <div class="camera-toggle-row">${modeMarkup}</div>
+      </div>
+      <div class="camera-controls__group">
+        <span class="camera-controls__label">Zoom</span>
+        <div class="camera-toggle-row">${zoomMarkup}</div>
+      </div>
+      ${
+        camera
+          ? `<div class="camera-controls__readout">${getTacticalCameraModeDefinition(camera.selection.mode_id).short_label} · ${
+              getTacticalZoomPresetDefinition(camera.selection.zoom_preset_id).short_label
+            }</div>`
+          : ""
+      }
+    </div>
   `;
 }
 
@@ -948,15 +1116,14 @@ function renderTacticalViewport(
   sessionValue: MatchSessionView | null,
   identityValue: SessionIdentity | null,
   plotPreview: PlotPreview | null,
-  selectedSystemContext: ReturnType<typeof getSelectedSystemContext>
+  selectedSystemContext: ReturnType<typeof getSelectedSystemContext>,
+  camera: TacticalCamera | null
 ): string {
   if (!sessionValue) {
     return "<p>Waiting for the session snapshot before rendering the tactical board.</p>";
   }
 
-  const boundary = getRectangleBoundary(sessionValue);
-
-  if (!boundary) {
+  if (!camera) {
     return "<p>The current battlefield boundary is not yet supported by the tactical viewport.</p>";
   }
 
@@ -966,32 +1133,69 @@ function renderTacticalViewport(
       .map((cue) => cue.target_ship_instance_id)
       .filter((shipId): shipId is string => shipId !== null) ?? []
   );
-  const ships = sessionValue.battle_state.match_setup.participants
-    .map((participant) => {
-      const ship = sessionValue.battle_state.ships[participant.ship_instance_id];
-      const shipConfig = sessionValue.battle_state.match_setup.ship_catalog[participant.ship_config_id];
+  const viewpointShip = camera.viewpoint_ship_instance_id
+    ? sessionValue.battle_state.ships[camera.viewpoint_ship_instance_id] ?? null
+    : null;
+  const visibleShips: string[] = [];
+  const offscreenMarkers: string[] = [];
 
-      if (!ship || !shipConfig) {
-        return "";
-      }
+  for (const participant of sessionValue.battle_state.match_setup.participants) {
+    const ship = sessionValue.battle_state.ships[participant.ship_instance_id];
+    const shipConfig = sessionValue.battle_state.match_setup.ship_catalog[participant.ship_config_id];
 
-      return renderShipGlyph(
-        sessionValue,
-        identityValue,
-        ship,
-        shipConfig,
-        participant.slot_id.toUpperCase(),
-        boundary,
-        targetedShipIds.has(ship.ship_instance_id),
-        focusedMountId !== null && identityValue?.ship_instance_id !== ship.ship_instance_id
+    if (!ship || !shipConfig) {
+      continue;
+    }
+
+    const isSelf = identityValue?.ship_instance_id === ship.ship_instance_id;
+    const isTargeted = targetedShipIds.has(ship.ship_instance_id);
+    const isTargetable = focusedMountId !== null && !isSelf;
+    const visible = isWorldPointVisibleInTacticalCamera(camera, ship.pose.position, 34);
+
+    if (visible) {
+      visibleShips.push(
+        renderShipGlyph(
+          sessionValue,
+          identityValue,
+          camera,
+          ship,
+          shipConfig,
+          participant.slot_id.toUpperCase(),
+          isTargeted,
+          isTargetable
+        )
       );
-    })
-    .join("");
-  const overlay = renderPlotPreviewOverlay(sessionValue, boundary, plotPreview, focusedMountId);
+    } else {
+      offscreenMarkers.push(
+        renderOffscreenMarker(
+          camera,
+          viewpointShip,
+          ship,
+          participant.slot_id.toUpperCase(),
+          isTargeted,
+          isTargetable,
+          isSelf
+        )
+      );
+    }
+  }
+
+  const overlay = renderPlotPreviewOverlay(sessionValue, camera, plotPreview, focusedMountId);
 
   return `
     <div class="tactical-board">
       <svg viewBox="0 0 ${TACTICAL_VIEWPORT.width} ${TACTICAL_VIEWPORT.height}" aria-label="Tactical viewport">
+        <defs>
+          <clipPath id="tactical-plot-clip">
+            <rect
+              x="${camera.drawable.min_x}"
+              y="${camera.drawable.min_y}"
+              width="${camera.drawable.width}"
+              height="${camera.drawable.height}"
+              rx="18"
+            />
+          </clipPath>
+        </defs>
         <rect
           class="tactical-board__frame"
           x="${TACTICAL_VIEWPORT.padding}"
@@ -1015,8 +1219,12 @@ function renderTacticalViewport(
           x2="${TACTICAL_VIEWPORT.width - TACTICAL_VIEWPORT.padding}"
           y2="${TACTICAL_VIEWPORT.height / 2}"
         />
-        ${overlay}
-        ${ships}
+        <g clip-path="url(#tactical-plot-clip)">
+          ${overlay}
+          ${visibleShips.join("")}
+        </g>
+        ${offscreenMarkers.join("")}
+        ${renderScaleBar(camera)}
       </svg>
     </div>
   `;
@@ -1058,13 +1266,16 @@ function render(): void {
   const plotSummary = getPlayerPlotSummary(sessionValue, identity);
   const selectedSystemContext = getSelectedSystemContext(sessionValue, identity);
   const plotPreview = sessionValue && plotSummary ? buildPlotPreview(sessionValue.battle_state, plotSummary.draft) : null;
-  const tacticalViewport = renderTacticalViewport(sessionValue, identity, plotPreview, selectedSystemContext);
+  const camera = getTacticalCamera(sessionValue, plotPreview, displayed?.ship.ship_instance_id ?? null);
+  const tacticalViewport = renderTacticalViewport(sessionValue, identity, plotPreview, selectedSystemContext, camera);
   const schematicViewport = renderSchematicViewport(sessionValue, identity, plotSummary, selectedSystemContext, plotPreview);
   const readoutStrip = renderReadoutStrip(sessionValue, identity);
   const actionStripControls = renderActionStripControls(sessionValue, identity, plotSummary);
   const footerStrip = renderFooterStrip(sessionValue);
   const phaseLabel = getPhaseLabel(sessionValue, selectedSystemContext);
   const missionBarClass = `mission-bar${selectedSystemContext?.system.type === "weapon_mount" ? " mission-bar--aim" : ""}`;
+  const cameraMode = camera ? getTacticalCameraModeDefinition(camera.selection.mode_id) : null;
+  const cameraZoom = camera ? getTacticalZoomPresetDefinition(camera.selection.zoom_preset_id) : null;
 
   root.innerHTML = `
     <main class="bridge-shell">
@@ -1093,11 +1304,14 @@ function render(): void {
           <div class="tactical-panel__header">
             <div>
               <span class="section-kicker">Tactical View</span>
-              <h2>Shared sensor plot</h2>
+              <h2>${cameraMode?.label ?? "Shared sensor plot"}</h2>
             </div>
-            <div class="tactical-panel__meta">
-              <span>${selectedSystemContext?.system.type === "weapon_mount" ? "Aim mode overlays the selected mount only." : "Heading is separate from drift."}</span>
-              <span>Dashed geometry is your current draft preview.</span>
+            <div class="tactical-panel__header-right">
+              <div class="tactical-panel__meta">
+                <span>${selectedSystemContext?.system.type === "weapon_mount" ? "Aim mode overlays the selected mount only." : "Heading is separate from drift."}</span>
+                <span>${cameraZoom ? `Zoom ${cameraZoom.label}.` : ""} Dashed geometry is your current draft preview.</span>
+              </div>
+              ${renderTacticalCameraControls(camera)}
             </div>
           </div>
           ${tacticalViewport}
@@ -1210,6 +1424,38 @@ function render(): void {
             : weapon
         )
       }));
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-camera-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const modeId = button.dataset.cameraMode as TacticalCameraModeId | undefined;
+
+      if (!modeId) {
+        return;
+      }
+
+      tacticalCameraSelection = {
+        ...tacticalCameraSelection,
+        mode_id: modeId
+      };
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-camera-zoom]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const zoomPresetId = button.dataset.cameraZoom as TacticalZoomPresetId | undefined;
+
+      if (!zoomPresetId) {
+        return;
+      }
+
+      tacticalCameraSelection = {
+        ...tacticalCameraSelection,
+        zoom_preset_id: zoomPresetId
+      };
+      render();
     });
   });
 

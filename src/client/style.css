@@ -461,9 +461,12 @@ body {
   stroke-width: 2;
 }
 
+.ssd-system {
+  cursor: pointer;
+}
+
 .ssd-system__hit {
   fill: transparent;
-  cursor: pointer;
 }
 
 .ssd-system__label,
@@ -527,8 +530,14 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 8px;
+}
+
+.tactical-panel__header-right {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
 }
 
 .tactical-panel__meta {
@@ -538,6 +547,56 @@ body {
   justify-content: flex-end;
   color: var(--text-1);
   font-size: 0.82rem;
+}
+
+.camera-controls {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.camera-controls__group {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+}
+
+.camera-controls__label,
+.camera-controls__readout {
+  color: var(--text-2);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.camera-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.camera-toggle {
+  padding: 6px 10px;
+  border: 1px solid rgba(125, 176, 218, 0.2);
+  background: rgba(10, 24, 37, 0.82);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.camera-toggle:hover {
+  border-color: rgba(125, 176, 218, 0.44);
+}
+
+.camera-toggle--active {
+  border-color: rgba(125, 213, 154, 0.64);
+  background: rgba(17, 44, 35, 0.86);
+  color: var(--text-0);
 }
 
 .tactical-board {
@@ -629,6 +688,46 @@ body {
   fill: rgba(236, 126, 116, 0.98);
 }
 
+.offscreen-marker__hit {
+  fill: transparent;
+}
+
+.offscreen-marker--targetable .offscreen-marker__hit {
+  cursor: crosshair;
+}
+
+.offscreen-marker__arrow {
+  fill: rgba(120, 191, 235, 0.24);
+  stroke: rgba(166, 225, 255, 0.78);
+  stroke-width: 1.5;
+}
+
+.offscreen-marker__core {
+  fill: rgba(226, 241, 250, 0.94);
+}
+
+.offscreen-marker__label {
+  fill: var(--text-0);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.offscreen-marker--self .offscreen-marker__arrow {
+  fill: rgba(125, 213, 154, 0.2);
+  stroke: rgba(125, 213, 154, 0.92);
+}
+
+.offscreen-marker--targeted .offscreen-marker__arrow {
+  fill: rgba(242, 200, 121, 0.22);
+  stroke: rgba(242, 200, 121, 0.96);
+}
+
+.offscreen-marker--targeted .offscreen-marker__core,
+.offscreen-marker--targeted .offscreen-marker__label {
+  fill: rgba(242, 200, 121, 0.96);
+}
+
 .plot-preview__path {
   fill: none;
   stroke: rgba(125, 213, 154, 0.78);
@@ -701,6 +800,20 @@ body {
 
 .plot-preview__cue--warn .plot-preview__target-reticle {
   stroke: rgba(236, 126, 116, 0.88);
+}
+
+.tactical-scale-bar__line,
+.tactical-scale-bar__tick {
+  stroke: rgba(125, 176, 218, 0.74);
+  stroke-width: 2;
+}
+
+.tactical-scale-bar__label {
+  fill: var(--text-1);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-anchor: middle;
 }
 
 .action-strip {
@@ -876,7 +989,20 @@ body {
     display: grid;
   }
 
+  .tactical-panel__header-right {
+    justify-items: stretch;
+  }
+
   .tactical-panel__meta {
+    justify-content: flex-start;
+  }
+
+  .camera-controls,
+  .camera-controls__group {
+    justify-items: start;
+  }
+
+  .camera-toggle-row {
     justify-content: flex-start;
   }
 
