@@ -14,6 +14,27 @@ export interface StateUpdatesPhaseOutput {
   events: ResolverEvent[];
 }
 
+function isOutsideBoundary(state: BattleState, shipId: ShipInstanceId): boolean {
+  const ship = state.ships[shipId];
+
+  if (!ship || ship.status !== "active") {
+    return false;
+  }
+
+  const boundary = state.match_setup.battlefield.boundary;
+
+  if (boundary.kind !== "rectangle") {
+    return false;
+  }
+
+  return (
+    ship.pose.position.x < boundary.min.x ||
+    ship.pose.position.x > boundary.max.x ||
+    ship.pose.position.y < boundary.min.y ||
+    ship.pose.position.y > boundary.max.y
+  );
+}
+
 export function runStateUpdatesPhase(input: StateUpdatesPhaseInput): StateUpdatesPhaseOutput {
   void input.plotsByShip;
   void input.subTick;
@@ -91,12 +112,30 @@ export function runStateUpdatesPhase(input: StateUpdatesPhaseInput): StateUpdate
     });
   }
 
-  if (destroyedBy.size > 0) {
+  const disengagedShipIds =
+    input.state.match_setup.rules.victory.boundary_disengage_enabled
+      ? input.state.match_setup.participants
+          .map((participant) => participant.ship_instance_id)
+          .filter((shipId) => isOutsideBoundary(input.state, shipId))
+          .sort()
+      : [];
+
+  for (const shipId of disengagedShipIds) {
+    const ship = input.state.ships[shipId];
+
+    if (!ship || ship.status !== "active") {
+      continue;
+    }
+
+    ship.status = "disengaged";
+  }
+
+  if (destroyedBy.size > 0 || disengagedShipIds.length > 0) {
     const activeShipIds = input.state.match_setup.participants
       .map((participant) => participant.ship_instance_id)
       .filter((shipId) => input.state.ships[shipId]?.status === "active");
 
-    input.state.outcome.end_reason = "destroyed";
+    input.state.outcome.end_reason = destroyedBy.size > 0 ? "destroyed" : "boundary_disengage";
     input.state.outcome.winner_ship_instance_id = activeShipIds.length === 1 ? activeShipIds[0]! : null;
   }
 
