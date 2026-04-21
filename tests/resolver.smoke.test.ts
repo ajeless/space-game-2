@@ -271,4 +271,89 @@ describe("resolver", () => {
       end_reason: "destroyed"
     });
   });
+
+  it("marks a ship as disengaged when it ends the turn outside the battle boundary", async () => {
+    const state = await readBattleStateFixture();
+
+    state.ships.alpha_ship!.pose.position = { x: -450, y: 0 };
+    state.ships.bravo_ship!.pose.position = { x: 0, y: 0 };
+
+    const result = resolve({
+      state,
+      plots_by_ship: {
+        alpha_ship: makePlot(state, {
+          ship_instance_id: "alpha_ship",
+          drive_pips: 8,
+          railgun_pips: 0,
+          desired_end_heading_degrees: 0,
+          weapons: []
+        }),
+        bravo_ship: makePlot(state, {
+          ship_instance_id: "bravo_ship",
+          drive_pips: 8,
+          railgun_pips: 0,
+          desired_end_heading_degrees: 180,
+          weapons: []
+        })
+      },
+      seed: "boundary-seed-1"
+    });
+
+    expect(result.next_state.ships.alpha_ship?.status).toBe("disengaged");
+    expect(result.next_state.ships.bravo_ship?.status).toBe("active");
+    expect(result.next_state.outcome).toMatchObject({
+      winner_ship_instance_id: "bravo_ship",
+      end_reason: "boundary_disengage"
+    });
+    expect(result.events[result.events.length - 1]).toMatchObject({
+      sub_tick: 60,
+      type: "turn_ended",
+      details: {
+        turnNumber: 2,
+        winner: "bravo_ship"
+      }
+    });
+  });
+
+  it("ignores boundary exit when disengage is disabled in the rules", async () => {
+    const state = await readBattleStateFixture();
+
+    state.match_setup.rules.victory.boundary_disengage_enabled = false;
+    state.ships.alpha_ship!.pose.position = { x: -450, y: 0 };
+
+    const result = resolve({
+      state,
+      plots_by_ship: {
+        alpha_ship: makePlot(state, {
+          ship_instance_id: "alpha_ship",
+          drive_pips: 8,
+          railgun_pips: 0,
+          desired_end_heading_degrees: 0,
+          weapons: []
+        }),
+        bravo_ship: makePlot(state, {
+          ship_instance_id: "bravo_ship",
+          drive_pips: 8,
+          railgun_pips: 0,
+          desired_end_heading_degrees: 180,
+          weapons: []
+        })
+      },
+      seed: "boundary-seed-2"
+    });
+
+    expect(result.next_state.ships.alpha_ship?.status).toBe("active");
+    expect(result.next_state.outcome).toMatchObject({
+      winner_ship_instance_id: null,
+      end_reason: null
+    });
+    expect(result.events[result.events.length - 1]).toMatchObject({
+      sub_tick: 60,
+      type: "turn_ended",
+      details: {
+        turnNumber: 2,
+        winner: null
+      }
+    });
+  });
 });
