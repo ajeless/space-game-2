@@ -27,6 +27,7 @@ Ships are JSON files with a top-level object. The shape:
 
 ```json
 {
+  "schema_version": "sg2/v0.1",
   "id": "css_meridian",
   "name": "CSS Meridian",
   "class": "frigate",
@@ -231,24 +232,23 @@ This separation is deliberate. It lets one ship have a much tougher reactor than
 "dynamics": {
   "mass": 1000,
   "moment_of_inertia": 500,
-  "initial_heading_degrees": 0,
   "max_turn_degrees_per_turn": 120
 }
 ```
 
 ```json
 "power": {
-  "allocations": ["drive", "railgun"]
+  "discretionary_allocation_ids": ["drive", "railgun"]
 }
 ```
 
-Properties governing how the ship responds to thrust and external forces. `mass` determines the cost of changing the ship's drift vector. `initial_heading_degrees` is the ship's starting orientation. `max_turn_degrees_per_turn` is the generous v0.1 kinematic turn limit that caps how far the ship may reorient during a turn.
+Properties governing how the ship responds to thrust and external forces. `mass` determines the cost of changing the ship's drift vector. `max_turn_degrees_per_turn` is the generous v0.1 kinematic turn limit that caps how far the ship may reorient during a turn. Starting pose is intentionally **not** part of the reusable ship definition: initial position, initial drift, and initial heading belong to the match setup / battle state because two instances of the same ship may start a scenario differently.
 
 At v0.1, heading change is *not* part of the explicit reactor-pip budget. The cost-bearing maneuvering problem is translational, not rotational. `moment_of_inertia` is preserved as a forward-looking field for richer rotational physics later, but the v0.1 resolver uses the ship's turn-rate cap rather than full torque simulation.
 
 ### `power` — the player-managed allocation model
 
-The v0.1 power model is intentionally coarse. The reactor exposes integer pips, and every pip must be assigned during plotting. The current allocatable sinks are `drive` and `railgun`.
+The v0.1 power model is intentionally coarse. The reactor exposes integer pips, and every pip must be assigned during plotting. The current allocatable sinks are `drive` and `railgun`. This top-level block is descriptive metadata for the planner / UI; the authoritative pip budget still lives on the reactor subsystem.
 
 ## Coordinate system conventions
 
@@ -291,6 +291,7 @@ The ship that ships with v0.1 — the one used for the two-identical-ship duel �
 
 ```json
 {
+  "schema_version": "sg2/v0.1",
   "id": "css_meridian",
   "name": "CSS Meridian",
   "class": "frigate",
@@ -353,11 +354,10 @@ The ship that ships with v0.1 — the one used for the two-identical-ship duel �
   "dynamics": {
     "mass": 1000,
     "moment_of_inertia": 500,
-    "initial_heading_degrees": 0,
     "max_turn_degrees_per_turn": 120
   },
   "power": {
-    "allocations": ["drive", "railgun"]
+    "discretionary_allocation_ids": ["drive", "railgun"]
   }
 }
 ```
@@ -392,4 +392,5 @@ This format does not block any of the following:
 
 - `stack_decision.md` — confirms JSON and TypeScript as the format and language context.
 - `resolver_design.md` — the module that consumes these files and runs the simulation.
+- `v0_1_data_contracts.md` — the canonical v0.1 config and runtime shapes built on this file format.
 - `ssd_layout.md` — the renderer that visualizes ships based on this data.

@@ -16,12 +16,14 @@ The resolver is a pure TypeScript module that takes a battle state and both play
 The resolver is a single pure function:
 
 ```
-resolve(state, plotA, plotB, seed) -> (nextState, events)
+resolve(state, plotsByShip, seed) -> (nextState, events)
 ```
 
-- **Inputs:** current battle state, plot submissions from both players, a deterministic seed.
+- **Inputs:** current battle state, plot submissions keyed by ship instance id, a deterministic seed.
 - **Outputs:** the battle state at the end of the turn, and an ordered list of replay events describing what happened during the turn.
 - **Side effects:** none. No network calls, no file I/O, no wall-clock reads, no UI dependencies, no logging to external systems.
+
+At v0.1, the battle state is expected to carry the immutable match setup snapshot needed for self-contained resolution and replay reproduction: the rules config, the ship catalog used by the match, the ship-instance-to-ship-config mapping, and the battlefield boundary.
 
 This purity is the most important property of the whole codebase. It's what makes every upgrade path in the stack decision doc possible. The resolver doesn't know whether it's running on a server, a client, a test runner, or a CI job. It takes data in, returns data out.
 
@@ -129,10 +131,10 @@ An event is a structured record:
 
 ```typescript
 {
-  sub_tick: number;           // 0..59
+  sub_tick: number;           // 0..sub_ticks; sub_ticks itself is reserved for end-of-turn sentinel events
   type: string;               // event type discriminator
-  actor?: string;             // ship id, if applicable
-  target?: string;            // ship id, if applicable
+  actor?: string;             // ship instance id, if applicable
+  target?: string;            // ship instance id, if applicable
   details: object;            // type-specific payload
 }
 ```
@@ -148,7 +150,7 @@ Seven types. Each is specified here in enough detail that an implementer can pro
 Emitted at sub-tick 0 for each ship. Records the plot as accepted by the resolver, so replays can show what each player intended independent of what actually happened.
 
 ```
-{ type: "plot_committed", actor: shipId, details: { plot: <plot object> } }
+{ type: "plot_committed", actor: shipInstanceId, details: { plot: <plot object> } }
 ```
 
 ### `thrust_applied`
@@ -156,7 +158,7 @@ Emitted at sub-tick 0 for each ship. Records the plot as accepted by the resolve
 Emitted whenever a ship's velocity changes due to thrust. May be emitted every sub-tick during active thrust.
 
 ```
-{ type: "thrust_applied", actor: shipId, details: {
+{ type: "thrust_applied", actor: shipInstanceId, details: {
     thrustVector: { x, y },
     resultingVelocity: { x, y },
     resultingPosition: { x, y },
@@ -171,13 +173,13 @@ Position is included for renderer convenience, even though it's recoverable from
 Emitted when a weapon successfully fires.
 
 ```
-{ type: "weapon_fired", actor: shipId, target: shipId, details: {
+{ type: "weapon_fired", actor: shipInstanceId, target: shipInstanceId, details: {
     mountId: string,
     mountPosition: { x, y },     // world coordinates at fire time
     targetPosition: { x, y },    // world coordinates at fire time
     chargePips: number,
     hitProbability: number,
-    damageRolled: number
+    baseDamage: number
   } }
 ```
 
@@ -186,8 +188,8 @@ Emitted when a weapon successfully fires.
 Emitted when a hit is resolved on a target ship.
 
 ```
-{ type: "hit_registered", target: shipId, details: {
-    fromActor: shipId,
+{ type: "hit_registered", target: shipInstanceId, details: {
+    fromActor: shipInstanceId,
     impactPoint: { x, y },       // world coordinates
     impactSystemId?: string,     // nearby impacted system, if any
     hullDamageApplied: number,
@@ -202,7 +204,7 @@ At v0.1, damage resolution is hybrid: every hit applies hull damage, and impacts
 Emitted when a system's state changes.
 
 ```
-{ type: "subsystem_damaged", actor: shipId, details: {
+{ type: "subsystem_damaged", actor: shipInstanceId, details: {
     systemId: string,
     previousState: "operational" | "degraded" | "offline",
     newState: "operational" | "degraded" | "offline",
@@ -218,8 +220,8 @@ At v0.1, subsystem integrity is numeric underneath, but gameplay behavior is int
 Emitted when a ship reaches zero hull.
 
 ```
-{ type: "ship_destroyed", target: shipId, details: {
-    causeActor: shipId,
+{ type: "ship_destroyed", target: shipInstanceId, details: {
+    causeActor: shipInstanceId,
     finalPosition: { x, y }
   } }
 ```
@@ -231,7 +233,7 @@ Emitted at sub-tick 60 (one past the last simulated sub-tick) to mark the end of
 ```
 { type: "turn_ended", details: {
     turnNumber: number,
-    winner: shipId | null       // null if no winner yet
+    winner: shipInstanceId | null       // null if no winner yet
   } }
 ```
 
@@ -241,25 +243,34 @@ A plot is the input from one player for one turn. Its rough shape:
 
 ```typescript
 {
-  shipId: string;
+  shipInstanceId: string;
   power: {
     drivePips: number;
     railgunPips: number;
   };
   maneuver: {
-    desiredEndPosition: { x: number, y: number };
+    translationPlan: {
+      kind: "piecewise_linear";
+      frame: "world";
+      knots: Array<{
+        t: number;
+        thrustFraction: { x: number, y: number };
+      }>;
+    };
     desiredEndHeadingDegrees: number;
   };
   weapons: Array<{
     mountId: string;
-    fireThisTurn: boolean;
+    targetShipId: string;
+    fireMode: "hold" | "best_shot_this_turn";
+    chargePips: number;
   }>;
 }
 ```
 
-The committed plot is deliberately expressed in game terms, not as a raw UI artifact. The player chooses a maneuver result, a desired end heading, and a pip allocation. The planner or server may compile that high-level intent into lower-level sub-tick schedules internally, but the canonical committed plot remains high-level.
+The committed plot is deliberately expressed in game terms, but it still has to be rich enough to reconstruct the ship's path through the turn deterministically. A mere end position is not enough once the resolver is allowed to choose the best legal shot timing inside the turn. The planner UI may present ghost projections and draggable handles, but the canonical committed plot is the compiled translation plan those controls produce, plus the desired end heading and power / fire commitments.
 
-Weapons at v0.1 are simple but explicit: the player marks which mounts are authorized to fire this turn, provided they were charged from the railgun allocation. The resolver does **not** use "first legal shot"; it chooses the highest-quality legal shot opportunity during the turn, earliest tie winning. No "fire at sub-tick X" specificity at v0.1 — timing policies finer than `best this turn` arrive in a later slice.
+Weapons at v0.1 are simple but explicit: the player marks which mounts are authorized to fire, which target they are authorized to fire at, and how many railgun pips were reserved onto that mount. The resolver does **not** use "first legal shot"; it chooses the highest-quality legal shot opportunity during the turn, earliest tie winning. No "fire at sub-tick X" specificity at v0.1 — timing policies finer than `best this turn` arrive in a later slice.
 
 ## Determinism discipline
 
@@ -362,4 +373,5 @@ Nothing outside the `resolver/` folder reaches into it. Nothing inside the folde
 
 - `stack_decision.md` — language, networking, and deployment context.
 - `ship_definition_format.md` — the data the resolver consumes.
+- `v0_1_data_contracts.md` — the canonical v0.1 JSON / TypeScript contract shapes.
 - `ssd_layout.md` — the renderer that consumes the resolver's events.

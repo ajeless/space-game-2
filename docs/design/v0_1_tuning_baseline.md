@@ -125,7 +125,6 @@ These numbers align with the current `css_meridian` example ship and make the tr
   "dynamics": {
     "mass": 1000,
     "moment_of_inertia": 500,
-    "initial_heading_degrees": 0,
     "max_turn_degrees_per_turn": 120
   },
   "reactor": {
@@ -420,17 +419,18 @@ That is the right posture for early vertical-slice work.
 
 ## Recommended next step
 
-After this document, the next planning task should be to turn these numbers into the actual data contracts:
+The next planning task is now captured in [v0.1 data contracts](v0_1_data_contracts.md):
 
 - match rules config shape
 - ship JSON shape
 - battle-state shape
 - plot submission shape
 
-At that point the first implementation pass can be strongly data-driven from day one.
+That is the bridge between these numeric defaults and the first implementation pass.
 
 ## Related docs
 
 - `resolver_design.md` — structural resolver behavior
 - `ship_definition_format.md` — where per-ship numeric data lives
+- `v0_1_data_contracts.md` — the canonical v0.1 contract shapes for those values
 - `ssd_layout.md` — how the player sees these numbers
