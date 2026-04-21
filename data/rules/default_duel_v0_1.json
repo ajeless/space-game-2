@@ -1,0 +1,100 @@
+{
+  "schema_version": "sg2/v0.1",
+  "id": "default_duel_v0_1",
+  "name": "Default Duel v0.1",
+  "turn": {
+    "sub_ticks": 60
+  },
+  "fire_control": {
+    "timing_policy": "best_legal_shot",
+    "tie_break": "earliest"
+  },
+  "hit_probability": {
+    "min_probability": 0.05,
+    "max_probability": 0.95,
+    "range_factor": {
+      "max_factor": 1.05,
+      "min_factor": 0.65,
+      "slope": 0.4
+    },
+    "transverse_factor": {
+      "max_factor": 1.0,
+      "min_factor": 0.5,
+      "reference_bearing_sweep_deg": 40,
+      "measurement_window_sub_ticks": 10,
+      "edge_mode": "clamp"
+    }
+  },
+  "damage": {
+    "subsystem_state_thresholds": {
+      "operational_min_fraction": 0.67,
+      "degraded_min_fraction": 0.34
+    },
+    "local_hit_resolution": {
+      "kind": "nearest_system_within_radius",
+      "radius_hull_units": 0.12,
+      "subsystem_damage_ratio": 0.6
+    },
+    "effects_by_system_type": {
+      "drive": {
+        "operational": {
+          "drive_authority_factor": 1.0
+        },
+        "degraded": {
+          "drive_authority_factor": 0.55
+        },
+        "offline": {
+          "drive_authority_factor": 0.0
+        }
+      },
+      "reactor": {
+        "operational": {
+          "discretionary_pips_factor": 1.0,
+          "rounding": "floor"
+        },
+        "degraded": {
+          "discretionary_pips_factor": 0.625,
+          "rounding": "floor"
+        },
+        "offline": {
+          "discretionary_pips_override": 0
+        }
+      },
+      "bridge": {
+        "operational": {
+          "turn_cap_factor": 1.0,
+          "track_quality_factor": 1.0
+        },
+        "degraded": {
+          "turn_cap_factor": 0.75,
+          "track_quality_factor": 0.85
+        },
+        "offline": {
+          "turn_cap_factor": 0.5,
+          "track_quality_factor": 0.6
+        }
+      },
+      "weapon_mount": {
+        "operational": {
+          "track_quality_factor": 1.0,
+          "charge_penalty_pips": 0,
+          "firing_enabled": true
+        },
+        "degraded": {
+          "track_quality_factor": 0.85,
+          "charge_penalty_pips": 1,
+          "firing_enabled": true
+        },
+        "offline": {
+          "track_quality_factor": 0.0,
+          "charge_penalty_pips": 0,
+          "firing_enabled": false
+        }
+      }
+    }
+  },
+  "victory": {
+    "hull_destroyed_at_or_below": 0,
+    "boundary_disengage_enabled": true
+  }
+}

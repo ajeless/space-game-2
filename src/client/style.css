@@ -1,0 +1,89 @@
+:root {
+  color-scheme: dark;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(43, 92, 132, 0.28), transparent 32%),
+    linear-gradient(180deg, #06131d 0%, #081b27 100%);
+  color: #d6e2eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#app {
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.shell {
+  max-width: 920px;
+  margin: 0 auto;
+  border: 1px solid rgba(145, 176, 198, 0.28);
+  background: rgba(8, 20, 31, 0.86);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.shell__header {
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(145, 176, 198, 0.18);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: baseline;
+}
+
+.shell__title {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shell__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  padding: 20px;
+}
+
+.panel {
+  padding: 16px;
+  border: 1px solid rgba(145, 176, 198, 0.16);
+  background: rgba(12, 28, 42, 0.7);
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.kv dt {
+  color: #7db0da;
+}
+
+.kv dd {
+  margin: 0;
+}
+
+.status--ok {
+  color: #77d59a;
+}
+
+.status--warn {
+  color: #f2c879;
+}
