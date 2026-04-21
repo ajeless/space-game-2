@@ -66,6 +66,7 @@ The sequence in which capabilities are added matters. These are the ordering com
 ## Audience docs
 
 - [Developer: layout and hit model](docs/developer/layout_and_hit_model.md)
+- [Developer: remote play runbook](docs/developer/remote_play_runbook.md)
 - [Player: ship layout and damage](docs/player/ship_layout_and_damage.md)
 
 ## Research questions (deferred)

@@ -33,6 +33,11 @@ export type ServerToClientMessage =
       session: MatchSessionView;
     }
   | {
+      type: "session_reset";
+      matchId: string;
+      turnNumber: number;
+    }
+  | {
       type: "session_state";
       session: MatchSessionView;
     }

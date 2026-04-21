@@ -1,10 +1,11 @@
 import { createServer } from "node:http";
-import type { ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { WebSocket, WebSocketServer } from "ws";
 import { validateBattleState } from "../shared/index.js";
 import type { ClientToServerMessage, ServerToClientMessage } from "../shared/network.js";
+import { getServerConfig } from "./config.js";
 import { MatchSession } from "./session.js";
 
 const CLIENT_DIST_ROOT = path.resolve(process.cwd(), "dist/client");
@@ -22,6 +23,20 @@ async function readJson(relativePath: string): Promise<unknown> {
   const raw = await readFile(absolutePath, "utf8");
 
   return JSON.parse(raw) as unknown;
+}
+
+async function loadBattleState(relativePath: string) {
+  return validateBattleState(await readJson(relativePath));
+}
+
+async function readRequestText(request: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 function getContentType(filePath: string): string {
@@ -75,9 +90,22 @@ async function serveClientAsset(pathname: string, response: ServerResponse): Pro
   return false;
 }
 
+function getResetToken(request: IncomingMessage, requestUrl: URL, body: unknown): string | null {
+  const headerToken = request.headers["x-sg2-admin-token"];
+  const headerValue = typeof headerToken === "string" ? headerToken : null;
+  const queryToken = requestUrl.searchParams.get("token");
+  const bodyToken =
+    body && typeof body === "object" && "adminToken" in body && typeof body.adminToken === "string"
+      ? body.adminToken
+      : null;
+
+  return headerValue ?? queryToken ?? bodyToken;
+}
+
 async function bootstrap() {
-  const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
-  const session = new MatchSession(battleState);
+  const config = getServerConfig();
+  const initialBattleState = await loadBattleState(config.battle_state_fixture_path);
+  const session = new MatchSession(initialBattleState);
   let nextClientId = 1;
   const clients = new Map<string, WebSocket>();
 
@@ -97,23 +125,97 @@ async function bootstrap() {
     }
   }
 
+  function makeHealthPayload() {
+    const view = session.getView();
+
+    return {
+      ok: true,
+      matchId: view.battle_state.match_setup.match_id,
+      rulesId: view.battle_state.match_setup.rules.id,
+      participantCount: view.battle_state.match_setup.participants.length,
+      shipCatalogCount: Object.keys(view.battle_state.match_setup.ship_catalog).length,
+      occupiedSlotCount: view.occupied_slot_ids.length,
+      websocketPath: "/ws",
+      resetEnabled: config.admin_token !== null,
+      fixturePath: config.battle_state_fixture_path,
+      host: config.host,
+      port: config.port,
+      externalOrigin: config.external_origin
+    };
+  }
+
   const server = createServer(async (request, response) => {
     if (!request.url) {
       response.writeHead(400).end("missing URL");
       return;
     }
 
-    const pathname = new URL(request.url, "http://127.0.0.1").pathname;
+    const requestUrl = new URL(request.url, "http://127.0.0.1");
+    const pathname = requestUrl.pathname;
 
     if (request.method === "GET" && pathname === "/api/health") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify(makeHealthPayload()));
+      return;
+    }
+
+    if (request.method === "POST" && pathname === "/api/session/reset") {
+      if (!config.admin_token) {
+        response.writeHead(403, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            ok: false,
+            message: "session reset is disabled until SG2_ADMIN_TOKEN is configured"
+          })
+        );
+        return;
+      }
+
+      const rawBody = await readRequestText(request);
+      const body =
+        rawBody.trim().length === 0
+          ? null
+          : (() => {
+              try {
+                return JSON.parse(rawBody) as unknown;
+              } catch {
+                return undefined;
+              }
+            })();
+
+      if (body === undefined) {
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(JSON.stringify({ ok: false, message: "invalid JSON body" }));
+        return;
+      }
+
+      const resetToken = getResetToken(request, requestUrl, body);
+
+      if (resetToken !== config.admin_token) {
+        response.writeHead(403, { "content-type": "application/json" });
+        response.end(JSON.stringify({ ok: false, message: "invalid admin token" }));
+        return;
+      }
+
+      const freshState = await loadBattleState(config.battle_state_fixture_path);
+      const resetView = session.reset(freshState);
+
+      broadcast({
+        type: "session_reset",
+        matchId: resetView.battle_state.match_setup.match_id,
+        turnNumber: resetView.battle_state.turn_number
+      });
+      broadcast({
+        type: "session_state",
+        session: resetView
+      });
+
       response.writeHead(200, { "content-type": "application/json" });
       response.end(
         JSON.stringify({
           ok: true,
-          matchId: session.getView().battle_state.match_setup.match_id,
-          rulesId: session.getView().battle_state.match_setup.rules.id,
-          participantCount: session.getView().battle_state.match_setup.participants.length,
-          shipCatalogCount: Object.keys(session.getView().battle_state.match_setup.ship_catalog).length
+          matchId: resetView.battle_state.match_setup.match_id,
+          turnNumber: resetView.battle_state.turn_number
         })
       );
       return;
@@ -148,6 +250,10 @@ async function bootstrap() {
     send(clientId, {
       type: "hello",
       identity: session.connectClient(clientId),
+      session: session.getView()
+    });
+    broadcast({
+      type: "session_state",
       session: session.getView()
     });
 
@@ -190,11 +296,15 @@ async function bootstrap() {
     });
   });
 
-  const host = "127.0.0.1";
-  const port = 8000;
+  server.listen(config.port, config.host, () => {
+    console.log(`space_game_2 server listening on http://${config.host}:${config.port}`);
 
-  server.listen(port, host, () => {
-    console.log(`space_game_2 server listening on http://${host}:${port}`);
+    if (config.external_origin) {
+      console.log(`external origin: ${config.external_origin}`);
+    }
+
+    console.log(`fixture: ${config.battle_state_fixture_path}`);
+    console.log(`session reset: ${config.admin_token ? "enabled" : "disabled"}`);
   });
 }
 

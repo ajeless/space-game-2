@@ -81,6 +81,27 @@ export class MatchSession {
     };
   }
 
+  reset(nextState: BattleState): MatchSessionView {
+    this.battleState = clone(validateBattleState(nextState));
+    this.pendingPlots.clear();
+    this.lastResolution = null;
+
+    const validShipIds = new Set(this.battleState.match_setup.participants.map((participant) => participant.ship_instance_id));
+
+    for (const [clientId, identity] of this.identities.entries()) {
+      if (identity.ship_instance_id && !validShipIds.has(identity.ship_instance_id)) {
+        this.identities.set(clientId, {
+          client_id: identity.client_id,
+          role: "spectator",
+          slot_id: null,
+          ship_instance_id: null
+        });
+      }
+    }
+
+    return this.getView();
+  }
+
   submitPlot(clientId: string, plotInput: unknown): SessionSubmitResult {
     const identity = this.identities.get(clientId);
 

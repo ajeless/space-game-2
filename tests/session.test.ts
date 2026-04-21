@@ -45,4 +45,19 @@ describe("MatchSession", () => {
 
     expect(() => session.submitPlot("client_1", bravoPlot)).toThrow("only submit plots");
   });
+
+  it("can reset the match state while preserving connected player slots", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+    const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/alpha_turn_1.json"), battleState);
+    const session = new MatchSession(battleState);
+    const firstIdentity = session.connectClient("client_1");
+
+    session.submitPlot("client_1", alphaPlot);
+    const resetView = session.reset(battleState);
+
+    expect(resetView.battle_state.turn_number).toBe(1);
+    expect(resetView.pending_plot_ship_ids).toEqual([]);
+    expect(resetView.last_resolution).toBeNull();
+    expect(session.getIdentity("client_1")).toEqual(firstIdentity);
+  });
 });

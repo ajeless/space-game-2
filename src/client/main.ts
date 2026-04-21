@@ -1726,6 +1726,12 @@ function handleServerMessage(message: ServerToClientMessage): void {
     return;
   }
 
+  if (message.type === "session_reset") {
+    logMessage(`session reset · ${message.matchId} · turn ${message.turnNumber}`);
+    render();
+    return;
+  }
+
   if (message.type === "session_state") {
     session = message.session;
     logMessage(`session updated · turn ${message.session.battle_state.turn_number}`);
