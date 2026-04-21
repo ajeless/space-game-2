@@ -8,11 +8,13 @@ import type { ResolverContext, ResolverEvent, SubTickResult } from "./types.js";
 
 export function runSubTick(context: ResolverContext, subTick: number): SubTickResult {
   const intentEvents = runIntentPhase(context, subTick);
-  let state = runDynamicsPhase({
+  const dynamicsOutput = runDynamicsPhase({
     state: context.next_state,
     plotsByShip: context.plots_by_ship,
+    sortedShipIds: context.sorted_ship_ids,
     subTick
   });
+  let state = dynamicsOutput.state;
 
   state = runSensingPhase({
     state,
@@ -33,7 +35,7 @@ export function runSubTick(context: ResolverContext, subTick: number): SubTickRe
     subTick
   });
 
-  const newEvents: ResolverEvent[] = [...intentEvents, ...eventsPhaseOutput.events];
+  const newEvents: ResolverEvent[] = [...intentEvents, ...dynamicsOutput.events, ...eventsPhaseOutput.events];
 
   return {
     state,

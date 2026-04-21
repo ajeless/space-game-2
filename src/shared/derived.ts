@@ -57,6 +57,41 @@ export function getSystemEffects(
   return entry?.[subsystemState] ?? {};
 }
 
+export function getRuntimeSystem(ship: ShipRuntimeState, systemId: SystemId) {
+  const runtimeSystem = ship.systems[systemId];
+
+  if (!runtimeSystem) {
+    throw new Error(`Runtime ship '${ship.ship_instance_id}' is missing system '${systemId}'`);
+  }
+
+  return runtimeSystem;
+}
+
+export function getSystemStateAndEffects(
+  state: BattleState,
+  ship: ShipRuntimeState,
+  systemId: SystemId
+): {
+  config: ReturnType<typeof getSystemConfig>;
+  state_label: SubsystemState;
+  effects: SystemEffectValues;
+} {
+  const shipConfig = getShipConfig(state, ship);
+  const systemConfig = getSystemConfig(shipConfig, systemId);
+  const runtimeSystem = getRuntimeSystem(ship, systemId);
+  const stateLabel = deriveSubsystemState(
+    runtimeSystem.current_integrity,
+    systemConfig.max_integrity,
+    state.match_setup.rules
+  );
+
+  return {
+    config: systemConfig,
+    state_label: stateLabel,
+    effects: getSystemEffects(state.match_setup.rules, systemConfig.type, stateLabel)
+  };
+}
+
 export function getAvailableReactorPips(state: BattleState, ship: ShipRuntimeState): number {
   const shipConfig = getShipConfig(state, ship);
   const reactor = shipConfig.systems.find((system) => system.type === "reactor");
@@ -65,11 +100,7 @@ export function getAvailableReactorPips(state: BattleState, ship: ShipRuntimeSta
     throw new Error(`Ship config '${shipConfig.id}' does not have a reactor`);
   }
 
-  const runtimeSystem = ship.systems[reactor.id];
-
-  if (!runtimeSystem) {
-    throw new Error(`Runtime ship '${ship.ship_instance_id}' is missing reactor '${reactor.id}'`);
-  }
+  const runtimeSystem = getRuntimeSystem(ship, reactor.id);
 
   const stateLabel = deriveSubsystemState(
     runtimeSystem.current_integrity,

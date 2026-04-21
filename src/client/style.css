@@ -22,7 +22,7 @@ body {
 }
 
 .shell {
-  max-width: 920px;
+  max-width: 1240px;
   margin: 0 auto;
   border: 1px solid rgba(145, 176, 198, 0.28);
   background: rgba(8, 20, 31, 0.86);
@@ -45,6 +45,11 @@ body {
   text-transform: uppercase;
 }
 
+.shell__subtitle {
+  margin: 6px 0 0;
+  color: #9cb7cb;
+}
+
 .shell__body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -63,6 +68,50 @@ body {
   font-size: 0.92rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.panel--wide {
+  grid-column: 1 / -1;
+}
+
+.tactical-board {
+  display: grid;
+  gap: 12px;
+}
+
+.tactical-board svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid rgba(145, 176, 198, 0.16);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(41, 84, 114, 0.22), transparent 52%),
+    linear-gradient(180deg, rgba(7, 18, 29, 0.96), rgba(5, 13, 21, 0.98));
+}
+
+.tactical-board__frame {
+  fill: rgba(8, 20, 31, 0.82);
+  stroke: rgba(125, 176, 218, 0.22);
+  stroke-width: 2;
+}
+
+.tactical-board__grid-line {
+  stroke: rgba(125, 176, 218, 0.08);
+  stroke-width: 1;
+}
+
+.tactical-board__axis {
+  stroke: rgba(125, 176, 218, 0.18);
+  stroke-dasharray: 6 8;
+}
+
+.tactical-board__caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  color: #9cb7cb;
+  font-size: 0.92rem;
 }
 
 .kv {
@@ -86,4 +135,122 @@ body {
 
 .status--warn {
   color: #f2c879;
+}
+
+.button-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.button {
+  border: 1px solid rgba(125, 176, 218, 0.4);
+  background: linear-gradient(180deg, rgba(21, 49, 72, 0.95), rgba(12, 31, 47, 0.95));
+  color: inherit;
+  text-align: left;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: rgba(125, 176, 218, 0.72);
+}
+
+.button span,
+.button small {
+  display: block;
+}
+
+.button small {
+  margin-top: 4px;
+  color: #9cb7cb;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid rgba(145, 176, 198, 0.16);
+  background: rgba(7, 18, 29, 0.8);
+  padding: 12px;
+}
+
+.card h3 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+
+.ship-glyph__velocity {
+  stroke: rgba(125, 176, 218, 0.45);
+  stroke-width: 2;
+}
+
+.ship-glyph__hull {
+  fill: rgba(130, 212, 255, 0.16);
+  stroke: rgba(166, 225, 255, 0.8);
+  stroke-width: 1.5;
+}
+
+.ship-glyph__heading {
+  stroke: rgba(162, 233, 193, 0.9);
+  stroke-width: 2;
+}
+
+.ship-glyph__core {
+  fill: #d6e2eb;
+}
+
+.ship-glyph__label {
+  fill: #d6e2eb;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-anchor: middle;
+}
+
+.ship-glyph--self .ship-glyph__hull {
+  fill: rgba(125, 213, 154, 0.18);
+  stroke: rgba(125, 213, 154, 0.95);
+}
+
+.ship-glyph--self .ship-glyph__heading {
+  stroke: rgba(125, 213, 154, 0.95);
+}
+
+.ship-glyph--pending .ship-glyph__hull {
+  stroke: rgba(242, 200, 121, 0.98);
+}
+
+.ship-glyph--pending .ship-glyph__velocity {
+  stroke: rgba(242, 200, 121, 0.68);
+}
+
+.log-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.log-list li {
+  border-top: 1px solid rgba(145, 176, 198, 0.1);
+  padding-top: 6px;
+}
+
+@media (max-width: 720px) {
+  #app {
+    padding: 18px;
+  }
+
+  .shell__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tactical-board__caption {
+    font-size: 0.84rem;
+  }
 }
