@@ -1,0 +1,32 @@
+{
+  "name": "space-game-2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "v0.1 foundation scaffold for space_game_2",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "check": "npm run typecheck && npm run test",
+    "dev:client": "vite",
+    "dev:server": "tsx watch src/server/index.ts",
+    "start:server": "node dist/server/server/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.4"
+  }
+}

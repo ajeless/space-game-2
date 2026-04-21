@@ -1,0 +1,90 @@
+{
+  "schema_version": "sg2/v0.1",
+  "id": "css_meridian",
+  "name": "CSS Meridian",
+  "class": "frigate",
+  "hull": {
+    "silhouette": [
+      { "x": 0, "y": -0.5 },
+      { "x": 0.15, "y": -0.35 },
+      { "x": 0.18, "y": 0.1 },
+      { "x": 0.14, "y": 0.3 },
+      { "x": 0.3, "y": 0.42 },
+      { "x": 0.2, "y": 0.55 },
+      { "x": 0, "y": 0.6 },
+      { "x": -0.2, "y": 0.55 },
+      { "x": -0.3, "y": 0.42 },
+      { "x": -0.14, "y": 0.3 },
+      { "x": -0.18, "y": 0.1 },
+      { "x": -0.15, "y": -0.35 }
+    ],
+    "max_integrity": 100
+  },
+  "dynamics": {
+    "mass": 1000,
+    "moment_of_inertia": 500,
+    "max_turn_degrees_per_turn": 120
+  },
+  "power": {
+    "discretionary_allocation_ids": ["drive", "railgun"]
+  },
+  "systems": [
+    {
+      "id": "forward_mount",
+      "type": "weapon_mount",
+      "physical_position": { "x": 0, "y": -0.35 },
+      "max_integrity": 24,
+      "render": {
+        "label": "FORWARD MOUNT",
+        "style_role": "weapon_mount"
+      },
+      "parameters": {
+        "arc_degrees": 60,
+        "bearing_degrees": 0,
+        "baseline_track_quality": 0.7,
+        "charge_table": [
+          { "pips": 1, "max_range_km": 140, "damage": 8 },
+          { "pips": 2, "max_range_km": 220, "damage": 12 },
+          { "pips": 3, "max_range_km": 300, "damage": 15 }
+        ]
+      }
+    },
+    {
+      "id": "reactor",
+      "type": "reactor",
+      "physical_position": { "x": 0, "y": 0.15 },
+      "max_integrity": 32,
+      "render": {
+        "label": "REACTOR",
+        "style_role": "reactor"
+      },
+      "parameters": {
+        "discretionary_pips": 8
+      }
+    },
+    {
+      "id": "bridge",
+      "type": "bridge",
+      "physical_position": { "x": 0, "y": -0.05 },
+      "max_integrity": 22,
+      "render": {
+        "label": "BRIDGE",
+        "style_role": "bridge"
+      },
+      "parameters": {}
+    },
+    {
+      "id": "drive",
+      "type": "drive",
+      "physical_position": { "x": 0, "y": 0.45 },
+      "max_integrity": 28,
+      "render": {
+        "label": "DRIVE",
+        "style_role": "drive"
+      },
+      "parameters": {
+        "max_thrust": 1.8
+      }
+    }
+  ]
+}
