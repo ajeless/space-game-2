@@ -270,6 +270,11 @@ body.is-plot-dragging {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.32);
 }
 
+.ssd-control-deck--locked {
+  border-color: rgba(242, 200, 121, 0.24);
+  background: linear-gradient(180deg, rgba(28, 24, 15, 0.92), rgba(17, 16, 12, 0.96));
+}
+
 .ssd-control-deck__header {
   display: flex;
   align-items: center;
@@ -1045,6 +1050,43 @@ body.is-plot-dragging {
   align-items: center;
 }
 
+.match-outcome-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin: 10px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(125, 176, 218, 0.2);
+  background: rgba(12, 28, 42, 0.74);
+}
+
+.match-outcome-banner--victory {
+  border-color: rgba(125, 213, 154, 0.44);
+  background: rgba(18, 42, 33, 0.82);
+}
+
+.match-outcome-banner--defeat {
+  border-color: rgba(236, 126, 116, 0.42);
+  background: rgba(46, 22, 20, 0.84);
+}
+
+.match-outcome-banner__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.match-outcome-banner__copy strong {
+  font-size: 1rem;
+}
+
+.match-outcome-banner__copy p,
+.match-outcome-banner__hint {
+  margin: 0;
+  color: var(--text-1);
+  font-size: 0.84rem;
+}
+
 .readout-strip {
   display: flex;
   flex-wrap: wrap;
@@ -1074,6 +1116,11 @@ body.is-plot-dragging {
 .commit-strip--spectator {
   justify-content: space-between;
   width: 100%;
+}
+
+.commit-strip--ended {
+  width: 100%;
+  justify-content: space-between;
 }
 
 .commit-strip__status {
@@ -1222,6 +1269,11 @@ body.is-plot-dragging {
 
   .footer-strip {
     grid-template-columns: 1fr;
+  }
+
+  .match-outcome-banner {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

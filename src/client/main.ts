@@ -455,6 +455,65 @@ function getClaimableSlotStates(
   });
 }
 
+function isMatchEnded(sessionValue: MatchSessionView | null): boolean {
+  return sessionValue?.battle_state.outcome.end_reason !== null;
+}
+
+type MatchOutcomePresentation = {
+  tone: "victory" | "defeat" | "neutral";
+  headline: string;
+  detail: string;
+  reset_hint: string;
+};
+
+function getMatchOutcomePresentation(
+  sessionValue: MatchSessionView | null,
+  identityValue: SessionIdentity | null
+): MatchOutcomePresentation | null {
+  if (!sessionValue || sessionValue.battle_state.outcome.end_reason === null) {
+    return null;
+  }
+
+  const { winner_ship_instance_id: winnerShipId, end_reason: endReason } = sessionValue.battle_state.outcome;
+  const winnerLabel = winnerShipId ? getShipSlotLabel(sessionValue, winnerShipId) : "NO WINNER";
+  const playerWon =
+    identityValue?.role === "player" &&
+    identityValue.ship_instance_id !== null &&
+    identityValue.ship_instance_id === winnerShipId;
+  const playerLost =
+    identityValue?.role === "player" &&
+    identityValue.ship_instance_id !== null &&
+    winnerShipId !== null &&
+    identityValue.ship_instance_id !== winnerShipId;
+  const reasonLabel =
+    endReason === "destroyed" ? "Kill confirmed. The duel ended in destruction." : "Boundary disengage ended the duel.";
+
+  if (playerWon) {
+    return {
+      tone: "victory",
+      headline: "Victory",
+      detail: `${winnerLabel} holds the field. ${reasonLabel}`,
+      reset_hint: "Host can reset the match to start a new duel."
+    };
+  }
+
+  if (playerLost) {
+    return {
+      tone: "defeat",
+      headline: "Defeat",
+      detail: `${winnerLabel} wins. ${reasonLabel}`,
+      reset_hint: "Host can reset the match to start a new duel."
+    };
+  }
+
+  return {
+    tone: "neutral",
+    headline: winnerShipId ? `${winnerLabel} wins` : "Match ended",
+    detail: reasonLabel,
+    reset_hint: "Host can reset the match to start a new duel."
+  };
+}
+
 function getOpponentStatusLabel(sessionValue: MatchSessionView | null, identityValue: SessionIdentity | null): string {
   if (!sessionValue || !identityValue || identityValue.role !== "player" || !identityValue.ship_instance_id) {
     return "observer";
@@ -503,6 +562,10 @@ function getPhaseLabel(
     return "CONNECTING";
   }
 
+  if (isMatchEnded(sessionValue)) {
+    return "MATCH ENDED";
+  }
+
   if (selectedSystemContext?.system.type === "weapon_mount") {
     return "AIM MODE";
   }
@@ -520,6 +583,11 @@ function getPlayerPlotSummary(
   identityValue: SessionIdentity | null
 ): PlotDraftSummary | null {
   if (!sessionValue || !identityValue || identityValue.role !== "player" || !identityValue.ship_instance_id) {
+    plotDraft = null;
+    return null;
+  }
+
+  if (isMatchEnded(sessionValue)) {
     plotDraft = null;
     return null;
   }
@@ -963,6 +1031,26 @@ function renderSchematicControlDeck(
     return "";
   }
 
+  if (isMatchEnded(sessionValue)) {
+    const outcome = getMatchOutcomePresentation(sessionValue, identityValue);
+
+    return `
+      <div class="ssd-control-deck ssd-control-deck--locked">
+        <div class="ssd-control-deck__header">
+          <div>
+            <span class="section-kicker">Plot Controls</span>
+            <strong>Locked</strong>
+          </div>
+          <span class="ssd-control-deck__status ssd-control-deck__status--pending">match over</span>
+        </div>
+        <div class="ssd-control-deck__note">
+          <strong>${outcome?.headline ?? "Match ended"}</strong><br />
+          ${outcome?.detail ?? "Plotting is disabled until the host resets the duel."}
+        </div>
+      </div>
+    `;
+  }
+
   if (!sessionValue || !plotSummary) {
     return `<div class="ssd-control-deck__note">Waiting for a playable ship and battle snapshot before enabling plot authoring.</div>`;
   }
@@ -1254,6 +1342,28 @@ function renderReadoutStrip(
         <strong>${ship.status.toUpperCase()}</strong>
       </div>
     </div>
+  `;
+}
+
+function renderMatchOutcomeBanner(
+  sessionValue: MatchSessionView | null,
+  identityValue: SessionIdentity | null
+): string {
+  const outcome = getMatchOutcomePresentation(sessionValue, identityValue);
+
+  if (!outcome) {
+    return "";
+  }
+
+  return `
+    <section class="match-outcome-banner match-outcome-banner--${outcome.tone}">
+      <div class="match-outcome-banner__copy">
+        <span class="section-kicker">Match Outcome</span>
+        <strong>${outcome.headline}</strong>
+        <p>${outcome.detail}</p>
+      </div>
+      <div class="match-outcome-banner__hint">${outcome.reset_hint}</div>
+    </section>
   `;
 }
 
@@ -2043,6 +2153,7 @@ function renderActionStripControls(
   plotSummary: PlotDraftSummary | null
 ): string {
   const claimableSlotStates = getClaimableSlotStates(sessionValue, identityValue);
+  const matchEnded = isMatchEnded(sessionValue);
 
   if (!identityValue || identityValue.role !== "player") {
     return `
@@ -2058,6 +2169,22 @@ function renderActionStripControls(
             )
             .join("")}
           ${health?.resetEnabled ? `<button class="action-button action-button--secondary" data-reset-session>Reset match</button>` : ""}
+        </div>
+      </section>
+    `;
+  }
+
+  if (matchEnded) {
+    const outcome = getMatchOutcomePresentation(sessionValue, identityValue);
+
+    return `
+      <section class="commit-strip commit-strip--ended">
+        <div class="commit-strip__status">
+          <span class="section-kicker">Plot Status</span>
+          <strong>${outcome?.headline ?? "Match ended"}</strong>
+        </div>
+        <div class="commit-strip__actions">
+          ${health?.resetEnabled ? `<button class="action-button action-button--primary" data-reset-session>Reset match</button>` : ""}
         </div>
       </section>
     `;
@@ -2118,6 +2245,7 @@ function render(): void {
   );
   const readoutStrip = renderReadoutStrip(sessionValue, identity);
   const actionStripControls = renderActionStripControls(sessionValue, identity, plotSummary);
+  const outcomeBanner = renderMatchOutcomeBanner(sessionValue, identity);
   const footerStrip = renderFooterStrip(sessionValue, playbackEvent);
   const phaseLabel = getPhaseLabel(sessionValue, selectedSystemContext);
   const missionBarClass = `mission-bar${selectedSystemContext?.system.type === "weapon_mount" ? " mission-bar--aim" : ""}`;
@@ -2165,6 +2293,7 @@ function render(): void {
           ${tacticalViewport}
         </article>
       </section>
+      ${outcomeBanner}
       <section class="action-strip">
         <div class="action-strip__readouts">
           ${readoutStrip}
@@ -2444,6 +2573,8 @@ function handleServerMessage(message: ServerToClientMessage): void {
   }
 
   if (message.type === "session_reset") {
+    plotDraft = null;
+    selectedSystemId = null;
     clearResolutionPlayback();
     logMessage(`session reset · ${message.matchId} · turn ${message.turnNumber}`);
     render();
