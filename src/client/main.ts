@@ -1174,6 +1174,7 @@ function renderSchematicSystem(
     <g class="${classes}" data-select-system="${system.id}">
       <rect
         class="ssd-system__hit"
+        data-select-system-hit="${system.id}"
         x="${hitX.toFixed(2)}"
         y="${hitY.toFixed(2)}"
         width="${SCHEMATIC_VIEWPORT.hitWidth}"
@@ -1353,7 +1354,7 @@ function renderSchematicControlDeck(
           />
         </label>
         <label class="ssd-slider-card">
-          <span>Axial Burn</span>
+          <span>Axial Trim</span>
           <strong>${formatSignedNumber(draft.thrust_input.axial_fraction * 100)}%</strong>
           <small>Stern to bow</small>
           <input
@@ -1366,7 +1367,7 @@ function renderSchematicControlDeck(
           />
         </label>
         <label class="ssd-slider-card">
-          <span>Lateral Burn</span>
+          <span>Lateral Trim</span>
           <strong>${formatSignedNumber(draft.thrust_input.lateral_fraction * 100)}%</strong>
           <small>Port to starboard</small>
           <input
@@ -1379,6 +1380,7 @@ function renderSchematicControlDeck(
           />
         </label>
       </div>
+      <p class="ssd-control-deck__hint">Primary controls live on the tactical plot. Use these sliders for fine trim.</p>
       <div class="ssd-control-summary">
         <div class="ssd-summary-chip"><span>Drive</span><strong>${power.drive_pips}</strong></div>
         <div class="ssd-summary-chip"><span>Railgun</span><strong>${power.railgun_pips}</strong></div>
@@ -1801,7 +1803,7 @@ function renderPreviewGhost(sessionValue: MatchSessionView, camera: TacticalCame
       <circle class="plot-preview__ghost-core" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="4" />
       ${
         shouldRenderTacticalText(camera)
-          ? `<text class="plot-preview__ghost-label" x="${center.x.toFixed(2)}" y="${labelY.toFixed(2)}">planned end · ${plotPreview.projected_pose.heading_degrees.toFixed(0).padStart(3, "0")}°</text>`
+          ? `<text class="plot-preview__ghost-label" x="${center.x.toFixed(2)}" y="${labelY.toFixed(2)}">${plotPreview.projected_pose.heading_degrees.toFixed(0).padStart(3, "0")}°</text>`
           : ""
       }
     </g>
@@ -1895,11 +1897,6 @@ function renderPlotInteractionHandles(
             data-plot-drag-handle="thrust"
           />
         </g>
-        ${
-          shouldRenderTacticalText(camera)
-            ? `<text class="plot-handles__label" x="${shipAnchor.x.toFixed(2)}" y="${(shipAnchor.y + TACTICAL_PLOT_HANDLES.thrustRadiusPx + 22).toFixed(2)}">burn vector</text>`
-            : ""
-        }
       </g>
       <g class="plot-handles__heading">
         <circle
@@ -1929,11 +1926,6 @@ function renderPlotInteractionHandles(
           r="9"
           data-plot-drag-handle="heading"
         />
-        ${
-          shouldRenderTacticalText(camera)
-            ? `<text class="plot-handles__label" x="${headingAnchor.x.toFixed(2)}" y="${(headingAnchor.y + TACTICAL_PLOT_HANDLES.headingRadiusPx + 20).toFixed(2)}">end heading</text>`
-            : ""
-        }
       </g>
     </g>
   `;
@@ -1944,6 +1936,7 @@ function renderWeaponCue(
   identityValue: SessionIdentity | null,
   camera: TacticalCamera,
   plotPreview: PlotPreview,
+  focusedMountId: SystemId | null,
   showLabels: boolean
 ): string {
   return plotPreview.weapon_cues
@@ -1961,6 +1954,7 @@ function renderWeaponCue(
       const mountPoint = worldToTacticalViewport(camera, cue.mount_position);
       const targetPoint = worldToTacticalViewport(camera, cue.target_position);
       const isArmed = isArmedWeaponCue(cue);
+      const isFocused = cue.mount_id === focusedMountId;
       const cueClass = !isArmed
         ? "plot-preview__cue--idle"
         : cue.target_in_arc && cue.target_in_range
@@ -1974,8 +1968,11 @@ function renderWeaponCue(
         : "standby";
 
       return `
-        <g class="plot-preview__cue ${cueClass}">
+        <g class="plot-preview__cue ${cueClass}${isFocused ? " plot-preview__cue--focused" : ""}">
           <polygon class="plot-preview__arc" points="${polygonPoints}" />
+          ${
+            isFocused
+              ? `
           <line
             class="plot-preview__target-line"
             x1="${mountPoint.x.toFixed(2)}"
@@ -1984,8 +1981,11 @@ function renderWeaponCue(
             y2="${targetPoint.y.toFixed(2)}"
           />
           <circle class="plot-preview__target-reticle" cx="${targetPoint.x.toFixed(2)}" cy="${targetPoint.y.toFixed(2)}" r="18" />
+          `
+              : ""
+          }
           ${
-            showLabels
+            showLabels && isFocused
               ? `<text class="plot-preview__target-label" x="${targetPoint.x.toFixed(2)}" y="${(targetPoint.y - 24).toFixed(2)}">${cue.label} · ${targetShortLabel} · ${cue.charge_pips}p · ${hitText}</text>`
               : ""
           }
@@ -2018,11 +2018,7 @@ function renderPlotPreviewOverlay(
   return `
     <g class="plot-preview">
       ${renderPreviewPath(camera, focusedPreview)}
-      ${
-        focusedMountId !== null
-          ? renderWeaponCue(sessionValue, identityValue, camera, focusedPreview, shouldRenderTacticalText(camera))
-          : ""
-      }
+      ${renderWeaponCue(sessionValue, identityValue, camera, plotPreview, focusedMountId, shouldRenderTacticalText(camera))}
       ${renderPreviewGhost(sessionValue, camera, focusedPreview)}
     </g>
   `;
@@ -2040,10 +2036,6 @@ function getOffscreenMarkerTextAnchor(camera: TacticalCamera, anchor: Vector2): 
   return "middle";
 }
 
-function getViewportBearingDegrees(camera: TacticalCamera, point: Vector2): number {
-  return normalizeDegrees((Math.atan2(point.x - camera.drawable.center_x, camera.drawable.center_y - point.y) * 180) / Math.PI);
-}
-
 function renderOffscreenMarker(
   camera: TacticalCamera,
   viewpointShip: ShipRuntimeState | null,
@@ -2055,13 +2047,12 @@ function renderOffscreenMarker(
   isSelf: boolean,
   playbackTone: "hit" | "destroyed" | "disengaged" | null
 ): string {
-  const projected = worldToTacticalViewport(camera, ship.pose.position);
   const anchor = clampWorldPointToTacticalViewportEdge(camera, ship.pose.position, TACTICAL_VIEWPORT.markerInsetPx);
   const targetAttribute = isTargetable ? `data-target-ship="${ship.ship_instance_id}"` : "";
   const labelAnchor = getOffscreenMarkerTextAnchor(camera, anchor);
   const labelX =
     labelAnchor === "start" ? anchor.x + 18 : labelAnchor === "end" ? anchor.x - 18 : anchor.x;
-  const bearingDegrees = getViewportBearingDegrees(camera, projected) - 90;
+  const bearingDegrees = getHeadingDegreesInTacticalCamera(camera, ship.pose.heading_degrees) - 90;
   const rangeText = viewpointShip
     ? formatDistance(
         Math.hypot(ship.pose.position.x - viewpointShip.pose.position.x, ship.pose.position.y - viewpointShip.pose.position.y)
@@ -2194,7 +2185,7 @@ function renderScaleBar(camera: TacticalCamera): string {
   `;
 }
 
-function renderTacticalCameraControls(camera: TacticalCamera | null): string {
+function renderTacticalCameraControls(): string {
   const zoomMarkup = TACTICAL_ZOOM_PRESETS.map((preset) => {
     const active = tacticalCameraSelection.zoom_preset_id === preset.id;
 
@@ -2209,11 +2200,6 @@ function renderTacticalCameraControls(camera: TacticalCamera | null): string {
         <span class="camera-controls__label">Zoom</span>
         <div class="camera-toggle-row">${zoomMarkup}</div>
       </div>
-      ${
-        camera
-          ? `<div class="camera-controls__readout">${getTacticalZoomPresetDefinition(camera.selection.zoom_preset_id).short_label}</div>`
-          : ""
-      }
     </div>
   `;
 }
@@ -2587,7 +2573,7 @@ function render(): void {
   const tacticalHint =
     selectedSystemContext?.system.type === "weapon_mount"
       ? "Aim mode overlays the selected mount."
-      : "Drag burn and end-heading handles directly on the plot.";
+      : "Drag burn and heading directly on the plot.";
   const stationLabel = getBridgeStationLabel(identity, displayed?.shipConfig.name ?? null);
   const situationalStatus =
     identity?.role === "player" ? capitalizeLabel(getOpponentStatusLabel(sessionValue, identity)) : "Spectator view";
@@ -2620,7 +2606,7 @@ function render(): void {
             <div class="tactical-panel__meta">
                 <span>${tacticalHint}</span>
             </div>
-              ${renderTacticalCameraControls(camera)}
+              ${renderTacticalCameraControls()}
             </div>
           </div>
           ${tacticalViewport}

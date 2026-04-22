@@ -112,8 +112,8 @@ body.is-plot-dragging {
 
 .bridge-main {
   display: grid;
-  grid-template-columns: minmax(320px, 34fr) minmax(560px, 66fr);
-  gap: 10px;
+  grid-template-columns: minmax(316px, 32fr) minmax(580px, 68fr);
+  gap: 8px;
   padding: 10px 12px 0;
   min-height: 0;
 }
@@ -129,7 +129,7 @@ body.is-plot-dragging {
 }
 
 .bridge-panel--tactical {
-  padding: 8px;
+  padding: 6px;
 }
 
 .schematic-shell,
@@ -313,14 +313,15 @@ body.is-plot-dragging {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  opacity: 0.82;
 }
 
 .ssd-slider-card {
   display: grid;
   gap: 4px;
   padding: 8px 10px;
-  border: 1px solid rgba(125, 176, 218, 0.14);
-  background: rgba(11, 24, 36, 0.82);
+  border: 1px dashed rgba(125, 176, 218, 0.16);
+  background: rgba(9, 20, 31, 0.56);
 }
 
 .ssd-slider-card span,
@@ -346,6 +347,13 @@ body.is-plot-dragging {
   width: 100%;
   margin: 0;
   accent-color: rgba(125, 213, 154, 0.95);
+}
+
+.ssd-control-deck__hint {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.75rem;
+  pointer-events: none;
 }
 
 .ssd-control-summary {
@@ -504,6 +512,7 @@ body.is-plot-dragging {
 
 .ssd-system__body {
   stroke-width: 1.8;
+  pointer-events: none;
 }
 
 .ssd-system {
@@ -602,35 +611,35 @@ body.is-plot-dragging {
 .tactical-panel__header {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   align-items: flex-start;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .tactical-panel__header-right {
   display: grid;
   justify-items: end;
-  gap: 4px;
+  gap: 2px;
 }
 
 .tactical-panel__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 10px;
+  gap: 4px 8px;
   justify-content: flex-end;
   color: var(--text-1);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
 }
 
 .camera-controls {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   justify-items: end;
 }
 
 .camera-controls__group {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   justify-items: end;
 }
 
@@ -646,7 +655,7 @@ body.is-plot-dragging {
 .camera-toggle-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
   justify-content: flex-end;
 }
 
@@ -705,8 +714,9 @@ body.is-plot-dragging {
 }
 
 .ship-glyph__velocity {
-  stroke: rgba(125, 176, 218, 0.45);
-  stroke-width: 2;
+  stroke: rgba(125, 176, 218, 0.34);
+  stroke-width: 1.6;
+  stroke-dasharray: 5 5;
 }
 
 .ship-glyph__hit {
@@ -802,7 +812,7 @@ body.is-plot-dragging {
 }
 
 .offscreen-marker__arrow {
-  fill: rgba(120, 191, 235, 0.24);
+  fill: rgba(120, 191, 235, 0.18);
   stroke: rgba(166, 225, 255, 0.78);
   stroke-width: 1.5;
 }
@@ -866,20 +876,20 @@ body.is-plot-dragging {
 }
 
 .plot-preview__ghost-hull {
-  fill: rgba(125, 213, 154, 0.05);
-  stroke: rgba(125, 213, 154, 0.62);
+  fill: rgba(125, 213, 154, 0.04);
+  stroke: rgba(125, 213, 154, 0.54);
   stroke-width: 1.6;
   stroke-dasharray: 6 5;
 }
 
 .plot-preview__ghost-heading {
-  stroke: rgba(125, 213, 154, 0.66);
+  stroke: rgba(125, 213, 154, 0.56);
   stroke-width: 1.8;
   stroke-dasharray: 5 4;
 }
 
 .plot-preview__ghost-core {
-  fill: rgba(125, 213, 154, 0.68);
+  fill: rgba(125, 213, 154, 0.56);
 }
 
 .plot-preview__ghost-label,
@@ -896,18 +906,32 @@ body.is-plot-dragging {
 }
 
 .plot-preview__cue--valid .plot-preview__arc {
-  fill: rgba(125, 213, 154, 0.08);
-  stroke: rgba(125, 213, 154, 0.38);
+  fill: none;
+  stroke: rgba(125, 213, 154, 0.34);
 }
 
 .plot-preview__cue--warn .plot-preview__arc {
-  fill: rgba(236, 126, 116, 0.08);
-  stroke: rgba(236, 126, 116, 0.32);
+  fill: none;
+  stroke: rgba(236, 126, 116, 0.3);
 }
 
 .plot-preview__cue--idle .plot-preview__arc {
-  fill: rgba(125, 176, 218, 0.05);
+  fill: none;
   stroke: rgba(125, 176, 218, 0.26);
+}
+
+.plot-preview__cue--focused.plot-preview__cue--valid .plot-preview__arc {
+  fill: rgba(125, 213, 154, 0.08);
+  stroke: rgba(125, 213, 154, 0.52);
+}
+
+.plot-preview__cue--focused.plot-preview__cue--warn .plot-preview__arc {
+  fill: rgba(236, 126, 116, 0.08);
+  stroke: rgba(236, 126, 116, 0.46);
+}
+
+.plot-preview__cue--focused.plot-preview__cue--idle .plot-preview__arc {
+  stroke: rgba(125, 176, 218, 0.4);
 }
 
 .plot-preview__target-line {

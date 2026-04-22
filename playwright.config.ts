@@ -20,6 +20,10 @@ export default defineConfig({
   use: {
     baseURL,
     headless: true,
+    viewport: {
+      width: 1600,
+      height: 1000
+    },
     ...(chromeExecutablePath
       ? {
           launchOptions: {

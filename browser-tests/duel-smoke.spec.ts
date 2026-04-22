@@ -14,7 +14,7 @@ test("two players can aim, submit, and resolve a turn", async ({ browser, baseUR
     await expect(hostPage.locator("[data-turn-number]")).toHaveText("Turn 1");
     await expect(guestPage.locator("[data-turn-number]")).toHaveText("Turn 1");
 
-    await hostPage.locator('[data-select-system="forward_mount"]').click();
+    await hostPage.locator('[data-select-system-hit="forward_mount"]').click();
     await expect(hostPage.locator("[data-phase-label]")).toHaveText("AIM MODE");
     await hostPage.keyboard.press("Escape");
     await expect(hostPage.locator("[data-phase-label]")).toHaveText("PLOT PHASE");
