@@ -3,8 +3,8 @@
 > Created in this repository on 2026-04-21.
 > This is a holding pen for UI issues we have noticed but are intentionally deferring so current work stays vertical-slice focused.
 
-**Status:** active scratch list  
-**Scope:** v0.1 client/UI cleanup backlog  
+**Status:** active scratch list
+**Scope:** remaining v0.2 client/UI cleanup backlog
 **Rule:** items here do not automatically become the next task
 
 ## How to use this file
@@ -22,21 +22,18 @@
 ## Deferred UI cleanup
 
 - Tactical board proportions still need tuning so the main viewport consistently feels dominant over the SSD.
-- Camera-mode controls work, but the chrome is still temporary and visually heavier than the final design should be.
+- The tactical view still needs a cleaner separation between current velocity/drift cues and planned burn/ghost cues.
+- Contact markers need one more readability pass so heading / closure information is obvious at a glance without overloading the scope.
 - Selected-target / armed-shot state should be more obvious in both the SSD and tactical view.
-- Tactical header copy and diagnostics should get tighter once the underlying interactions settle.
-- The SSD still mixes temporary engineering readouts with player-facing controls in places.
+- Tactical header and overlay copy should get one more compression pass now that the main interactions are stable.
+- The SSD trim sliders are useful, but they should stay visibly secondary to direct tactical plotting.
 - The bottom strip and footer copy need a later compression pass once the final information hierarchy is clearer.
 - Combat and outcome events need a cleaner player-facing presentation than raw-ish resolution summaries.
 - Aim-mode overlays need another readability pass once more real combat cases are exercised.
-- Keyboard shortcuts and on-screen key labels from the layout spec are not implemented yet.
-- The current UI is structurally closer to the intended SSD shell, but not yet at the final design pass for spacing, typography, or visual consistency.
+- Basic sounds and modest replay-motion polish still need a deliberate pass.
+- The current UI is structurally close to the intended SSD shell, but not yet at the final spacing / typography / visual-consistency pass.
 
-## Candidate cleanup pass trigger
+## Related implementation cleanup
 
-Do the dedicated UI cleanup pass when all of these are true:
-
-- local two-player play is stable
-- tunnel-based remote play has been tested at least once
-- the tactical camera modes have been exercised enough to know which ones survive
-- one more gameplay slice has landed after the current camera work
+- `src/client/main.ts` is still oversized and should be split into smaller render / input / screen-composition modules once the current UI behavior settles.
+- `src/client/style.css` still carries too much mixed responsibility and should be broken into clearer tactical / schematic / chrome sections when that refactor earns its cost.
