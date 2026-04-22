@@ -141,8 +141,10 @@ const SCHEMATIC_VIEWPORT = {
   centerX: 210,
   centerY: 262,
   scalePx: 208,
-  systemWidth: 108,
-  systemHeight: 38
+  hitWidth: 108,
+  hitHeight: 38,
+  bodyWidth: 76,
+  bodyHeight: 28
 } as const;
 
 function normalizeDegrees(angle: number): number {
@@ -940,13 +942,28 @@ function getSystemShortLabel(system: ShipSystemConfig): string {
   const explicit = system.render?.short_label;
 
   if (explicit) {
-    return explicit;
+    return explicit.toUpperCase();
   }
 
-  const label = system.render?.label ?? system.id.replaceAll("_", " ");
-  const firstWord = label.split(" ")[0];
+  const label = (system.render?.label ?? system.id.replaceAll("_", " ")).toUpperCase();
 
-  return firstWord ? firstWord.toUpperCase() : system.id.toUpperCase();
+  if (label.length <= 12) {
+    return label;
+  }
+
+  const words = label.split(/\s+/).filter(Boolean);
+
+  if (words.length > 1) {
+    const abbreviated = words
+      .map((word, index) => (word.length <= 4 ? word : word.slice(0, index === words.length - 1 ? 5 : 3)))
+      .join(" ");
+
+    if (abbreviated.length <= 12) {
+      return abbreviated;
+    }
+  }
+
+  return label.slice(0, 12).trim();
 }
 
 function renderHeadingCompass(headingDegrees: number): string {
@@ -993,7 +1010,7 @@ function renderSchematicSystem(
   ship: ShipRuntimeState,
   system: ShipSystemConfig,
   selectedSystemValue: SystemId | null,
-  weaponIntent: Pick<WeaponIntentPresentation, "is_armed" | "system_meta_label"> | null,
+  weaponIntent: Pick<WeaponIntentPresentation, "is_armed"> | null,
   playbackTone: "hit" | "critical" | null
 ): string {
   const stateAndEffects = getSystemStateAndEffects(state, ship, system.id);
@@ -1004,8 +1021,10 @@ function renderSchematicSystem(
   }
 
   const position = localToSchematic(system.ssd_position ?? system.physical_position);
-  const x = position.x - SCHEMATIC_VIEWPORT.systemWidth / 2;
-  const y = position.y - SCHEMATIC_VIEWPORT.systemHeight / 2;
+  const hitX = position.x - SCHEMATIC_VIEWPORT.hitWidth / 2;
+  const hitY = position.y - SCHEMATIC_VIEWPORT.hitHeight / 2;
+  const bodyX = position.x - SCHEMATIC_VIEWPORT.bodyWidth / 2;
+  const bodyY = position.y - SCHEMATIC_VIEWPORT.bodyHeight / 2;
   const integrityPercent = (runtimeSystem.current_integrity / system.max_integrity) * 100;
 
   const classes = [
@@ -1019,27 +1038,25 @@ function renderSchematicSystem(
   ]
     .filter(Boolean)
     .join(" ");
-  const metaLabel = weaponIntent?.system_meta_label
-    ? `${weaponIntent.system_meta_label} · ${formatPercent(integrityPercent)}`
-    : `${stateAndEffects.state_label.toUpperCase()} · ${formatPercent(integrityPercent)}`;
+  const metaLabel = formatPercent(integrityPercent);
 
   return `
     <g class="${classes}" data-select-system="${system.id}">
       <rect
         class="ssd-system__hit"
-        x="${x.toFixed(2)}"
-        y="${y.toFixed(2)}"
-        width="${SCHEMATIC_VIEWPORT.systemWidth}"
-        height="${SCHEMATIC_VIEWPORT.systemHeight}"
-        rx="12"
+        x="${hitX.toFixed(2)}"
+        y="${hitY.toFixed(2)}"
+        width="${SCHEMATIC_VIEWPORT.hitWidth}"
+        height="${SCHEMATIC_VIEWPORT.hitHeight}"
+        rx="14"
       />
-      <rect class="ssd-system__body" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${
-        SCHEMATIC_VIEWPORT.systemWidth
-      }" height="${SCHEMATIC_VIEWPORT.systemHeight}" rx="12" />
-      <text class="ssd-system__label" x="${position.x.toFixed(2)}" y="${(position.y - 4).toFixed(2)}">
+      <rect class="ssd-system__body" x="${bodyX.toFixed(2)}" y="${bodyY.toFixed(2)}" width="${
+        SCHEMATIC_VIEWPORT.bodyWidth
+      }" height="${SCHEMATIC_VIEWPORT.bodyHeight}" rx="10" />
+      <text class="ssd-system__label" x="${position.x.toFixed(2)}" y="${(position.y - 2).toFixed(2)}">
         ${getSystemShortLabel(system)}
       </text>
-      <text class="ssd-system__meta" x="${position.x.toFixed(2)}" y="${(position.y + 12).toFixed(2)}">
+      <text class="ssd-system__meta" x="${position.x.toFixed(2)}" y="${(position.y + 10).toFixed(2)}">
         ${metaLabel}
       </text>
     </g>
@@ -1252,9 +1269,8 @@ function renderSchematicViewport(
   const { participant, ship, shipConfig } = displayed;
   const hullPercent = (ship.hull.current_integrity / shipConfig.hull.max_integrity) * 100;
   const reactorPips = getAvailableReactorPips(sessionValue.battle_state, ship);
-  const mount = shipConfig.systems.find((system) => system.type === "weapon_mount");
-  const mountState = mount ? getSystemStateAndEffects(sessionValue.battle_state, ship, mount.id).state_label : "offline";
-  const weaponIntentByMountId = new Map<SystemId, Pick<WeaponIntentPresentation, "is_armed" | "system_meta_label">>();
+  const speed = Math.hypot(ship.pose.velocity.x, ship.pose.velocity.y);
+  const weaponIntentByMountId = new Map<SystemId, Pick<WeaponIntentPresentation, "is_armed">>();
 
   if (plotSummary) {
     for (const weapon of plotSummary.draft.weapons) {
@@ -1269,8 +1285,7 @@ function renderSchematicViewport(
       );
 
       weaponIntentByMountId.set(weapon.mount_id, {
-        is_armed: intent.is_armed,
-        system_meta_label: intent.system_meta_label
+        is_armed: intent.is_armed
       });
     }
   }
@@ -1288,86 +1303,75 @@ function renderSchematicViewport(
       )
     )
     .join("");
+  const controlDeck = renderSchematicControlDeck(sessionValue, identityValue, plotSummary, selectedSystemContext, plotPreview);
+  const schematicKicker = identityValue?.role === "player" ? "Your Ship" : participant.slot_id.toUpperCase();
 
   return `
     <section class="schematic-shell">
       <div class="schematic-shell__header">
-        <div>
-          <span class="section-kicker">${participant.slot_id.toUpperCase()}</span>
-          <h2>${shipConfig.name}</h2>
-          <p>${ship.ship_instance_id} · fixed-orientation SSD shell</p>
+        <div class="schematic-shell__header-main">
+          <div>
+            <span class="section-kicker">${schematicKicker}</span>
+            <h2>${shipConfig.name}</h2>
+            <p>Fixed-orientation ship schematic</p>
+          </div>
+          <div class="ssd-status-grid">
+            <article class="status-tile">
+              <span>Hull</span>
+              <strong>${formatPercent(hullPercent)}</strong>
+            </article>
+            <article class="status-tile">
+              <span>Reactor</span>
+              <strong>${reactorPips} pips</strong>
+            </article>
+            <article class="status-tile">
+              <span>Velocity</span>
+              <strong>${formatNumber(speed)}</strong>
+            </article>
+          </div>
         </div>
         ${renderHeadingCompass(ship.pose.heading_degrees)}
       </div>
-      <div class="ssd-viewport">
-        <div class="ssd-status-grid">
-          <article class="status-tile">
-            <span>Hull</span>
-            <strong>${formatPercent(hullPercent)}</strong>
-          </article>
-          <article class="status-tile">
-            <span>Reactor</span>
-            <strong>${reactorPips} pips</strong>
-          </article>
-          <article class="status-tile">
-            <span>Mount</span>
-            <strong>${mountState.toUpperCase()}</strong>
-          </article>
+      <div class="schematic-shell__body">
+        <div class="ssd-viewport">
+          <svg viewBox="0 0 ${SCHEMATIC_VIEWPORT.width} ${SCHEMATIC_VIEWPORT.height}" aria-label="Ship schematic">
+            <rect class="ssd-viewport__frame" x="10" y="10" width="${SCHEMATIC_VIEWPORT.width - 20}" height="${
+              SCHEMATIC_VIEWPORT.height - 20
+            }" rx="24" />
+            ${renderSchematicHull(shipConfig)}
+            ${systems}
+          </svg>
         </div>
-        <svg viewBox="0 0 ${SCHEMATIC_VIEWPORT.width} ${SCHEMATIC_VIEWPORT.height}" aria-label="Ship schematic">
-          <rect class="ssd-viewport__frame" x="10" y="10" width="${SCHEMATIC_VIEWPORT.width - 20}" height="${
-            SCHEMATIC_VIEWPORT.height - 20
-          }" rx="24" />
-          ${renderSchematicHull(shipConfig)}
-          ${systems}
-        </svg>
-        ${renderSchematicControlDeck(sessionValue, identityValue, plotSummary, selectedSystemContext, plotPreview)}
+        ${controlDeck}
       </div>
     </section>
   `;
 }
 
-function renderReadoutStrip(
-  sessionValue: MatchSessionView | null,
-  identityValue: SessionIdentity | null
-): string {
-  const displayed = getDisplayedShipContext(sessionValue, identityValue);
-
-  if (!displayed || !sessionValue) {
+function renderReadoutStrip(sessionValue: MatchSessionView | null, plotSummary: PlotDraftSummary | null): string {
+  if (!plotSummary) {
     return `
       <div class="readout-strip">
-        <div class="readout-chip"><span>Heading</span><strong>...</strong></div>
-        <div class="readout-chip"><span>Velocity</span><strong>...</strong></div>
-        <div class="readout-chip"><span>Status</span><strong>...</strong></div>
+        <div class="readout-chip"><span>Turn</span><strong>...</strong></div>
+        <div class="readout-chip"><span>Drive</span><strong>...</strong></div>
+        <div class="readout-chip"><span>Railgun</span><strong>...</strong></div>
       </div>
     `;
   }
 
-  const { ship, shipConfig } = displayed;
-  const availablePips = getAvailableReactorPips(sessionValue.battle_state, ship);
-  const speed = Math.hypot(ship.pose.velocity.x, ship.pose.velocity.y);
-
   return `
     <div class="readout-strip">
       <div class="readout-chip">
-        <span>Heading</span>
-        <strong>${formatNumber(ship.pose.heading_degrees)}°</strong>
+        <span>Turn</span>
+        <strong>${formatSignedNumber(plotSummary.draft.heading_delta_degrees)}°</strong>
       </div>
       <div class="readout-chip">
-        <span>Velocity</span>
-        <strong>${formatNumber(speed)}</strong>
+        <span>Drive</span>
+        <strong>${plotSummary.power.drive_pips}</strong>
       </div>
       <div class="readout-chip">
-        <span>Hull</span>
-        <strong>${ship.hull.current_integrity} / ${shipConfig.hull.max_integrity}</strong>
-      </div>
-      <div class="readout-chip">
-        <span>Reactor</span>
-        <strong>${availablePips} pips</strong>
-      </div>
-      <div class="readout-chip">
-        <span>Status</span>
-        <strong>${ship.status.toUpperCase()}</strong>
+        <span>Railgun</span>
+        <strong>${plotSummary.power.railgun_pips}</strong>
       </div>
     </div>
   `;
@@ -2321,7 +2325,7 @@ function render(): void {
     plotPreview,
     playbackEvent
   );
-  const readoutStrip = renderReadoutStrip(sessionValue, identity);
+  const readoutStrip = renderReadoutStrip(sessionValue, plotSummary);
   const actionStripControls = renderActionStripControls(sessionValue, identity, plotSummary);
   const outcomeBanner = renderMatchOutcomeBanner(sessionValue, identity);
   const footerStrip = renderFooterStrip(sessionValue, playbackEvent);

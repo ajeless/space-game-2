@@ -155,6 +155,19 @@ body.is-plot-dragging {
   align-items: flex-start;
 }
 
+.schematic-shell__header-main {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.schematic-shell__body {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
 .schematic-shell__header h2,
 .tactical-panel__header h2,
 .console-panel h2 {
@@ -194,17 +207,14 @@ body.is-plot-dragging {
 }
 
 .ssd-status-grid {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 1;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  width: min(148px, calc(100% - 32px));
 }
 
 .status-tile {
-  padding: 9px 10px;
+  min-width: 96px;
+  padding: 8px 10px;
   border: 1px solid rgba(125, 176, 218, 0.22);
   background: rgba(9, 24, 37, 0.88);
 }
@@ -231,6 +241,7 @@ body.is-plot-dragging {
   justify-items: center;
   gap: 6px;
   min-width: 104px;
+  align-self: start;
 }
 
 .heading-compass svg {
@@ -261,11 +272,6 @@ body.is-plot-dragging {
 }
 
 .ssd-control-deck {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 14px;
-  z-index: 2;
   display: grid;
   gap: 8px;
   padding: 10px;
@@ -491,18 +497,18 @@ body.is-plot-dragging {
 }
 
 .ssd-hull__shape {
-  fill: rgba(103, 133, 157, 0.18);
-  stroke: rgba(186, 208, 222, 0.42);
+  fill: rgba(103, 133, 157, 0.14);
+  stroke: rgba(186, 208, 222, 0.5);
   stroke-width: 2;
 }
 
 .ssd-hull__spine {
-  stroke: rgba(186, 208, 222, 0.16);
+  stroke: rgba(186, 208, 222, 0.22);
   stroke-width: 2;
 }
 
 .ssd-system__body {
-  stroke-width: 2;
+  stroke-width: 1.8;
 }
 
 .ssd-system {
@@ -521,34 +527,34 @@ body.is-plot-dragging {
 }
 
 .ssd-system__label {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
 }
 
 .ssd-system__meta {
-  font-size: 10px;
+  font-size: 8px;
   letter-spacing: 0.06em;
 }
 
 .ssd-system--weapon_mount .ssd-system__body {
-  fill: rgba(105, 68, 17, 0.74);
-  stroke: rgba(196, 138, 43, 0.9);
+  fill: rgba(105, 68, 17, 0.48);
+  stroke: rgba(196, 138, 43, 0.82);
 }
 
 .ssd-system--reactor .ssd-system__body {
-  fill: rgba(22, 58, 96, 0.8);
-  stroke: rgba(56, 128, 204, 0.92);
+  fill: rgba(22, 58, 96, 0.5);
+  stroke: rgba(56, 128, 204, 0.84);
 }
 
 .ssd-system--bridge .ssd-system__body {
-  fill: rgba(17, 69, 56, 0.8);
-  stroke: rgba(35, 132, 105, 0.92);
+  fill: rgba(17, 69, 56, 0.5);
+  stroke: rgba(35, 132, 105, 0.84);
 }
 
 .ssd-system--drive .ssd-system__body {
-  fill: rgba(58, 57, 53, 0.8);
-  stroke: rgba(143, 138, 130, 0.92);
+  fill: rgba(58, 57, 53, 0.5);
+  stroke: rgba(143, 138, 130, 0.84);
 }
 
 .ssd-system--degraded .ssd-system__body {
@@ -563,7 +569,7 @@ body.is-plot-dragging {
 
 .ssd-system--selected .ssd-system__body {
   stroke: rgba(242, 200, 121, 0.98);
-  filter: drop-shadow(0 0 10px rgba(242, 200, 121, 0.22));
+  filter: drop-shadow(0 0 8px rgba(242, 200, 121, 0.18));
 }
 
 .ssd-system--selected .ssd-system__meta {
@@ -572,7 +578,7 @@ body.is-plot-dragging {
 
 .ssd-system--armed .ssd-system__body {
   stroke: rgba(125, 213, 154, 0.96);
-  filter: drop-shadow(0 0 8px rgba(125, 213, 154, 0.18));
+  filter: drop-shadow(0 0 6px rgba(125, 213, 154, 0.14));
 }
 
 .ssd-system--armed .ssd-system__meta {
@@ -1302,6 +1308,10 @@ body.is-plot-dragging {
     display: grid;
   }
 
+  .schematic-shell__body {
+    grid-template-rows: minmax(320px, 1fr) auto;
+  }
+
   .tactical-panel__header-right {
     justify-items: stretch;
   }
@@ -1320,7 +1330,6 @@ body.is-plot-dragging {
   }
 
   .ssd-control-deck {
-    position: static;
-    margin: 12px;
+    margin: 0;
   }
 }

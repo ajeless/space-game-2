@@ -35,7 +35,8 @@
       "physical_position": { "x": 0, "y": -0.35 },
       "max_integrity": 24,
       "render": {
-        "label": "FORWARD MOUNT",
+        "label": "BOW RAILGUN",
+        "short_label": "RAILGUN",
         "style_role": "weapon_mount"
       },
       "parameters": {
