@@ -333,6 +333,10 @@ export class MatchSession {
       throw new Error("spectators cannot submit plots");
     }
 
+    if (this.battleState.outcome.end_reason !== null) {
+      throw new Error("match already ended");
+    }
+
     const plot = validatePlotSubmission(plotInput, this.battleState);
 
     if (plot.ship_instance_id !== identity.ship_instance_id) {

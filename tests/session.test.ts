@@ -125,4 +125,67 @@ describe("MatchSession", () => {
       connection_state: "connected"
     });
   });
+
+  it("preserves a submitted plot across reconnect token resume and resolves the turn", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+    const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/alpha_turn_1.json"), battleState);
+    const bravoPlot = validatePlotSubmission(await readJson("fixtures/plots/bravo_turn_1.json"), battleState);
+    const session = new MatchSession(battleState);
+
+    const alphaIdentity = session.connectClient("client_1").identity;
+    session.connectClient("client_2");
+    session.submitPlot("client_1", alphaPlot);
+    session.disconnectClient("client_1");
+
+    const resumedAlpha = session.connectClient("client_3", alphaIdentity.reconnect_token).identity;
+    const resolved = session.submitPlot("client_2", bravoPlot);
+
+    expect(resumedAlpha.ship_instance_id).toBe("alpha_ship");
+    expect(resumedAlpha.reconnect_token).toBe(alphaIdentity.reconnect_token);
+    expect(resolved.resolution_committed).toBe(true);
+    expect(resolved.session.pending_plot_ship_ids).toEqual([]);
+    expect(resolved.session.battle_state.turn_number).toBe(2);
+  });
+
+  it("preserves a disconnected player's submitted plot when a fresh spectator claims the slot", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+    const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/alpha_turn_1.json"), battleState);
+    const bravoPlot = validatePlotSubmission(await readJson("fixtures/plots/bravo_turn_1.json"), battleState);
+    const session = new MatchSession(battleState);
+
+    session.connectClient("client_1");
+    session.connectClient("client_2");
+    session.submitPlot("client_2", bravoPlot);
+    session.disconnectClient("client_2");
+
+    const spectatorIdentity = session.connectClient("client_3").identity;
+    expect(spectatorIdentity.role).toBe("spectator");
+
+    const claim = session.claimSlot("client_3", "bravo");
+    const resolved = session.submitPlot("client_1", alphaPlot);
+
+    expect(claim.identity.slot_id).toBe("bravo");
+    expect(claim.session.pending_plot_ship_ids).toEqual(["bravo_ship"]);
+    expect(resolved.resolution_committed).toBe(true);
+    expect(resolved.session.pending_plot_ship_ids).toEqual([]);
+    expect(resolved.session.battle_state.turn_number).toBe(2);
+  });
+
+  it("rejects server-side plot submission after the match has already ended", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+    const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/alpha_turn_1.json"), battleState);
+    const session = new MatchSession(battleState);
+
+    battleState.outcome = {
+      winner_ship_instance_id: "alpha_ship",
+      end_reason: "destroyed"
+    };
+    battleState.ships.bravo_ship!.status = "destroyed";
+
+    const endedSession = new MatchSession(battleState);
+    endedSession.connectClient("client_1");
+
+    expect(() => endedSession.submitPlot("client_1", alphaPlot)).toThrow("match already ended");
+    expect(session.getView().battle_state.outcome.end_reason).toBeNull();
+  });
 });
