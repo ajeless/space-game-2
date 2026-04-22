@@ -24,6 +24,8 @@ The host server now reads these environment variables:
   Optional. Enables the authenticated session reset endpoint.
 - `SG2_EXTERNAL_ORIGIN`
   Optional. Purely diagnostic for now. Shows what public origin the host expects remote players to use.
+- `SG2_RECONNECT_GRACE_MS`
+  Optional. Default: `120000`. How long a disconnected player slot stays reserved for reconnect before it becomes open again.
 
 ## Local host startup
 
@@ -81,9 +83,13 @@ This value is informational only. The client already uses a relative websocket U
    - both players can submit plots
    - the turn resolves after both plots arrive
 
+If a fully fresh browser context reconnects after a player slot was disconnected and lost its local reconnect token, it can reclaim the reserved seat with the in-app `Claim <slot>` control while that slot is still marked `reconnecting`.
+
 ## Resetting the session
 
 The reset endpoint is intentionally disabled unless `SG2_ADMIN_TOKEN` is set.
+
+When reset is enabled, the browser UI also exposes a minimal `Reset match` button. The first use prompts for the admin token locally, then reuses it from browser storage for later resets.
 
 When enabled, reset the current match with:
 

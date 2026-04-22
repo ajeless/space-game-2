@@ -105,7 +105,9 @@ function getResetToken(request: IncomingMessage, requestUrl: URL, body: unknown)
 async function bootstrap() {
   const config = getServerConfig();
   const initialBattleState = await loadBattleState(config.battle_state_fixture_path);
-  const session = new MatchSession(initialBattleState);
+  const session = new MatchSession(initialBattleState, {
+    reconnect_grace_ms: config.reconnect_grace_ms
+  });
   let nextClientId = 1;
   const clients = new Map<string, WebSocket>();
 
@@ -140,7 +142,8 @@ async function bootstrap() {
       fixturePath: config.battle_state_fixture_path,
       host: config.host,
       port: config.port,
-      externalOrigin: config.external_origin
+      externalOrigin: config.external_origin,
+      reconnectGraceMs: config.reconnect_grace_ms
     };
   }
 
@@ -232,7 +235,9 @@ async function bootstrap() {
   const websocketServer = new WebSocketServer({ noServer: true });
 
   server.on("upgrade", (request, socket, head) => {
-    if (request.url !== "/ws") {
+    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+
+    if (requestUrl.pathname !== "/ws") {
       socket.destroy();
       return;
     }
@@ -242,14 +247,26 @@ async function bootstrap() {
     });
   });
 
-  websocketServer.on("connection", (client) => {
+  websocketServer.on("connection", (client, request) => {
     const clientId = `client_${nextClientId}`;
     nextClientId += 1;
     clients.set(clientId, client);
+    const requestUrl = new URL(request.url ?? "/ws", "http://127.0.0.1");
+    const reconnectToken = requestUrl.searchParams.get("reconnectToken");
+    const connectionResult = session.connectClient(clientId, reconnectToken);
+
+    if (connectionResult.displaced_client_id) {
+      send(connectionResult.displaced_client_id, {
+        type: "error",
+        message: "session resumed in another browser tab"
+      });
+      clients.get(connectionResult.displaced_client_id)?.close(4001, "session resumed elsewhere");
+      clients.delete(connectionResult.displaced_client_id);
+    }
 
     send(clientId, {
       type: "hello",
-      identity: session.connectClient(clientId),
+      identity: connectionResult.identity,
       session: session.getView()
     });
     broadcast({
@@ -260,6 +277,21 @@ async function bootstrap() {
     client.on("message", (payload) => {
       try {
         const parsed = JSON.parse(payload.toString()) as ClientToServerMessage;
+
+        if (parsed.type === "claim_slot") {
+          const claim = session.claimSlot(clientId, parsed.slot_id);
+
+          send(clientId, {
+            type: "hello",
+            identity: claim.identity,
+            session: claim.session
+          });
+          broadcast({
+            type: "session_state",
+            session: claim.session
+          });
+          return;
+        }
 
         if (parsed.type !== "submit_plot") {
           send(clientId, { type: "error", message: "unknown message type" });

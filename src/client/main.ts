@@ -45,6 +45,8 @@ type HealthResponse = {
   rulesId: string;
   participantCount: number;
   shipCatalogCount: number;
+  resetEnabled: boolean;
+  reconnectGraceMs: number;
 };
 
 function getRootElement(): HTMLDivElement {
@@ -58,12 +60,15 @@ function getRootElement(): HTMLDivElement {
 }
 
 const root = getRootElement();
+const RECONNECT_TOKEN_STORAGE_KEY = "sg2_reconnect_token";
+const ADMIN_TOKEN_STORAGE_KEY = "sg2_admin_token";
 
 let health: HealthResponse | null = null;
 let wsState: "connecting" | "connected" | "closed" | "error" = "connecting";
 let identity: SessionIdentity | null = null;
 let session: MatchSessionView | null = null;
 let socket: WebSocket | null = null;
+let reconnectTimer: number | null = null;
 let plotDraft: PlotDraft | null = null;
 let selectedSystemId: SystemId | null = null;
 let tacticalCameraSelection: TacticalCameraSelection = createDefaultTacticalCameraSelection();
@@ -81,6 +86,27 @@ type ResolutionPlaybackState = {
 };
 let resolutionPlayback: ResolutionPlaybackState | null = null;
 let resolutionPlaybackTimer: number | null = null;
+
+function readStoredValue(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredValue(key: string, value: string | null): void {
+  try {
+    if (value === null) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+
+    window.localStorage.setItem(key, value);
+  } catch {
+    // ignore storage failures in v0.1
+  }
+}
 
 function logMessage(message: string): void {
   messages.unshift(message);
@@ -376,6 +402,59 @@ function getDisplayedShipContext(
   };
 }
 
+function getSlotConnectionState(
+  sessionValue: MatchSessionView | null,
+  slotId: string | null
+): MatchSessionView["slot_states"][number]["connection_state"] | null {
+  if (!sessionValue || !slotId) {
+    return null;
+  }
+
+  return sessionValue.slot_states.find((slotState) => slotState.slot_id === slotId)?.connection_state ?? null;
+}
+
+function formatSlotConnectionLabel(
+  sessionValue: MatchSessionView | null,
+  slotId: string | null
+): string {
+  const connectionState = getSlotConnectionState(sessionValue, slotId);
+
+  if (!slotId || !connectionState) {
+    return "unknown";
+  }
+
+  if (connectionState === "connected") {
+    return `${slotId} connected`;
+  }
+
+  if (connectionState === "reconnecting") {
+    return `${slotId} reconnecting`;
+  }
+
+  return `${slotId} open`;
+}
+
+function getClaimableSlotStates(
+  sessionValue: MatchSessionView | null,
+  identityValue: SessionIdentity | null
+): MatchSessionView["slot_states"] {
+  if (!sessionValue) {
+    return [];
+  }
+
+  return sessionValue.slot_states.filter((slotState) => {
+    if (slotState.connection_state === "connected") {
+      return false;
+    }
+
+    if (identityValue?.role === "player" && identityValue.slot_id === slotState.slot_id) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 function getOpponentStatusLabel(sessionValue: MatchSessionView | null, identityValue: SessionIdentity | null): string {
   if (!sessionValue || !identityValue || identityValue.role !== "player" || !identityValue.ship_instance_id) {
     return "observer";
@@ -399,8 +478,14 @@ function getOpponentStatusLabel(sessionValue: MatchSessionView | null, identityV
     return `${opponent.slot_id} disengaged`;
   }
 
-  if (!sessionValue.occupied_slot_ids.includes(opponent.slot_id)) {
-    return `${opponent.slot_id} disconnected`;
+  const opponentConnectionState = getSlotConnectionState(sessionValue, opponent.slot_id);
+
+  if (opponentConnectionState === "reconnecting") {
+    return `${opponent.slot_id} reconnecting`;
+  }
+
+  if (opponentConnectionState === "open") {
+    return `${opponent.slot_id} open`;
   }
 
   if (sessionValue.pending_plot_ship_ids.includes(opponent.ship_instance_id)) {
@@ -1957,8 +2042,25 @@ function renderActionStripControls(
   identityValue: SessionIdentity | null,
   plotSummary: PlotDraftSummary | null
 ): string {
+  const claimableSlotStates = getClaimableSlotStates(sessionValue, identityValue);
+
   if (!identityValue || identityValue.role !== "player") {
-    return "<p class=\"action-strip__note\">Open a second browser session to claim the other player slot. Additional sessions join as spectators.</p>";
+    return `
+      <section class="commit-strip commit-strip--spectator">
+        <p class="action-strip__note">Player slots: ${sessionValue?.slot_states
+          .map((slotState) => formatSlotConnectionLabel(sessionValue, slotState.slot_id))
+          .join(" · ") || "awaiting session state"}. Additional sessions join as spectators.</p>
+        <div class="commit-strip__actions">
+          ${claimableSlotStates
+            .map(
+              (slotState) =>
+                `<button class="action-button action-button--secondary" data-claim-slot="${slotState.slot_id}">Claim ${slotState.slot_id}</button>`
+            )
+            .join("")}
+          ${health?.resetEnabled ? `<button class="action-button action-button--secondary" data-reset-session>Reset match</button>` : ""}
+        </div>
+      </section>
+    `;
   }
 
   if (!sessionValue || !plotSummary) {
@@ -1975,6 +2077,13 @@ function renderActionStripControls(
         <strong>${isPending ? "Plot on file" : "Drafting turn"} ${context.turn_number}</strong>
       </div>
       <div class="commit-strip__actions">
+        ${claimableSlotStates
+          .map(
+            (slotState) =>
+              `<button class="action-button action-button--secondary" data-claim-slot="${slotState.slot_id}">Claim ${slotState.slot_id}</button>`
+          )
+          .join("")}
+        ${health?.resetEnabled ? `<button class="action-button action-button--secondary" data-reset-session>Reset match</button>` : ""}
         <button class="action-button action-button--secondary" data-reset-plot>Reset draft</button>
         <button class="action-button action-button--primary" data-submit-plot>Submit plot</button>
       </div>
@@ -2032,6 +2141,7 @@ function render(): void {
       <div class="bridge-shell__subline">
         <span>Match ${health?.matchId ?? "..."}</span>
         <span>Displayed ship ${displayed?.ship.ship_instance_id ?? "..."}</span>
+        <span>Slots ${sessionValue?.slot_states.map((slotState) => formatSlotConnectionLabel(sessionValue, slotState.slot_id)).join(" · ") || "..."}</span>
         <span>Pending ${sessionValue?.pending_plot_ship_ids.join(", ") || "none"}</span>
       </div>
       <section class="bridge-main">
@@ -2224,6 +2334,33 @@ function render(): void {
     render();
   });
 
+  document.querySelector<HTMLButtonElement>("[data-reset-session]")?.addEventListener("click", () => {
+    void requestSessionReset();
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-claim-slot]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      const slotId = button.dataset.claimSlot;
+
+      if (!slotId) {
+        return;
+      }
+
+      socket.send(
+        JSON.stringify({
+          type: "claim_slot",
+          slot_id: slotId
+        })
+      );
+      logMessage(`claim requested · ${slotId}`);
+      render();
+    });
+  });
+
   document.querySelector<HTMLButtonElement>("[data-submit-plot]")?.addEventListener("click", () => {
     if (!socket || socket.readyState !== WebSocket.OPEN || !session) {
       return;
@@ -2259,10 +2396,45 @@ async function loadHealth(): Promise<void> {
   render();
 }
 
+async function requestSessionReset(): Promise<void> {
+  const storedToken = readStoredValue(ADMIN_TOKEN_STORAGE_KEY);
+  const adminToken = storedToken ?? window.prompt("Enter the host reset token");
+
+  if (!adminToken) {
+    return;
+  }
+
+  const response = await fetch("/api/session/reset", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-sg2-admin-token": adminToken
+    },
+    body: JSON.stringify({ adminToken })
+  });
+  const payload = (await response.json()) as { ok: boolean; message?: string; turnNumber?: number };
+
+  if (!response.ok || !payload.ok) {
+    writeStoredValue(ADMIN_TOKEN_STORAGE_KEY, null);
+    logMessage(payload.message ?? "session reset failed");
+    render();
+    return;
+  }
+
+  writeStoredValue(ADMIN_TOKEN_STORAGE_KEY, adminToken);
+  logMessage(`session reset requested · turn ${payload.turnNumber ?? "?"}`);
+  render();
+}
+
 function handleServerMessage(message: ServerToClientMessage): void {
   if (message.type === "hello") {
     identity = message.identity;
     session = message.session;
+    writeStoredValue(RECONNECT_TOKEN_STORAGE_KEY, message.identity.reconnect_token);
+    if (reconnectTimer !== null) {
+      window.clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
     syncResolutionPlayback(session);
     logMessage(
       `hello received · ${message.identity.role}${message.identity.slot_id ? ` · ${message.identity.slot_id}` : ""}`
@@ -2302,7 +2474,14 @@ function handleServerMessage(message: ServerToClientMessage): void {
 
 function connectWebSocket(): void {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+  const reconnectToken = readStoredValue(RECONNECT_TOKEN_STORAGE_KEY);
+  const url = new URL(`${protocol}//${window.location.host}/ws`);
+
+  if (reconnectToken) {
+    url.searchParams.set("reconnectToken", reconnectToken);
+  }
+
+  socket = new WebSocket(url.toString());
 
   socket.addEventListener("open", () => {
     wsState = "connected";
@@ -2314,8 +2493,16 @@ function connectWebSocket(): void {
     handleServerMessage(message);
   });
 
-  socket.addEventListener("close", () => {
+  socket.addEventListener("close", (event) => {
     wsState = "closed";
+    if (event.code !== 4001 && reconnectTimer === null) {
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        wsState = "connecting";
+        render();
+        connectWebSocket();
+      }, 1000);
+    }
     render();
   });
 

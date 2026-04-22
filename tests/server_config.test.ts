@@ -8,7 +8,8 @@ describe("server config", () => {
       port: 8000,
       battle_state_fixture_path: "fixtures/battle_states/default_duel_turn_1.json",
       admin_token: null,
-      external_origin: null
+      external_origin: null,
+      reconnect_grace_ms: 120000
     });
   });
 
@@ -19,14 +20,16 @@ describe("server config", () => {
         SG2_PORT: "8111",
         SG2_BATTLE_STATE_FIXTURE: "fixtures/custom.json",
         SG2_ADMIN_TOKEN: "secret-token",
-        SG2_EXTERNAL_ORIGIN: "https://example.trycloudflare.com"
+        SG2_EXTERNAL_ORIGIN: "https://example.trycloudflare.com",
+        SG2_RECONNECT_GRACE_MS: "45000"
       })
     ).toEqual({
       host: "0.0.0.0",
       port: 8111,
       battle_state_fixture_path: "fixtures/custom.json",
       admin_token: "secret-token",
-      external_origin: "https://example.trycloudflare.com"
+      external_origin: "https://example.trycloudflare.com",
+      reconnect_grace_ms: 45000
     });
   });
 });

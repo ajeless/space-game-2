@@ -17,8 +17,8 @@ describe("MatchSession", () => {
     const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/alpha_turn_1.json"), battleState);
     const bravoPlot = validatePlotSubmission(await readJson("fixtures/plots/bravo_turn_1.json"), battleState);
     const session = new MatchSession(battleState);
-    const firstIdentity = session.connectClient("client_1");
-    const secondIdentity = session.connectClient("client_2");
+    const firstIdentity = session.connectClient("client_1").identity;
+    const secondIdentity = session.connectClient("client_2").identity;
 
     expect(firstIdentity.ship_instance_id).toBe("alpha_ship");
     expect(secondIdentity.ship_instance_id).toBe("bravo_ship");
@@ -50,7 +50,7 @@ describe("MatchSession", () => {
     const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
     const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/alpha_turn_1.json"), battleState);
     const session = new MatchSession(battleState);
-    const firstIdentity = session.connectClient("client_1");
+    const firstIdentity = session.connectClient("client_1").identity;
 
     session.submitPlot("client_1", alphaPlot);
     const resetView = session.reset(battleState);
@@ -59,5 +59,70 @@ describe("MatchSession", () => {
     expect(resetView.pending_plot_ship_ids).toEqual([]);
     expect(resetView.last_resolution).toBeNull();
     expect(session.getIdentity("client_1")).toEqual(firstIdentity);
+  });
+
+  it("reserves a disconnected slot for reconnect and restores it with the reconnect token", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+    const session = new MatchSession(battleState);
+    const alphaIdentity = session.connectClient("client_1").identity;
+
+    session.disconnectClient("client_1");
+
+    expect(session.getView().slot_states).toContainEqual({
+      slot_id: "alpha",
+      ship_instance_id: "alpha_ship",
+      connection_state: "reconnecting"
+    });
+
+    const bravoIdentity = session.connectClient("client_2").identity;
+    const resumedAlpha = session.connectClient("client_3", alphaIdentity.reconnect_token).identity;
+
+    expect(bravoIdentity.ship_instance_id).toBe("bravo_ship");
+    expect(resumedAlpha.ship_instance_id).toBe("alpha_ship");
+    expect(resumedAlpha.reconnect_token).toBe(alphaIdentity.reconnect_token);
+  });
+
+  it("releases a disconnected slot after the reconnect grace period expires", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+    let now = 1_000;
+    const session = new MatchSession(battleState, {
+      reconnect_grace_ms: 50,
+      now: () => now
+    });
+
+    const alphaIdentity = session.connectClient("client_1").identity;
+    session.disconnectClient("client_1");
+    now += 100;
+
+    const replacementIdentity = session.connectClient("client_2").identity;
+
+    expect(replacementIdentity.ship_instance_id).toBe("alpha_ship");
+    expect(replacementIdentity.reconnect_token).not.toBe(alphaIdentity.reconnect_token);
+  });
+
+  it("lets a fresh spectator explicitly claim a reconnecting slot", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+    const session = new MatchSession(battleState);
+
+    const alphaIdentity = session.connectClient("client_1").identity;
+    const bravoIdentity = session.connectClient("client_2").identity;
+
+    session.disconnectClient("client_2");
+
+    const spectatorIdentity = session.connectClient("client_3").identity;
+    expect(spectatorIdentity.role).toBe("spectator");
+
+    const claim = session.claimSlot("client_3", "bravo");
+
+    expect(alphaIdentity.ship_instance_id).toBe("alpha_ship");
+    expect(bravoIdentity.ship_instance_id).toBe("bravo_ship");
+    expect(claim.identity.role).toBe("player");
+    expect(claim.identity.slot_id).toBe("bravo");
+    expect(claim.identity.ship_instance_id).toBe("bravo_ship");
+    expect(claim.session.slot_states).toContainEqual({
+      slot_id: "bravo",
+      ship_instance_id: "bravo_ship",
+      connection_state: "connected"
+    });
   });
 });
