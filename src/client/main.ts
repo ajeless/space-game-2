@@ -21,7 +21,7 @@ import {
   TACTICAL_ZOOM_PRESETS,
   worldToTacticalViewport
 } from "../shared/index.js";
-import type { MatchSessionView, ServerToClientMessage, SessionIdentity } from "../shared/index.js";
+import type { MatchSessionView, ResolverEvent, ServerToClientMessage, SessionIdentity } from "../shared/index.js";
 import type {
   BattleBoundary,
   PlotDraft,
@@ -74,6 +74,13 @@ type ActiveTacticalDrag = {
   pointer_id: number;
 };
 let activeTacticalDrag: ActiveTacticalDrag | null = null;
+type ResolutionPlaybackState = {
+  key: string;
+  focus_events: ResolverEvent[];
+  current_index: number;
+};
+let resolutionPlayback: ResolutionPlaybackState | null = null;
+let resolutionPlaybackTimer: number | null = null;
 
 function logMessage(message: string): void {
   messages.unshift(message);
@@ -88,8 +95,8 @@ type RectangleBoundary = Extract<BattleBoundary, { kind: "rectangle" }>;
 
 const TACTICAL_VIEWPORT = {
   width: 960,
-  height: 560,
-  padding: 36,
+  height: 860,
+  padding: 28,
   hullScalePx: 44,
   headingVectorLengthPx: 28,
   velocityProjectionDistance: 120000,
@@ -132,6 +139,202 @@ function formatRole(identityValue: SessionIdentity | null): string {
   }
 
   return `${identityValue.role}${identityValue.slot_id ? ` · ${identityValue.slot_id}` : ""}`;
+}
+
+function isResolutionFocusEvent(event: ResolverEvent): boolean {
+  return (
+    event.type === "weapon_fired" ||
+    event.type === "hit_registered" ||
+    event.type === "subsystem_damaged" ||
+    event.type === "ship_destroyed" ||
+    event.type === "ship_disengaged" ||
+    event.type === "turn_ended"
+  );
+}
+
+function getResolutionKey(sessionValue: MatchSessionView | null): string | null {
+  if (!sessionValue?.last_resolution) {
+    return null;
+  }
+
+  return `${sessionValue.last_resolution.resolved_from_turn_number}:${sessionValue.last_resolution.event_count}`;
+}
+
+function clearResolutionPlaybackTimer(): void {
+  if (resolutionPlaybackTimer !== null) {
+    window.clearTimeout(resolutionPlaybackTimer);
+    resolutionPlaybackTimer = null;
+  }
+}
+
+function clearResolutionPlayback(): void {
+  clearResolutionPlaybackTimer();
+  resolutionPlayback = null;
+}
+
+function queueResolutionPlaybackAdvance(): void {
+  clearResolutionPlaybackTimer();
+
+  if (!resolutionPlayback) {
+    return;
+  }
+
+  if (resolutionPlayback.current_index >= resolutionPlayback.focus_events.length - 1) {
+    resolutionPlaybackTimer = window.setTimeout(() => {
+      resolutionPlayback = null;
+      resolutionPlaybackTimer = null;
+      render();
+    }, 1400);
+    return;
+  }
+
+  resolutionPlaybackTimer = window.setTimeout(() => {
+    if (!resolutionPlayback) {
+      return;
+    }
+
+    resolutionPlayback.current_index += 1;
+    queueResolutionPlaybackAdvance();
+    render();
+  }, 700);
+}
+
+function syncResolutionPlayback(sessionValue: MatchSessionView | null): void {
+  const key = getResolutionKey(sessionValue);
+
+  if (!key || !sessionValue?.last_resolution) {
+    clearResolutionPlayback();
+    return;
+  }
+
+  if (resolutionPlayback?.key === key) {
+    return;
+  }
+
+  const focusEvents = sessionValue.last_resolution.events.filter(isResolutionFocusEvent);
+
+  if (focusEvents.length === 0) {
+    clearResolutionPlayback();
+    return;
+  }
+
+  resolutionPlayback = {
+    key,
+    focus_events: focusEvents,
+    current_index: 0
+  };
+  queueResolutionPlaybackAdvance();
+}
+
+function getCurrentResolutionPlaybackEvent(sessionValue: MatchSessionView | null): ResolverEvent | null {
+  if (!resolutionPlayback || resolutionPlayback.key !== getResolutionKey(sessionValue)) {
+    return null;
+  }
+
+  return resolutionPlayback.focus_events[resolutionPlayback.current_index] ?? null;
+}
+
+function getRecentResolutionEvents(sessionValue: MatchSessionView | null): ResolverEvent[] {
+  return sessionValue?.last_resolution?.events.filter(isResolutionFocusEvent).slice(-4).reverse() ?? [];
+}
+
+function getSystemPlaybackTone(
+  playbackEvent: ResolverEvent | null,
+  shipInstanceId: ShipInstanceId,
+  systemId: SystemId
+): "hit" | "critical" | null {
+  if (!playbackEvent) {
+    return null;
+  }
+
+  if (
+    playbackEvent.type === "hit_registered" &&
+    playbackEvent.target === shipInstanceId &&
+    playbackEvent.details.impactSystemId === systemId
+  ) {
+    return "hit";
+  }
+
+  if (
+    playbackEvent.type === "subsystem_damaged" &&
+    playbackEvent.actor === shipInstanceId &&
+    playbackEvent.details.systemId === systemId
+  ) {
+    return playbackEvent.details.newState === "offline" ? "critical" : "hit";
+  }
+
+  return null;
+}
+
+function getShipPlaybackTone(
+  playbackEvent: ResolverEvent | null,
+  shipInstanceId: ShipInstanceId
+): "hit" | "destroyed" | "disengaged" | null {
+  if (!playbackEvent) {
+    return null;
+  }
+
+  if (playbackEvent.type === "ship_destroyed" && playbackEvent.target === shipInstanceId) {
+    return "destroyed";
+  }
+
+  if (playbackEvent.type === "ship_disengaged" && playbackEvent.target === shipInstanceId) {
+    return "disengaged";
+  }
+
+  if (playbackEvent.type === "hit_registered" && playbackEvent.target === shipInstanceId) {
+    return "hit";
+  }
+
+  return null;
+}
+
+function getShipSlotLabel(sessionValue: MatchSessionView, shipInstanceId: ShipInstanceId | null): string {
+  if (!shipInstanceId) {
+    return "NONE";
+  }
+
+  const participant = sessionValue.battle_state.match_setup.participants.find(
+    (candidate) => candidate.ship_instance_id === shipInstanceId
+  );
+
+  return participant ? participant.slot_id.toUpperCase() : shipInstanceId;
+}
+
+function formatShipContactLabel(sessionValue: MatchSessionView, shipInstanceId: ShipInstanceId | null): string {
+  if (!shipInstanceId) {
+    return "none";
+  }
+
+  return `${getShipSlotLabel(sessionValue, shipInstanceId)} · ${shipInstanceId}`;
+}
+
+function formatResolutionEventSummary(sessionValue: MatchSessionView, event: ResolverEvent): string {
+  switch (event.type) {
+    case "weapon_fired":
+      return `${getShipSlotLabel(sessionValue, event.actor ?? null)} fired ${event.details.mountId} at ${getShipSlotLabel(
+        sessionValue,
+        event.target ?? null
+      )} · ${event.details.chargePips}P`;
+    case "hit_registered":
+      return `${getShipSlotLabel(sessionValue, event.details.fromActor)} hit ${getShipSlotLabel(
+        sessionValue,
+        event.target ?? null
+      )}${event.details.impactSystemId ? ` · ${event.details.impactSystemId}` : ""}`;
+    case "subsystem_damaged":
+      return `${getShipSlotLabel(sessionValue, event.actor ?? null)} ${event.details.systemId} ${event.details.newState.toUpperCase()}`;
+    case "ship_destroyed":
+      return `${getShipSlotLabel(sessionValue, event.target ?? null)} destroyed by ${getShipSlotLabel(
+        sessionValue,
+        event.details.causeActor
+      )}`;
+    case "ship_disengaged":
+      return `${getShipSlotLabel(sessionValue, event.target ?? null)} disengaged beyond boundary`;
+    case "turn_ended":
+      return `Turn ${event.details.turnNumber - 1} resolved${event.details.winner ? ` · winner ${getShipSlotLabel(sessionValue, event.details.winner)}` : ""}`;
+    default:
+      return event.type;
+  }
 }
 
 function getDisplayedShipContext(
@@ -364,26 +567,6 @@ type WeaponIntentPresentation = {
   shot_state_label: string;
   is_armed: boolean;
 };
-
-function getShipSlotLabel(sessionValue: MatchSessionView, shipInstanceId: ShipInstanceId | null): string {
-  if (!shipInstanceId) {
-    return "NONE";
-  }
-
-  const participant = sessionValue.battle_state.match_setup.participants.find(
-    (candidate) => candidate.ship_instance_id === shipInstanceId
-  );
-
-  return participant ? participant.slot_id.toUpperCase() : shipInstanceId;
-}
-
-function formatShipContactLabel(sessionValue: MatchSessionView, shipInstanceId: ShipInstanceId | null): string {
-  if (!shipInstanceId) {
-    return "none";
-  }
-
-  return `${getShipSlotLabel(sessionValue, shipInstanceId)} · ${shipInstanceId}`;
-}
 
 function isArmedWeaponCue(cue: WeaponCue | null | undefined): boolean {
   return Boolean(cue && cue.firing_enabled && cue.charge_pips > 0 && cue.target_ship_instance_id !== null);
@@ -631,7 +814,8 @@ function renderSchematicSystem(
   ship: ShipRuntimeState,
   system: ShipSystemConfig,
   selectedSystemValue: SystemId | null,
-  weaponIntent: Pick<WeaponIntentPresentation, "is_armed" | "system_meta_label"> | null
+  weaponIntent: Pick<WeaponIntentPresentation, "is_armed" | "system_meta_label"> | null,
+  playbackTone: "hit" | "critical" | null
 ): string {
   const stateAndEffects = getSystemStateAndEffects(state, ship, system.id);
   const runtimeSystem = ship.systems[system.id];
@@ -650,6 +834,8 @@ function renderSchematicSystem(
     `ssd-system--${system.type}`,
     `ssd-system--${stateAndEffects.state_label}`,
     weaponIntent?.is_armed ? "ssd-system--armed" : "",
+    playbackTone === "hit" ? "ssd-system--recent-hit" : "",
+    playbackTone === "critical" ? "ssd-system--critical-hit" : "",
     selectedSystemValue === system.id ? "ssd-system--selected" : ""
   ]
     .filter(Boolean)
@@ -854,7 +1040,8 @@ function renderSchematicViewport(
   identityValue: SessionIdentity | null,
   plotSummary: PlotDraftSummary | null,
   selectedSystemContext: ReturnType<typeof getSelectedSystemContext>,
-  plotPreview: PlotPreview | null
+  plotPreview: PlotPreview | null,
+  playbackEvent: ResolverEvent | null
 ): string {
   const displayed = getDisplayedShipContext(sessionValue, identityValue);
 
@@ -895,7 +1082,8 @@ function renderSchematicViewport(
         ship,
         system,
         selectedSystemId,
-        system.type === "weapon_mount" ? weaponIntentByMountId.get(system.id) ?? null : null
+        system.type === "weapon_mount" ? weaponIntentByMountId.get(system.id) ?? null : null,
+        getSystemPlaybackTone(playbackEvent, ship.ship_instance_id, system.id)
       )
     )
     .join("");
@@ -984,13 +1172,18 @@ function renderReadoutStrip(
   `;
 }
 
-function renderFooterStrip(sessionValue: MatchSessionView | null): string {
-  const latestResolutionEvent = sessionValue?.last_resolution?.events.at(-1);
-  const latestResolutionText = sessionValue?.last_resolution
-    ? `Resolved T${sessionValue.last_resolution.resolved_from_turn_number} with ${sessionValue.last_resolution.event_count} events${
-        latestResolutionEvent ? ` · ${latestResolutionEvent.type}` : ""
-      }`
-    : "No turn resolved yet";
+function renderFooterStrip(sessionValue: MatchSessionView | null, playbackEvent: ResolverEvent | null): string {
+  const playbackSummary =
+    sessionValue && playbackEvent
+      ? formatResolutionEventSummary(sessionValue, playbackEvent)
+      : sessionValue?.last_resolution
+        ? `Resolved T${sessionValue.last_resolution.resolved_from_turn_number}`
+        : "No turn resolved yet";
+  const recentResolutionMarkup = sessionValue?.last_resolution
+    ? `<ul class="resolution-feed">${getRecentResolutionEvents(sessionValue)
+        .map((event) => `<li>${formatResolutionEventSummary(sessionValue, event)}</li>`)
+        .join("")}</ul>`
+    : `<div class="resolution-feed resolution-feed--empty">Awaiting first turn resolution.</div>`;
   const contactText =
     sessionValue?.battle_state.match_setup.participants
       .map((participant) => {
@@ -1008,16 +1201,17 @@ function renderFooterStrip(sessionValue: MatchSessionView | null): string {
   return `
     <section class="footer-strip">
       <div class="footer-strip__cell">
-        <span class="section-kicker">Resolution</span>
-        <strong>${latestResolutionText}</strong>
+        <span class="section-kicker">Resolution Playback</span>
+        <strong>${playbackSummary}</strong>
       </div>
       <div class="footer-strip__cell">
-        <span class="section-kicker">Contacts</span>
-        <strong>${contactText}</strong>
+        <span class="section-kicker">Recent Events</span>
+        ${recentResolutionMarkup}
       </div>
       <div class="footer-strip__cell footer-strip__cell--log">
-        <span class="section-kicker">Log</span>
-        <strong>${latestMessage}</strong>
+        <span class="section-kicker">Status</span>
+        <strong>${contactText}</strong>
+        <span class="footer-strip__meta">${latestMessage}</span>
       </div>
     </section>
   `;
@@ -1108,7 +1302,8 @@ function renderShipGlyph(
   slotLabel: string,
   targetCue: WeaponCue | null,
   isTargeted: boolean,
-  isTargetable: boolean
+  isTargetable: boolean,
+  playbackTone: "hit" | "destroyed" | "disengaged" | null
 ): string {
   const center = worldToTacticalViewport(camera, ship.pose.position);
   const hullPoints = getShipHullPoints(shipConfig, center);
@@ -1124,7 +1319,10 @@ function renderShipGlyph(
     "ship-glyph",
     identityValue?.ship_instance_id === ship.ship_instance_id ? "ship-glyph--self" : "",
     sessionValue.pending_plot_ship_ids.includes(ship.ship_instance_id) ? "ship-glyph--pending" : "",
-    isTargeted ? "ship-glyph--targeted" : ""
+    isTargeted ? "ship-glyph--targeted" : "",
+    playbackTone === "hit" ? "ship-glyph--impact" : "",
+    playbackTone === "destroyed" ? "ship-glyph--destroyed" : "",
+    playbackTone === "disengaged" ? "ship-glyph--disengaged" : ""
   ]
     .filter(Boolean)
     .join(" ");
@@ -1279,6 +1477,13 @@ function renderPlotInteractionHandles(
           y2="${thrustHandle.y.toFixed(2)}"
         />
         <circle
+          class="plot-handles__hit-target"
+          cx="${thrustHandle.x.toFixed(2)}"
+          cy="${thrustHandle.y.toFixed(2)}"
+          r="18"
+          data-plot-drag-handle="thrust"
+        />
+        <circle
           class="plot-handles__grip plot-handles__grip--thrust"
           cx="${thrustHandle.x.toFixed(2)}"
           cy="${thrustHandle.y.toFixed(2)}"
@@ -1302,6 +1507,13 @@ function renderPlotInteractionHandles(
           y1="${headingAnchor.y.toFixed(2)}"
           x2="${headingHandle.x.toFixed(2)}"
           y2="${headingHandle.y.toFixed(2)}"
+        />
+        <circle
+          class="plot-handles__hit-target"
+          cx="${headingHandle.x.toFixed(2)}"
+          cy="${headingHandle.y.toFixed(2)}"
+          r="16"
+          data-plot-drag-handle="heading"
         />
         <circle
           class="plot-handles__grip plot-handles__grip--heading"
@@ -1390,7 +1602,6 @@ function renderPlotPreviewOverlay(
       ${renderPreviewPath(camera, focusedPreview)}
       ${renderWeaponCue(sessionValue, camera, focusedPreview)}
       ${renderPreviewGhost(sessionValue, camera, focusedPreview)}
-      ${renderPlotInteractionHandles(sessionValue, camera, plotSummary, focusedPreview)}
     </g>
   `;
 }
@@ -1419,7 +1630,8 @@ function renderOffscreenMarker(
   targetCue: WeaponCue | null,
   isTargeted: boolean,
   isTargetable: boolean,
-  isSelf: boolean
+  isSelf: boolean,
+  playbackTone: "hit" | "destroyed" | "disengaged" | null
 ): string {
   const anchor = clampWorldPointToTacticalViewportEdge(camera, ship.pose.position, TACTICAL_VIEWPORT.markerInsetPx);
   const targetAttribute = isTargetable ? `data-target-ship="${ship.ship_instance_id}"` : "";
@@ -1436,7 +1648,10 @@ function renderOffscreenMarker(
     "offscreen-marker",
     isSelf ? "offscreen-marker--self" : "",
     isTargeted ? "offscreen-marker--targeted" : "",
-    isTargetable ? "offscreen-marker--targetable" : ""
+    isTargetable ? "offscreen-marker--targetable" : "",
+    playbackTone === "hit" ? "offscreen-marker--impact" : "",
+    playbackTone === "destroyed" ? "offscreen-marker--destroyed" : "",
+    playbackTone === "disengaged" ? "offscreen-marker--disengaged" : ""
   ]
     .filter(Boolean)
     .join(" ");
@@ -1475,6 +1690,55 @@ function renderOffscreenMarker(
       }
     </g>
   `;
+}
+
+function renderResolutionPlaybackOverlay(camera: TacticalCamera, playbackEvent: ResolverEvent | null): string {
+  if (!playbackEvent) {
+    return "";
+  }
+
+  if (playbackEvent.type === "weapon_fired") {
+    const mountPoint = worldToTacticalViewport(camera, playbackEvent.details.mountPosition);
+    const targetPoint = worldToTacticalViewport(camera, playbackEvent.details.targetPosition);
+
+    return `
+      <g class="resolution-playback resolution-playback--shot">
+        <circle class="resolution-playback__flash" cx="${mountPoint.x.toFixed(2)}" cy="${mountPoint.y.toFixed(2)}" r="12" />
+        <line
+          class="resolution-playback__shot-line"
+          x1="${mountPoint.x.toFixed(2)}"
+          y1="${mountPoint.y.toFixed(2)}"
+          x2="${targetPoint.x.toFixed(2)}"
+          y2="${targetPoint.y.toFixed(2)}"
+        />
+      </g>
+    `;
+  }
+
+  if (playbackEvent.type === "hit_registered") {
+    const impactPoint = worldToTacticalViewport(camera, playbackEvent.details.impactPoint);
+
+    return `
+      <g class="resolution-playback resolution-playback--impact">
+        <circle class="resolution-playback__impact-ring" cx="${impactPoint.x.toFixed(2)}" cy="${impactPoint.y.toFixed(2)}" r="16" />
+        <circle class="resolution-playback__impact-core" cx="${impactPoint.x.toFixed(2)}" cy="${impactPoint.y.toFixed(2)}" r="5" />
+      </g>
+    `;
+  }
+
+  if (playbackEvent.type === "ship_destroyed" || playbackEvent.type === "ship_disengaged") {
+    const finalPoint = worldToTacticalViewport(camera, playbackEvent.details.finalPosition);
+    const label = playbackEvent.type === "ship_destroyed" ? "destroyed" : "boundary disengage";
+
+    return `
+      <g class="resolution-playback resolution-playback--terminal">
+        <circle class="resolution-playback__terminal-ring" cx="${finalPoint.x.toFixed(2)}" cy="${finalPoint.y.toFixed(2)}" r="26" />
+        <text class="resolution-playback__terminal-label" x="${finalPoint.x.toFixed(2)}" y="${(finalPoint.y - 32).toFixed(2)}">${label}</text>
+      </g>
+    `;
+  }
+
+  return "";
 }
 
 function renderScaleBar(camera: TacticalCamera): string {
@@ -1550,7 +1814,8 @@ function renderTacticalViewport(
   plotSummary: PlotDraftSummary | null,
   plotPreview: PlotPreview | null,
   selectedSystemContext: ReturnType<typeof getSelectedSystemContext>,
-  camera: TacticalCamera | null
+  camera: TacticalCamera | null,
+  playbackEvent: ResolverEvent | null
 ): string {
   if (!sessionValue) {
     return "<p>Waiting for the session snapshot before rendering the tactical board.</p>";
@@ -1594,6 +1859,7 @@ function renderTacticalViewport(
     const targetCue = armedCueByTargetShipId.get(ship.ship_instance_id) ?? null;
     const isTargeted = targetedShipIds.has(ship.ship_instance_id);
     const isTargetable = focusedMountId !== null && !isSelf;
+    const playbackTone = getShipPlaybackTone(playbackEvent, ship.ship_instance_id);
     const visible = isWorldPointVisibleInTacticalCamera(camera, ship.pose.position, 34);
 
     if (visible) {
@@ -1607,7 +1873,8 @@ function renderTacticalViewport(
           participant.slot_id.toUpperCase(),
           targetCue,
           isTargeted,
-          isTargetable
+          isTargetable,
+          playbackTone
         )
       );
     } else {
@@ -1620,13 +1887,16 @@ function renderTacticalViewport(
           targetCue,
           isTargeted,
           isTargetable,
-          isSelf
+          isSelf,
+          playbackTone
         )
       );
     }
   }
 
   const overlay = renderPlotPreviewOverlay(sessionValue, camera, plotPreview, focusedMountId, plotSummary);
+  const interactionHandles = renderPlotInteractionHandles(sessionValue, camera, plotSummary, plotPreview);
+  const playbackOverlay = renderResolutionPlaybackOverlay(camera, playbackEvent);
 
   return `
     <div class="tactical-board">
@@ -1672,6 +1942,8 @@ function renderTacticalViewport(
         <g clip-path="url(#tactical-plot-clip)">
           ${overlay}
           ${visibleShips.join("")}
+          ${playbackOverlay}
+          ${interactionHandles}
         </g>
         ${offscreenMarkers.join("")}
         ${renderScaleBar(camera)}
@@ -1717,18 +1989,27 @@ function render(): void {
   const selectedSystemContext = getSelectedSystemContext(sessionValue, identity);
   const plotPreview = sessionValue && plotSummary ? buildPlotPreview(sessionValue.battle_state, plotSummary.draft) : null;
   const camera = getTacticalCamera(sessionValue, plotPreview, displayed?.ship.ship_instance_id ?? null);
+  const playbackEvent = getCurrentResolutionPlaybackEvent(sessionValue);
   const tacticalViewport = renderTacticalViewport(
     sessionValue,
     identity,
     plotSummary,
     plotPreview,
     selectedSystemContext,
-    camera
+    camera,
+    playbackEvent
   );
-  const schematicViewport = renderSchematicViewport(sessionValue, identity, plotSummary, selectedSystemContext, plotPreview);
+  const schematicViewport = renderSchematicViewport(
+    sessionValue,
+    identity,
+    plotSummary,
+    selectedSystemContext,
+    plotPreview,
+    playbackEvent
+  );
   const readoutStrip = renderReadoutStrip(sessionValue, identity);
   const actionStripControls = renderActionStripControls(sessionValue, identity, plotSummary);
-  const footerStrip = renderFooterStrip(sessionValue);
+  const footerStrip = renderFooterStrip(sessionValue, playbackEvent);
   const phaseLabel = getPhaseLabel(sessionValue, selectedSystemContext);
   const missionBarClass = `mission-bar${selectedSystemContext?.system.type === "weapon_mount" ? " mission-bar--aim" : ""}`;
   const cameraMode = camera ? getTacticalCameraModeDefinition(camera.selection.mode_id) : null;
@@ -1982,6 +2263,7 @@ function handleServerMessage(message: ServerToClientMessage): void {
   if (message.type === "hello") {
     identity = message.identity;
     session = message.session;
+    syncResolutionPlayback(session);
     logMessage(
       `hello received · ${message.identity.role}${message.identity.slot_id ? ` · ${message.identity.slot_id}` : ""}`
     );
@@ -1990,6 +2272,7 @@ function handleServerMessage(message: ServerToClientMessage): void {
   }
 
   if (message.type === "session_reset") {
+    clearResolutionPlayback();
     logMessage(`session reset · ${message.matchId} · turn ${message.turnNumber}`);
     render();
     return;
@@ -1997,6 +2280,7 @@ function handleServerMessage(message: ServerToClientMessage): void {
 
   if (message.type === "session_state") {
     session = message.session;
+    syncResolutionPlayback(session);
     logMessage(`session updated · turn ${message.session.battle_state.turn_number}`);
     render();
     return;

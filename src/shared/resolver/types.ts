@@ -67,6 +67,13 @@ export type ShipDestroyedEvent = ResolverEventBase<
   }
 >;
 
+export type ShipDisengagedEvent = ResolverEventBase<
+  "ship_disengaged",
+  {
+    finalPosition: Vector2;
+  }
+>;
+
 export type TurnEndedEvent = ResolverEventBase<
   "turn_ended",
   {
@@ -82,6 +89,7 @@ export type ResolverEvent =
   | HitRegisteredEvent
   | SubsystemDamagedEvent
   | ShipDestroyedEvent
+  | ShipDisengagedEvent
   | TurnEndedEvent;
 
 export interface ResolveTurnInput {

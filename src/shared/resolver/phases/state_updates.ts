@@ -128,6 +128,14 @@ export function runStateUpdatesPhase(input: StateUpdatesPhaseInput): StateUpdate
     }
 
     ship.status = "disengaged";
+    consequenceEvents.push({
+      sub_tick: input.subTick,
+      type: "ship_disengaged",
+      target: ship.ship_instance_id,
+      details: {
+        finalPosition: { ...ship.pose.position }
+      }
+    });
   }
 
   if (destroyedBy.size > 0 || disengagedShipIds.length > 0) {

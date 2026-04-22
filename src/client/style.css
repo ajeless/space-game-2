@@ -570,6 +570,25 @@ body.is-plot-dragging {
   fill: rgba(125, 213, 154, 0.96);
 }
 
+.ssd-system--recent-hit .ssd-system__body {
+  stroke: rgba(236, 126, 116, 0.98);
+  fill: rgba(80, 28, 24, 0.82);
+}
+
+.ssd-system--recent-hit .ssd-system__meta {
+  fill: rgba(236, 126, 116, 0.98);
+}
+
+.ssd-system--critical-hit .ssd-system__body {
+  stroke: rgba(255, 178, 120, 1);
+  fill: rgba(97, 39, 17, 0.86);
+  filter: drop-shadow(0 0 10px rgba(255, 178, 120, 0.24));
+}
+
+.ssd-system--critical-hit .ssd-system__meta {
+  fill: rgba(255, 206, 149, 1);
+}
+
 .tactical-panel__header {
   display: flex;
   justify-content: space-between;
@@ -682,9 +701,11 @@ body.is-plot-dragging {
 
 .ship-glyph__hit {
   fill: transparent;
+  pointer-events: none;
 }
 
 .ship-glyph__hit--targetable {
+  pointer-events: auto;
   cursor: crosshair;
 }
 
@@ -730,6 +751,21 @@ body.is-plot-dragging {
 
 .ship-glyph--targeted .ship-glyph__core {
   fill: rgba(236, 126, 116, 0.98);
+}
+
+.ship-glyph--impact .ship-glyph__hull {
+  stroke: rgba(236, 126, 116, 0.98);
+  fill: rgba(103, 32, 28, 0.26);
+}
+
+.ship-glyph--destroyed .ship-glyph__hull {
+  stroke: rgba(255, 178, 120, 0.98);
+  fill: rgba(82, 38, 16, 0.32);
+}
+
+.ship-glyph--disengaged .ship-glyph__hull {
+  stroke: rgba(125, 176, 218, 0.72);
+  stroke-dasharray: 5 4;
 }
 
 .ship-glyph__target-ring {
@@ -792,6 +828,24 @@ body.is-plot-dragging {
 .offscreen-marker--targeted .offscreen-marker__core,
 .offscreen-marker--targeted .offscreen-marker__label {
   fill: rgba(242, 200, 121, 0.96);
+}
+
+.offscreen-marker--impact .offscreen-marker__arrow,
+.offscreen-marker--impact .offscreen-marker__core,
+.offscreen-marker--impact .offscreen-marker__label {
+  stroke: rgba(236, 126, 116, 0.96);
+  fill: rgba(236, 126, 116, 0.96);
+}
+
+.offscreen-marker--destroyed .offscreen-marker__arrow,
+.offscreen-marker--destroyed .offscreen-marker__core,
+.offscreen-marker--destroyed .offscreen-marker__label {
+  stroke: rgba(255, 178, 120, 0.98);
+  fill: rgba(255, 178, 120, 0.98);
+}
+
+.offscreen-marker--disengaged .offscreen-marker__arrow {
+  stroke-dasharray: 4 4;
 }
 
 .plot-preview__path {
@@ -906,6 +960,11 @@ body.is-plot-dragging {
   stroke-width: 2;
 }
 
+.plot-handles__hit-target {
+  fill: transparent;
+  cursor: grab;
+}
+
 .plot-handles__grip--thrust {
   fill: rgba(125, 213, 154, 0.18);
   stroke: rgba(125, 213, 154, 0.96);
@@ -921,6 +980,44 @@ body.is-plot-dragging {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
+  text-anchor: middle;
+  text-transform: uppercase;
+}
+
+.resolution-playback__flash {
+  fill: rgba(255, 243, 197, 0.22);
+  stroke: rgba(255, 220, 112, 0.98);
+  stroke-width: 2;
+}
+
+.resolution-playback__shot-line {
+  stroke: rgba(255, 220, 112, 0.96);
+  stroke-width: 2.4;
+  stroke-dasharray: 9 4;
+}
+
+.resolution-playback__impact-ring {
+  fill: none;
+  stroke: rgba(236, 126, 116, 0.96);
+  stroke-width: 2.4;
+}
+
+.resolution-playback__impact-core {
+  fill: rgba(236, 126, 116, 0.96);
+}
+
+.resolution-playback__terminal-ring {
+  fill: none;
+  stroke: rgba(255, 178, 120, 0.98);
+  stroke-width: 2.4;
+  stroke-dasharray: 6 4;
+}
+
+.resolution-playback__terminal-label {
+  fill: rgba(255, 206, 149, 0.98);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-anchor: middle;
   text-transform: uppercase;
 }
@@ -1057,6 +1154,35 @@ body.is-plot-dragging {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.footer-strip__meta {
+  color: var(--text-2);
+  font-size: 0.76rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resolution-feed {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 3px;
+  color: var(--text-1);
+  font-size: 0.78rem;
+}
+
+.resolution-feed li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resolution-feed--empty {
+  color: var(--text-2);
+  font-size: 0.78rem;
 }
 
 @media (max-width: 1180px) {

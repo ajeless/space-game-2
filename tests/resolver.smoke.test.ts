@@ -305,6 +305,16 @@ describe("resolver", () => {
       winner_ship_instance_id: "bravo_ship",
       end_reason: "boundary_disengage"
     });
+    expect(result.events).toContainEqual(
+      expect.objectContaining({
+        sub_tick: expect.any(Number),
+        type: "ship_disengaged",
+        target: "alpha_ship",
+        details: expect.objectContaining({
+          finalPosition: expect.any(Object)
+        })
+      })
+    );
     expect(result.events[result.events.length - 1]).toMatchObject({
       sub_tick: 60,
       type: "turn_ended",
