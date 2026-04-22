@@ -54,7 +54,8 @@ This document is the player-facing guide for the current duel loop:
 ## Arming and aiming weapons
 
 - Select the `RAILGUN` mount on the SSD to enter `AIM MODE`.
-- In aim mode, click the contact on the tactical plot to authorize or withdraw fire for that mount.
+- In aim mode, click a contact on the tactical plot to lock that mount onto it.
+- Click the same contact again or use `Clear Target` in the SSD to stand the mount down.
 - Set charge using the mount charge control in the SSD.
 - `Esc` closes the current selection or exits aim mode.
 

@@ -480,6 +480,15 @@ body.is-plot-dragging {
   gap: 8px;
 }
 
+.ssd-selected-panel__actions {
+  display: flex;
+  align-items: stretch;
+}
+
+.ssd-selected-panel__actions .action-button {
+  width: 100%;
+}
+
 .ssd-selected-readout {
   display: grid;
   gap: 4px;
@@ -1240,6 +1249,15 @@ body.is-plot-dragging {
 
 .action-button:hover {
   border-color: rgba(125, 176, 218, 0.72);
+}
+
+.action-button:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+.action-button:disabled:hover {
+  border-color: rgba(125, 176, 218, 0.34);
 }
 
 .action-button > span,

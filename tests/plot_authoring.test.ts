@@ -3,7 +3,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildPlotSubmissionFromDraft,
+  clearPlotDraftWeaponIntent,
   createPlotDraft,
+  setPlotDraftWeaponTarget,
   setPlotDraftDesiredEndHeading,
   setPlotDraftWorldThrust,
   summarizePlotDraft,
@@ -23,6 +25,19 @@ async function readBattleStateFixture() {
 }
 
 describe("plot authoring", () => {
+  it("starts weapon mounts unassigned until a contact is selected", async () => {
+    const state = await readBattleStateFixture();
+    const summary = summarizePlotDraft(state, createPlotDraft(state, "alpha_ship"));
+
+    expect(summary.draft.weapons).toEqual([
+      {
+        mount_id: "forward_mount",
+        target_ship_instance_id: null,
+        charge_pips: 0
+      }
+    ]);
+  });
+
   it("builds a valid PlotSubmission from a direct-control draft", async () => {
     const state = await readBattleStateFixture();
     const draft = createPlotDraft(state, "alpha_ship");
@@ -112,5 +127,28 @@ describe("plot authoring", () => {
     expect(summary.draft.thrust_input.lateral_fraction).toBeCloseTo(0, 10);
     expect(summary.world_thrust_fraction.x).toBeCloseTo(1, 10);
     expect(summary.world_thrust_fraction.y).toBeCloseTo(0, 10);
+  });
+
+  it("can arm and explicitly clear a weapon target without reselecting a default contact", async () => {
+    const state = await readBattleStateFixture();
+    const draft = createPlotDraft(state, "alpha_ship");
+
+    const targeted = setPlotDraftWeaponTarget(state, draft, "forward_mount", "bravo_ship");
+    const targetedSummary = summarizePlotDraft(state, targeted);
+
+    expect(targetedSummary.draft.weapons[0]).toEqual({
+      mount_id: "forward_mount",
+      target_ship_instance_id: "bravo_ship",
+      charge_pips: 1
+    });
+
+    const cleared = clearPlotDraftWeaponIntent(state, targeted, "forward_mount");
+    const clearedSummary = summarizePlotDraft(state, cleared);
+
+    expect(clearedSummary.draft.weapons[0]).toEqual({
+      mount_id: "forward_mount",
+      target_ship_instance_id: null,
+      charge_pips: 0
+    });
   });
 });

@@ -47,7 +47,6 @@ type RenderTacticalBoardArgs = {
   focusedMountId: SystemId | null;
   camera: TacticalCamera;
   playbackEvent: ResolverEvent | null;
-  getContactShortLabel: (shipInstanceId: ShipInstanceId | null) => string;
 };
 
 function normalizeDegrees(angle: number): number {
@@ -385,15 +384,10 @@ function renderWeaponCue(
   camera: TacticalCamera,
   plotPreview: PlotPreview,
   focusedMountId: SystemId | null,
-  showLabels: boolean,
-  getContactShortLabel: (shipInstanceId: ShipInstanceId | null) => string
+  _showLabels: boolean
 ): string {
   return plotPreview.weapon_cues
     .map((cue) => {
-      if (cue.target_position === null) {
-        return "";
-      }
-
       const polygonPoints = getArcPolygonPoints(cue, 12)
         .map((point) => {
           const projected = worldToTacticalViewport(camera, point);
@@ -401,7 +395,7 @@ function renderWeaponCue(
         })
         .join(" ");
       const mountPoint = worldToTacticalViewport(camera, cue.mount_position);
-      const targetPoint = worldToTacticalViewport(camera, cue.target_position);
+      const targetPoint = cue.target_position ? worldToTacticalViewport(camera, cue.target_position) : null;
       const isArmed = isArmedWeaponCue(cue);
       const isFocused = cue.mount_id === focusedMountId;
       const cueClass = !isArmed
@@ -409,18 +403,12 @@ function renderWeaponCue(
         : cue.target_in_arc && cue.target_in_range
           ? "plot-preview__cue--valid"
           : "plot-preview__cue--warn";
-      const targetShortLabel = getContactShortLabel(cue.target_ship_instance_id).toUpperCase();
-      const hitText = isArmed
-        ? cue.predicted_hit_probability !== null
-          ? `${Math.round(cue.predicted_hit_probability * 100)}%`
-          : "no shot"
-        : "standby";
 
       return `
         <g class="plot-preview__cue ${cueClass}${isFocused ? " plot-preview__cue--focused" : ""}">
           <polygon class="plot-preview__arc" points="${polygonPoints}" />
           ${
-            isFocused
+            isFocused && targetPoint
               ? `
           <line
             class="plot-preview__target-line"
@@ -433,11 +421,6 @@ function renderWeaponCue(
           `
               : ""
           }
-          ${
-            showLabels && isFocused
-              ? `<text class="plot-preview__target-label" x="${targetPoint.x.toFixed(2)}" y="${(targetPoint.y - 24).toFixed(2)}">${cue.label} · ${targetShortLabel} · ${cue.charge_pips}p · ${hitText}</text>`
-              : ""
-          }
         </g>
       `;
     })
@@ -448,8 +431,7 @@ function renderPlotPreviewOverlay(
   sessionValue: MatchSessionView,
   camera: TacticalCamera,
   plotPreview: PlotPreview | null,
-  focusedMountId: SystemId | null,
-  getContactShortLabel: (shipInstanceId: ShipInstanceId | null) => string
+  focusedMountId: SystemId | null
 ): string {
   if (!plotPreview) {
     return "";
@@ -466,7 +448,7 @@ function renderPlotPreviewOverlay(
   return `
     <g class="plot-preview">
       ${renderPreviewPath(camera, focusedPreview)}
-      ${renderWeaponCue(camera, plotPreview, focusedMountId, shouldRenderTacticalText(camera), getContactShortLabel)}
+      ${renderWeaponCue(camera, plotPreview, focusedMountId, shouldRenderTacticalText(camera))}
       ${renderPreviewGhost(sessionValue, camera, focusedPreview)}
     </g>
   `;
@@ -640,8 +622,7 @@ export function renderTacticalBoard({
   plotPreview,
   focusedMountId,
   camera,
-  playbackEvent,
-  getContactShortLabel
+  playbackEvent
 }: RenderTacticalBoardArgs): string {
   const emphasizedCues = (focusedMountId === null
     ? plotPreview?.weapon_cues ?? []
@@ -711,7 +692,7 @@ export function renderTacticalBoard({
     }
   }
 
-  const overlay = renderPlotPreviewOverlay(sessionValue, camera, plotPreview, focusedMountId, getContactShortLabel);
+  const overlay = renderPlotPreviewOverlay(sessionValue, camera, plotPreview, focusedMountId);
   const interactionHandles = renderPlotInteractionHandles(sessionValue, camera, plotSummary, plotPreview);
   const playbackOverlay = renderResolutionPlaybackOverlay(camera, playbackEvent);
 

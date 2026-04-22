@@ -13,12 +13,14 @@ import {
   buildPlotPreview,
   buildTacticalCamera,
   buildPlotSubmissionFromDraft,
+  clearPlotDraftWeaponIntent,
   createPlotDraft,
   createDefaultTacticalCameraSelection,
   getTacticalCameraModeDefinition,
   getTacticalZoomPresetDefinition,
   getShipConfig,
   getSystemStateAndEffects,
+  setPlotDraftWeaponTarget,
   setPlotDraftDesiredEndHeading,
   setPlotDraftWorldThrust,
   summarizePlotDraft,
@@ -66,6 +68,7 @@ function getRootElement(): HTMLDivElement {
 const root = getRootElement();
 const RECONNECT_TOKEN_STORAGE_KEY = "sg2_reconnect_token";
 const ADMIN_TOKEN_STORAGE_KEY = "sg2_admin_token";
+const LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY = "sg2_last_presented_resolution_key";
 
 let health: HealthResponse | null = null;
 let wsState: "connecting" | "connected" | "closed" | "error" = "connecting";
@@ -90,6 +93,9 @@ type ResolutionPlaybackState = {
 };
 let resolutionPlayback: ResolutionPlaybackState | null = null;
 let resolutionPlaybackTimer: number | null = null;
+let lastPresentedResolutionKey: string | null = readStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY);
+// Keep discrete zoom support wired up, but hide the controls until tactical scale tuning resumes.
+const SHOW_TACTICAL_ZOOM_CONTROLS = false;
 
 function readStoredValue(key: string): string | null {
   try {
@@ -237,7 +243,7 @@ function getResolutionKey(sessionValue: MatchSessionView | null): string | null 
     return null;
   }
 
-  return `${sessionValue.last_resolution.resolved_from_turn_number}:${sessionValue.last_resolution.event_count}`;
+  return `${sessionValue.battle_state.match_setup.match_id}:${sessionValue.last_resolution.resolved_from_turn_number}:${sessionValue.last_resolution.event_count}`;
 }
 
 function clearResolutionPlaybackTimer(): void {
@@ -283,11 +289,16 @@ function syncResolutionPlayback(sessionValue: MatchSessionView | null): void {
   const key = getResolutionKey(sessionValue);
 
   if (!key || !sessionValue?.last_resolution) {
+    if (sessionValue && !sessionValue.last_resolution) {
+      lastPresentedResolutionKey = null;
+      writeStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY, null);
+    }
+
     clearResolutionPlayback();
     return;
   }
 
-  if (resolutionPlayback?.key === key) {
+  if (resolutionPlayback?.key === key || lastPresentedResolutionKey === key) {
     return;
   }
 
@@ -303,6 +314,8 @@ function syncResolutionPlayback(sessionValue: MatchSessionView | null): void {
     focus_events: focusEvents,
     current_index: 0
   };
+  lastPresentedResolutionKey = key;
+  writeStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY, key);
   queueResolutionPlaybackAdvance();
 }
 
@@ -1124,8 +1137,7 @@ function render(): void {
           plotPreview,
           focusedMountId,
           camera,
-          playbackEvent,
-          getContactShortLabel: (shipInstanceId) => getPlayerFacingContactLabel(sessionValue, identity, shipInstanceId)
+          playbackEvent
         });
   const schematicViewport = renderSchematicPanel({
     sessionValue,
@@ -1135,7 +1147,6 @@ function render(): void {
     selectedSystemContext,
     plotPreview,
     playbackEvent,
-    camera,
     selectedSystemId,
     outcomePresentation,
     getContactLabel: (shipInstanceId) =>
@@ -1158,13 +1169,15 @@ function render(): void {
   const situationalStatus =
     identity?.role === "player" ? capitalizeLabel(getOpponentStatusLabel(sessionValue, identity)) : "Spectator view";
   const linkStatusLabel = formatLinkStatusLabel(wsState);
-  const cameraControls = renderTacticalCameraControls(
-    TACTICAL_ZOOM_PRESETS.map((preset) => ({
-      id: preset.id,
-      short_label: preset.short_label,
-      active: tacticalCameraSelection.zoom_preset_id === preset.id
-    }))
-  );
+  const cameraControls = SHOW_TACTICAL_ZOOM_CONTROLS
+    ? renderTacticalCameraControls(
+        TACTICAL_ZOOM_PRESETS.map((preset) => ({
+          id: preset.id,
+          short_label: preset.short_label,
+          active: tacticalCameraSelection.zoom_preset_id === preset.id
+        }))
+      )
+    : "";
 
   root.innerHTML = renderBridgeShell({
     phase_label: phaseLabel,
@@ -1258,28 +1271,29 @@ function render(): void {
       const targetShipId = element.getAttribute("data-target-ship");
       const selectedMountId =
         selectedSystemContext?.system.type === "weapon_mount" ? selectedSystemContext.system.id : null;
-      const mountContext = plotSummary?.context.weapon_mounts.find((mount) => mount.mount_id === selectedMountId);
+      const currentWeapon = plotSummary?.draft.weapons.find((weapon) => weapon.mount_id === selectedMountId);
 
-      if (!targetShipId || !selectedMountId || !mountContext || !mountContext.firing_enabled) {
+      if (!sessionValue || !targetShipId || !selectedMountId) {
         return;
       }
 
-      updatePlotDraft((draft) => ({
-        ...draft,
-        weapons: draft.weapons.map((weapon) =>
-          weapon.mount_id === selectedMountId
-            ? {
-                ...weapon,
-                target_ship_instance_id: targetShipId,
-                charge_pips:
-                  weapon.target_ship_instance_id === targetShipId && weapon.charge_pips > 0
-                    ? 0
-                    : Math.max(weapon.charge_pips, mountContext.allowed_charge_pips[0] ?? 0)
-              }
-            : weapon
-        )
-      }));
+      updatePlotDraft((draft) =>
+        currentWeapon?.target_ship_instance_id === targetShipId
+          ? clearPlotDraftWeaponIntent(sessionValue.battle_state, draft, selectedMountId)
+          : setPlotDraftWeaponTarget(sessionValue.battle_state, draft, selectedMountId, targetShipId)
+      );
     });
+  });
+
+  document.querySelector<HTMLButtonElement>("[data-clear-aim-target]")?.addEventListener("click", (event) => {
+    const target = event.currentTarget as HTMLButtonElement;
+    const mountId = target.dataset.clearAimTarget;
+
+    if (!sessionValue || !mountId) {
+      return;
+    }
+
+    updatePlotDraft((draft) => clearPlotDraftWeaponIntent(sessionValue.battle_state, draft, mountId));
   });
 
   document.querySelectorAll<SVGElement>("[data-plot-drag-handle]").forEach((element) => {
@@ -1412,6 +1426,8 @@ function handleServerMessage(message: ServerToClientMessage): void {
   if (message.type === "session_reset") {
     plotDraft = null;
     selectedSystemId = null;
+    lastPresentedResolutionKey = null;
+    writeStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY, null);
     clearResolutionPlayback();
     logMessage(`session reset · ${message.matchId} · turn ${message.turnNumber}`);
     render();

@@ -53,6 +53,17 @@ export interface PlotDraftSummary {
   world_thrust_fraction: Vector2;
 }
 
+function updatePlotDraftWeaponAssignment(
+  draft: PlotDraft,
+  mountId: SystemId,
+  mutate: (weapon: PlotDraftWeaponAssignment) => PlotDraftWeaponAssignment
+): PlotDraft {
+  return {
+    ...draft,
+    weapons: draft.weapons.map((weapon) => (weapon.mount_id === mountId ? mutate(weapon) : weapon))
+  };
+}
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -227,7 +238,7 @@ export function createPlotDraft(state: BattleState, shipInstanceId: ShipInstance
     },
     weapons: context.weapon_mounts.map((mount) => ({
       mount_id: mount.mount_id,
-      target_ship_instance_id: mount.target_ship_instance_ids[0] ?? null,
+      target_ship_instance_id: null,
       charge_pips: 0
     }))
   };
@@ -253,9 +264,10 @@ export function normalizePlotDraft(state: BattleState, draft: PlotDraft): PlotDr
     },
     weapons: context.weapon_mounts.map((mount) => {
       const current = byMountId.get(mount.mount_id);
-      const targetShipInstanceId = mount.target_ship_instance_ids.includes(current?.target_ship_instance_id ?? "")
-        ? current?.target_ship_instance_id ?? null
-        : mount.target_ship_instance_ids[0] ?? null;
+      const targetShipInstanceId =
+        current?.target_ship_instance_id && mount.target_ship_instance_ids.includes(current.target_ship_instance_id)
+          ? current.target_ship_instance_id
+          : null;
       const chargePips =
         targetShipInstanceId && mount.firing_enabled
           ? getClampedChargePips(current?.charge_pips ?? 0, mount.allowed_charge_pips, remainingWeaponPips)
@@ -270,6 +282,42 @@ export function normalizePlotDraft(state: BattleState, draft: PlotDraft): PlotDr
       };
     })
   };
+}
+
+export function setPlotDraftWeaponTarget(
+  state: BattleState,
+  draft: PlotDraft,
+  mountId: SystemId,
+  targetShipInstanceId: ShipInstanceId
+): PlotDraft {
+  const context = getPlotAuthoringContext(state, draft.ship_instance_id);
+  const mount = context.weapon_mounts.find((candidate) => candidate.mount_id === mountId);
+
+  if (!mount || !mount.firing_enabled || !mount.target_ship_instance_ids.includes(targetShipInstanceId)) {
+    return normalizePlotDraft(state, draft);
+  }
+
+  const minimumChargePips = mount.allowed_charge_pips[0] ?? 0;
+
+  return normalizePlotDraft(
+    state,
+    updatePlotDraftWeaponAssignment(draft, mountId, (weapon) => ({
+      ...weapon,
+      target_ship_instance_id: targetShipInstanceId,
+      charge_pips: Math.max(weapon.charge_pips, minimumChargePips)
+    }))
+  );
+}
+
+export function clearPlotDraftWeaponIntent(state: BattleState, draft: PlotDraft, mountId: SystemId): PlotDraft {
+  return normalizePlotDraft(
+    state,
+    updatePlotDraftWeaponAssignment(draft, mountId, (weapon) => ({
+      ...weapon,
+      target_ship_instance_id: null,
+      charge_pips: 0
+    }))
+  );
 }
 
 export function setPlotDraftDesiredEndHeading(

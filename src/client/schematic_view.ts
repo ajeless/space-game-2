@@ -1,8 +1,4 @@
-import {
-  getAvailableReactorPips,
-  getHeadingDegreesInTacticalCamera,
-  getSystemStateAndEffects
-} from "../shared/index.js";
+import { getAvailableReactorPips, getSystemStateAndEffects } from "../shared/index.js";
 import type {
   MatchSessionView,
   PlotDraft,
@@ -15,7 +11,6 @@ import type {
   ShipRuntimeState,
   ShipSystemConfig,
   SystemId,
-  TacticalCamera,
   Vector2
 } from "../shared/index.js";
 
@@ -70,7 +65,6 @@ type RenderSchematicPanelArgs = {
   selectedSystemContext: SelectedSystemContext | null;
   plotPreview: PlotPreview | null;
   playbackEvent: ResolverEvent | null;
-  camera: TacticalCamera | null;
   selectedSystemId: SystemId | null;
   outcomePresentation: OutcomePresentation;
   getContactLabel: (shipInstanceId: ShipInstanceId | null) => string;
@@ -402,6 +396,7 @@ function renderSchematicControlDeck(
         cue,
         mountContext?.firing_enabled ?? false
       );
+      const canClearTarget = weaponDraft?.target_ship_instance_id !== null || selectedChargePips > 0;
       const chargeOptions = [
         `<option value="0"${selectedChargePips === 0 ? " selected" : ""}>Hold fire</option>`,
         ...(mountContext?.allowed_charge_pips ?? []).map(
@@ -433,6 +428,17 @@ function renderSchematicControlDeck(
                 ${chargeOptions}
               </select>
             </label>
+            <div class="ssd-selected-panel__actions">
+              <button
+                class="action-button action-button--secondary action-button--compact"
+                data-clear-aim-target="${selectedSystemContext.system.id}"
+                ${canClearTarget ? "" : "disabled"}
+              >
+                <span class="action-button__row">
+                  <span class="action-button__label">Clear Target</span>
+                </span>
+              </button>
+            </div>
             <div class="ssd-selected-readout">
               <span>Target</span>
               <strong>${intent.target_label}</strong>
@@ -450,7 +456,7 @@ function renderSchematicControlDeck(
               <strong>${intent.shot_state_label}</strong>
             </div>
           </div>
-          <p class="ssd-control-deck__note">Click an enemy contact in the tactical plot to authorize or withdraw fire for this mount.</p>
+          <p class="ssd-control-deck__note">Click an enemy contact in the tactical plot to lock this mount. Click the same contact again or use Clear Target to stand it down.</p>
         </section>
       `;
     } else {
@@ -558,7 +564,6 @@ export function renderSchematicPanel({
   selectedSystemContext,
   plotPreview,
   playbackEvent,
-  camera,
   selectedSystemId,
   outcomePresentation,
   getContactLabel
@@ -608,9 +613,7 @@ export function renderSchematicPanel({
     getContactLabel
   );
   const schematicKicker = identityValue?.role === "player" ? "Your Ship" : participant.slot_id.toUpperCase();
-  const displayHeadingDegrees = camera
-    ? getHeadingDegreesInTacticalCamera(camera, ship.pose.heading_degrees)
-    : ship.pose.heading_degrees;
+  const displayHeadingDegrees = ship.pose.heading_degrees;
 
   return `
     <section class="schematic-shell">

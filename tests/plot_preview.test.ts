@@ -34,6 +34,21 @@ describe("plot preview", () => {
     expect(preview.projected_pose.position.x).toBeGreaterThan(state.ships.alpha_ship!.pose.position.x);
   });
 
+  it("keeps an unarmed mount cue available for passive arc rendering without forcing a target", async () => {
+    const state = await readBattleStateFixture();
+    const preview = buildPlotPreview(state, createPlotDraft(state, "alpha_ship"));
+
+    expect(preview.weapon_cues).toHaveLength(1);
+    expect(preview.weapon_cues[0]).toMatchObject({
+      mount_id: "forward_mount",
+      target_ship_instance_id: null,
+      charge_pips: 0,
+      target_position: null,
+      predicted_hit_probability: null
+    });
+    expect(preview.weapon_cues[0]?.arc_visual_range_km).toBeGreaterThan(0);
+  });
+
   it("builds targeting cues for charged mounts against the selected target", async () => {
     const state = await readBattleStateFixture();
     const draft = createPlotDraft(state, "alpha_ship");
