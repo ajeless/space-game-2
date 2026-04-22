@@ -284,7 +284,11 @@ export function validateMatchRulesConfig(value: unknown): MatchRulesConfig {
     id: expectString(record.id, "MatchRulesConfig.id"),
     name: expectString(record.name, "MatchRulesConfig.name"),
     turn: {
-      sub_ticks: expectInteger(turn.sub_ticks, "MatchRulesConfig.turn.sub_ticks")
+      sub_ticks: expectInteger(turn.sub_ticks, "MatchRulesConfig.turn.sub_ticks"),
+      duration_seconds: expectPositiveNumber(
+        turn.duration_seconds,
+        "MatchRulesConfig.turn.duration_seconds"
+      )
     },
     fire_control: {
       timing_policy:

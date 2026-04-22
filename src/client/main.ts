@@ -125,7 +125,6 @@ const TACTICAL_VIEWPORT = {
   padding: 28,
   hullScalePx: 44,
   headingVectorLengthPx: 28,
-  velocityProjectionDistance: 120000,
   markerInsetPx: 22,
   scaleBarTargetPx: 112
 } as const;
@@ -1503,11 +1502,12 @@ function renderShipGlyph(
   const center = worldToTacticalViewport(camera, ship.pose.position);
   const hullPoints = getShipHullPoints(shipConfig, center);
   const headingVector = getHeadingVector(ship.pose.heading_degrees, TACTICAL_VIEWPORT.headingVectorLengthPx);
+  const oneTurnDriftSeconds = sessionValue.battle_state.match_setup.rules.turn.duration_seconds;
   const velocityProjection = worldToTacticalViewport(
     camera,
     {
-      x: ship.pose.position.x + ship.pose.velocity.x * TACTICAL_VIEWPORT.velocityProjectionDistance,
-      y: ship.pose.position.y + ship.pose.velocity.y * TACTICAL_VIEWPORT.velocityProjectionDistance
+      x: ship.pose.position.x + ship.pose.velocity.x * oneTurnDriftSeconds,
+      y: ship.pose.position.y + ship.pose.velocity.y * oneTurnDriftSeconds
     }
   );
   const classes = [

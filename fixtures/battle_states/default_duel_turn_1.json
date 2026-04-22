@@ -8,7 +8,8 @@
       "id": "default_duel_v0_1",
       "name": "Default Duel v0.1",
       "turn": {
-        "sub_ticks": 60
+        "sub_ticks": 60,
+        "duration_seconds": 120
       },
       "fire_control": {
         "timing_policy": "best_legal_shot",

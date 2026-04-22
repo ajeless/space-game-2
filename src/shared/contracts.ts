@@ -26,6 +26,7 @@ export interface MatchRulesConfig {
   name: string;
   turn: {
     sub_ticks: number;
+    duration_seconds: number;
   };
   fire_control: {
     timing_policy: "best_legal_shot";

@@ -91,7 +91,7 @@ export function advanceShipDynamics(
 } {
   const shipConfig = getShipConfig(state, ship);
   const subTicksPerTurn = state.match_setup.rules.turn.sub_ticks;
-  const dt = 1 / subTicksPerTurn;
+  const dt = state.match_setup.rules.turn.duration_seconds / subTicksPerTurn;
   const sampleT = (subTick + 0.5) / subTicksPerTurn;
   const { availableThrustThisTurn } = getDriveContext(state, ship, plot);
   const thrustFraction = interpolateTranslationPlan(plot, sampleT);

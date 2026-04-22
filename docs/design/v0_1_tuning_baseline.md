@@ -72,6 +72,7 @@ This is the starting global rules model for `v0.1`.
 {
   "turn": {
     "sub_ticks": 60,
+    "duration_seconds": 120,
     "best_shot_tiebreak": "earliest"
   },
   "damage": {
@@ -190,6 +191,18 @@ For the baseline ship with `8` pips and `max_thrust = 1.8`:
 | 8 | 1.000 | 1.800 |
 
 The tactical reachable region and ghost projection should come from the resolver/planner using this actual available thrust, not from a separate hand-authored lookup table.
+
+### Turn duration baseline
+
+`duration_seconds = 120` is the first usable `v0.1` baseline.
+
+Rationale:
+
+- it makes burn and drift visibly matter on the tactical board
+- it keeps closure rates readable inside the current duel map size
+- it lets velocity arrows represent roughly one turn of projected drift instead of an arbitrary visual exaggeration
+
+The earlier "duration intentionally deferred" stance was fine while contracts were being settled, but real playtesting shows the value is no longer optional if maneuver has to be perceptible.
 
 ### Turning baseline
 
