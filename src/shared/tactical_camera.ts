@@ -34,6 +34,7 @@ export interface TacticalCamera {
   selection: TacticalCameraSelection;
   viewpoint_ship_instance_id: ShipInstanceId | null;
   center_world: Vector2;
+  view_rotation_degrees: number;
   world_units_per_px: number;
   drawable: {
     min_x: number;
@@ -110,6 +111,11 @@ function getZoomDefinition(zoomPresetId: TacticalZoomPresetId): TacticalZoomPres
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function normalizeDegrees(angle: number): number {
+  const normalized = angle % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
 }
 
 function getDrawable(viewport: TacticalCameraViewport): TacticalCamera["drawable"] {
@@ -235,6 +241,7 @@ export function buildTacticalCamera(params: {
   const zoom = getZoomDefinition(selection.zoom_preset_id);
   const viewpointShipId = getViewpointShipId(state, preferredShipId);
   const viewpointShip = viewpointShipId ? state.ships[viewpointShipId] : null;
+  const viewRotationDegrees = selection.mode_id === "player_centered" && viewpointShip ? viewpointShip.pose.heading_degrees : 0;
   let centerWorld = getRectangleBoundaryCenter(boundary);
   let worldUnitsPerPx = MIN_WORLD_UNITS_PER_PX;
 
@@ -270,6 +277,7 @@ export function buildTacticalCamera(params: {
     selection,
     viewpoint_ship_instance_id: viewpointShipId,
     center_world: centerWorld,
+    view_rotation_degrees: viewRotationDegrees,
     world_units_per_px: worldUnitsPerPx,
     drawable,
     visible_world_bounds: {
@@ -285,11 +293,67 @@ export function buildTacticalCamera(params: {
   };
 }
 
-export function worldToTacticalViewport(camera: TacticalCamera, point: Vector2): Vector2 {
-  return {
-    x: camera.drawable.center_x + (point.x - camera.center_world.x) / camera.world_units_per_px,
-    y: camera.drawable.center_y - (point.y - camera.center_world.y) / camera.world_units_per_px
+function rotateWorldVectorToView(camera: TacticalCamera, vector: Vector2): Vector2 {
+  const radians = (camera.view_rotation_degrees * Math.PI) / 180;
+  const starboard = {
+    x: Math.cos(radians),
+    y: -Math.sin(radians)
   };
+  const forward = {
+    x: Math.sin(radians),
+    y: Math.cos(radians)
+  };
+
+  return {
+    x: vector.x * starboard.x + vector.y * starboard.y,
+    y: vector.x * forward.x + vector.y * forward.y
+  };
+}
+
+function rotateViewVectorToWorld(camera: TacticalCamera, vector: Vector2): Vector2 {
+  const radians = (camera.view_rotation_degrees * Math.PI) / 180;
+  const starboard = {
+    x: Math.cos(radians),
+    y: -Math.sin(radians)
+  };
+  const forward = {
+    x: Math.sin(radians),
+    y: Math.cos(radians)
+  };
+
+  return {
+    x: forward.x * vector.y + starboard.x * vector.x,
+    y: forward.y * vector.y + starboard.y * vector.x
+  };
+}
+
+export function worldToTacticalViewport(camera: TacticalCamera, point: Vector2): Vector2 {
+  const relative = rotateWorldVectorToView(camera, {
+    x: point.x - camera.center_world.x,
+    y: point.y - camera.center_world.y
+  });
+
+  return {
+    x: camera.drawable.center_x + relative.x / camera.world_units_per_px,
+    y: camera.drawable.center_y - relative.y / camera.world_units_per_px
+  };
+}
+
+export function tacticalViewportToWorld(camera: TacticalCamera, point: Vector2): Vector2 {
+  const relative = {
+    x: (point.x - camera.drawable.center_x) * camera.world_units_per_px,
+    y: (camera.drawable.center_y - point.y) * camera.world_units_per_px
+  };
+  const worldDelta = rotateViewVectorToWorld(camera, relative);
+
+  return {
+    x: camera.center_world.x + worldDelta.x,
+    y: camera.center_world.y + worldDelta.y
+  };
+}
+
+export function getHeadingDegreesInTacticalCamera(camera: TacticalCamera, headingDegrees: number): number {
+  return normalizeDegrees(headingDegrees - camera.view_rotation_degrees);
 }
 
 export function isWorldPointVisibleInTacticalCamera(

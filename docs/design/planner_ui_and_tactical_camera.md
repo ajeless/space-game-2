@@ -5,23 +5,24 @@
 
 **Status:** decided (direction), working contract draft  
 **Scope:** v0.1 planner UI, tactical camera, and player-facing terminology  
-**Last updated:** 2026-04-21
+**Last updated:** 2026-04-22
 
 ## Summary
 
 The planner UI should be data-driven, but it should not be folded into resolver rules or battle-state payloads. `MatchRulesConfig`, `ShipConfig`, `BattleState`, and `PlotSubmission` remain the combat contracts. A separate planner/UI data layer defines how those contracts are exposed to the player: control labels, widget types, step sizes, grouping, ordering, zoom presets, and other presentational affordances.
 
-The tactical viewport should behave like a relative sensor scope rather than a tiny absolute map. In normal play, the player's ship stays centered, contacts are shown relative to it, zoom is chosen from discrete player-controlled levels, and off-screen contacts are represented with edge markers rather than continuous autoscaling.
+The tactical viewport should behave like a relative sensor scope rather than a tiny absolute map. In normal play, the player's ship stays centered and bow-up on screen, contacts are shown relative to it, zoom is chosen from discrete player-controlled levels, and off-screen contacts are represented with edge markers rather than continuous autoscaling.
 
 ## Decisions
 
 1. **Planner controls are configurable from data.** Labels, units, widget types, increments, visibility, and grouping should come from a data file, not from hard-coded UI-only assumptions.
 2. **Planner UI config is separate from resolver config.** Combat math does not need to know whether a value came from a slider, stepper, toggle, keyboard shortcut, or other widget.
-3. **The tactical view is player-relative by default.** The ship being piloted anchors the tactical scope; the scope is not an absolute world map.
+3. **The tactical view is player-relative by default.** The ship being piloted anchors the tactical scope, remains centered, and stays bow-up on screen; the scope is not an absolute world map.
 4. **Zoom is discrete and player-controlled.** No continuous auto-rescale during plotting or aim mode.
 5. **Off-screen contacts stay represented.** If a contact is outside the current zoom window, the UI shows an edge marker with range and bearing rather than silently losing it.
 6. **Boundary rules still exist in world space.** A relative camera does not remove disengagement or battlefield geometry from the simulation.
 7. **`Lateral Burn` replaces `Beam Trim`.** The old term was too easy to misread as a weapon or optics adjustment rather than sideways translational thrust.
+8. **Alternate camera modes remain implementation options, not primary player UI.** Replay, observer, or later configurable views may still use fit/world cameras, but the normal player flow should emphasize the ship-relative scope.
 
 ## Planner UI data layer
 
@@ -122,6 +123,7 @@ The important seam is this: the planner UI config chooses how to present a contr
 The main tactical view should show the world relative to the player's ship. During plot phase and aim mode:
 
 - the player's ship stays at the center of the tactical viewport
+- the player's ship stays facing viewport-up while the world rotates around it
 - enemy contacts are rendered at relative positions and velocities
 - projected motion and shot overlays are drawn in the same relative frame
 
@@ -183,6 +185,7 @@ The tactical display still has an up direction on screen, but that is a display 
 - exact file location and loading rules for planner UI config
 - whether zoom presets are numeric scale factors, named presets, or both
 - whether execute phase keeps the player's chosen zoom or offers an optional replay-only fit mode
+- how alternate tactical views become configurable later without reintroducing player-facing camera clutter
 - exact off-screen marker art and interaction affordances
 - whether a secondary mini-scope or inset radar is worth the additional chrome in v0.1
 

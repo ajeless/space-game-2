@@ -7,8 +7,10 @@ import {
   createDefaultTacticalCameraSelection,
   createPlotDraft,
   isWorldPointVisibleInTacticalCamera,
+  tacticalViewportToWorld,
   validateBattleState
 } from "../src/shared/index.js";
+import { worldToTacticalViewport } from "../src/shared/tactical_camera.js";
 
 async function readJson(relativePath: string): Promise<unknown> {
   const absolutePath = path.resolve(process.cwd(), relativePath);
@@ -59,6 +61,61 @@ describe("tactical camera", () => {
     });
 
     expect(isWorldPointVisibleInTacticalCamera(camera, state.ships.bravo_ship!.pose.position, 34)).toBe(true);
+  });
+
+  it("keeps the piloted ship facing up for either player in the default player-centered scope", async () => {
+    const state = await readBattleStateFixture();
+    const alphaCamera = buildTacticalCamera({
+      state,
+      boundary: state.match_setup.battlefield.boundary,
+      viewport,
+      selection: createDefaultTacticalCameraSelection(),
+      preferred_ship_instance_id: "alpha_ship",
+      plot_preview: null
+    });
+    const bravoCamera = buildTacticalCamera({
+      state,
+      boundary: state.match_setup.battlefield.boundary,
+      viewport,
+      selection: createDefaultTacticalCameraSelection(),
+      preferred_ship_instance_id: "bravo_ship",
+      plot_preview: null
+    });
+
+    const alphaSelf = worldToTacticalViewport(alphaCamera, state.ships.alpha_ship!.pose.position);
+    const alphaAhead = worldToTacticalViewport(alphaCamera, {
+      x: state.ships.alpha_ship!.pose.position.x,
+      y: state.ships.alpha_ship!.pose.position.y + 40
+    });
+    const bravoSelf = worldToTacticalViewport(bravoCamera, state.ships.bravo_ship!.pose.position);
+    const bravoAhead = worldToTacticalViewport(bravoCamera, {
+      x: state.ships.bravo_ship!.pose.position.x,
+      y: state.ships.bravo_ship!.pose.position.y - 40
+    });
+
+    expect(alphaSelf.x).toBeCloseTo(alphaCamera.drawable.center_x, 6);
+    expect(alphaSelf.y).toBeCloseTo(alphaCamera.drawable.center_y, 6);
+    expect(alphaAhead.y).toBeLessThan(alphaSelf.y);
+    expect(bravoSelf.x).toBeCloseTo(bravoCamera.drawable.center_x, 6);
+    expect(bravoSelf.y).toBeCloseTo(bravoCamera.drawable.center_y, 6);
+    expect(bravoAhead.y).toBeLessThan(bravoSelf.y);
+  });
+
+  it("round-trips viewport coordinates through the rotated player-centered camera transform", async () => {
+    const state = await readBattleStateFixture();
+    const camera = buildTacticalCamera({
+      state,
+      boundary: state.match_setup.battlefield.boundary,
+      viewport,
+      selection: createDefaultTacticalCameraSelection(),
+      preferred_ship_instance_id: "bravo_ship",
+      plot_preview: null
+    });
+    const projected = worldToTacticalViewport(camera, state.ships.alpha_ship!.pose.position);
+    const roundTripped = tacticalViewportToWorld(camera, projected);
+
+    expect(roundTripped.x).toBeCloseTo(state.ships.alpha_ship!.pose.position.x, 6);
+    expect(roundTripped.y).toBeCloseTo(state.ships.alpha_ship!.pose.position.y, 6);
   });
 
   it("supports duel-fit mode for keeping both ships and the plotted motion in frame", async () => {

@@ -117,8 +117,8 @@ body.is-plot-dragging {
 
 .bridge-main {
   display: grid;
-  grid-template-columns: minmax(320px, 35fr) minmax(560px, 65fr);
-  gap: 12px;
+  grid-template-columns: minmax(320px, 34fr) minmax(560px, 66fr);
+  gap: 10px;
   padding: 10px 12px 0;
   min-height: 0;
 }
@@ -131,6 +131,10 @@ body.is-plot-dragging {
   border: 1px solid var(--line-0);
   background: rgba(12, 28, 42, 0.66);
   padding: 10px;
+}
+
+.bridge-panel--tactical {
+  padding: 8px;
 }
 
 .schematic-shell,
@@ -597,29 +601,29 @@ body.is-plot-dragging {
 .tactical-panel__header {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .tactical-panel__header-right {
   display: grid;
   justify-items: end;
-  gap: 8px;
+  gap: 4px;
 }
 
 .tactical-panel__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  gap: 6px 10px;
   justify-content: flex-end;
   color: var(--text-1);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
 }
 
 .camera-controls {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   justify-items: end;
 }
 
@@ -646,7 +650,7 @@ body.is-plot-dragging {
 }
 
 .camera-toggle {
-  padding: 6px 10px;
+  padding: 5px 9px;
   border: 1px solid rgba(125, 176, 218, 0.2);
   background: rgba(10, 24, 37, 0.82);
   color: var(--text-1);
@@ -855,26 +859,26 @@ body.is-plot-dragging {
 
 .plot-preview__path {
   fill: none;
-  stroke: rgba(125, 213, 154, 0.78);
+  stroke: rgba(125, 213, 154, 0.56);
   stroke-width: 2;
   stroke-dasharray: 7 6;
 }
 
 .plot-preview__ghost-hull {
-  fill: rgba(125, 213, 154, 0.08);
-  stroke: rgba(125, 213, 154, 0.9);
+  fill: rgba(125, 213, 154, 0.05);
+  stroke: rgba(125, 213, 154, 0.62);
   stroke-width: 1.6;
   stroke-dasharray: 6 5;
 }
 
 .plot-preview__ghost-heading {
-  stroke: rgba(125, 213, 154, 0.95);
+  stroke: rgba(125, 213, 154, 0.66);
   stroke-width: 1.8;
   stroke-dasharray: 5 4;
 }
 
 .plot-preview__ghost-core {
-  fill: rgba(125, 213, 154, 0.95);
+  fill: rgba(125, 213, 154, 0.68);
 }
 
 .plot-preview__ghost-label,
@@ -942,27 +946,28 @@ body.is-plot-dragging {
 
 .plot-handles__guide-ring {
   fill: none;
-  stroke: rgba(125, 176, 218, 0.2);
+  stroke: rgba(125, 176, 218, 0.16);
   stroke-width: 1.2;
   stroke-dasharray: 5 5;
 }
 
 .plot-handles__guide-ring--heading {
-  stroke: rgba(242, 200, 121, 0.26);
+  stroke: rgba(242, 200, 121, 0.2);
 }
 
 .plot-handles__vector {
-  stroke: rgba(125, 213, 154, 0.9);
+  stroke: rgba(125, 213, 154, 0.62);
   stroke-width: 2;
 }
 
 .plot-handles__vector--heading {
-  stroke: rgba(242, 200, 121, 0.92);
+  stroke: rgba(242, 200, 121, 0.72);
 }
 
 .plot-handles__grip {
   cursor: grab;
   stroke-width: 2;
+  pointer-events: auto;
 }
 
 .plot-handles__hit-target {
@@ -971,13 +976,14 @@ body.is-plot-dragging {
 }
 
 .plot-handles__grip--thrust {
-  fill: rgba(125, 213, 154, 0.18);
-  stroke: rgba(125, 213, 154, 0.96);
+  fill: rgba(125, 213, 154, 0.12);
+  stroke: rgba(125, 213, 154, 0.78);
+  stroke-linejoin: round;
 }
 
 .plot-handles__grip--heading {
-  fill: rgba(242, 200, 121, 0.16);
-  stroke: rgba(242, 200, 121, 0.98);
+  fill: rgba(242, 200, 121, 0.1);
+  stroke: rgba(242, 200, 121, 0.8);
 }
 
 .plot-handles__label {
