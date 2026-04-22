@@ -1562,7 +1562,7 @@ function renderFooterStrip(sessionValue: MatchSessionView | null, playbackEvent:
     <section class="footer-strip">
       <div class="footer-strip__cell">
         <span class="section-kicker">Current Resolution</span>
-        <strong>${playbackSummary}</strong>
+        <strong data-current-resolution>${playbackSummary}</strong>
       </div>
       <div class="footer-strip__cell">
         <span class="section-kicker">Combat Feed</span>
@@ -2414,7 +2414,7 @@ function renderActionStripControls(
       <section class="commit-strip commit-strip--ended">
         <div class="commit-strip__status">
           <span class="section-kicker">Match Status</span>
-          <strong>${outcome?.headline ?? "Match ended"}</strong>
+          <strong data-turn-status>${outcome?.headline ?? "Match ended"}</strong>
         </div>
         ${resetMatchButton}
       </section>
@@ -2432,7 +2432,7 @@ function renderActionStripControls(
     <section class="commit-strip">
       <div class="commit-strip__status">
         <span class="section-kicker">Turn Status</span>
-        <strong>Turn ${context.turn_number} · ${isPending ? "Plot submitted" : "Plot in progress"}</strong>
+        <strong data-turn-status>Turn ${context.turn_number} · ${isPending ? "Plot submitted" : "Plot in progress"}</strong>
       </div>
       <div class="commit-strip__actions">
         ${claimableSlotStates
@@ -2596,9 +2596,9 @@ function render(): void {
   root.innerHTML = `
     <main class="bridge-shell">
       <header class="${missionBarClass}">
-        <div class="mission-bar__mode">${phaseLabel}</div>
+        <div class="mission-bar__mode" data-phase-label>${phaseLabel}</div>
         <div class="mission-bar__meta">
-          <span>Turn ${sessionValue?.battle_state.turn_number ?? "..."}</span>
+          <span data-turn-number>Turn ${sessionValue?.battle_state.turn_number ?? "..."}</span>
           <span>${stationLabel}</span>
         </div>
         <div class="mission-bar__status">
