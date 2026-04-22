@@ -1,5 +1,6 @@
 # Local agent/editor state
 .codex
+audit/
 
 # Dependencies
 node_modules/
