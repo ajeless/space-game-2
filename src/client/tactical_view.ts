@@ -20,6 +20,13 @@ import type {
   TacticalCamera,
   Vector2
 } from "../shared/index.js";
+import {
+  getContactTelemetry,
+  getWeaponCueEngagementLabel,
+  getWeaponCueEngagementPriority,
+  getWeaponCueEngagementState,
+  type ContactTelemetry
+} from "./combat_readability.js";
 
 export const TACTICAL_VIEWPORT = {
   width: 960,
@@ -130,7 +137,7 @@ function renderShipGlyph(
   ship: ShipRuntimeState,
   shipConfig: ShipConfig,
   targetCue: WeaponCue | null,
-  isTargeted: boolean,
+  contactTelemetry: string | null,
   isTargetable: boolean,
   playbackTone: "hit" | "destroyed" | "disengaged" | null
 ): string {
@@ -143,11 +150,13 @@ function renderShipGlyph(
     x: ship.pose.position.x + ship.pose.velocity.x * oneTurnDriftSeconds,
     y: ship.pose.position.y + ship.pose.velocity.y * oneTurnDriftSeconds
   });
+  const engagementState = getWeaponCueEngagementState(targetCue);
+  const isTargeted = engagementState !== "none";
   const classes = [
     "ship-glyph",
     identityValue?.ship_instance_id === ship.ship_instance_id ? "ship-glyph--self" : "",
     sessionValue.pending_plot_ship_ids.includes(ship.ship_instance_id) ? "ship-glyph--pending" : "",
-    isTargeted ? "ship-glyph--targeted" : "",
+    isTargeted ? `ship-glyph--${engagementState}` : "",
     playbackTone === "hit" ? "ship-glyph--impact" : "",
     playbackTone === "destroyed" ? "ship-glyph--destroyed" : "",
     playbackTone === "disengaged" ? "ship-glyph--disengaged" : ""
@@ -155,14 +164,11 @@ function renderShipGlyph(
     .filter(Boolean)
     .join(" ");
   const targetAttribute = isTargetable ? `data-target-ship="${ship.ship_instance_id}"` : "";
-  const targetTag =
-    targetCue && isArmedWeaponCue(targetCue)
-      ? `${targetCue.charge_pips}P · ${
-          targetCue.predicted_hit_probability !== null ? `${Math.round(targetCue.predicted_hit_probability * 100)}%` : "locked"
-        }`
-      : null;
+  const targetTag = getWeaponCueEngagementLabel(targetCue);
   const label = getTacticalShipLabel(identityValue, ship, shipConfig);
   const showText = shouldRenderTacticalText(camera);
+  const labelY = contactTelemetry ? center.y - 28 : center.y - 20;
+  const metaY = center.y - 14;
 
   return `
     <g class="${classes}">
@@ -196,10 +202,15 @@ function renderShipGlyph(
           ? `<circle class="ship-glyph__target-ring" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="22" />`
           : ""
       }
-      ${showText && label ? `<text class="ship-glyph__label" x="${center.x.toFixed(2)}" y="${(center.y - 20).toFixed(2)}">${label}</text>` : ""}
+      ${showText && label ? `<text class="ship-glyph__label" x="${center.x.toFixed(2)}" y="${labelY.toFixed(2)}">${label}</text>` : ""}
+      ${
+        showText && label && contactTelemetry
+          ? `<text class="ship-glyph__meta" x="${center.x.toFixed(2)}" y="${metaY.toFixed(2)}">${contactTelemetry}</text>`
+          : ""
+      }
       ${
         targetTag && showText
-          ? `<text class="ship-glyph__target-tag" x="${center.x.toFixed(2)}" y="${(center.y + 32).toFixed(2)}">TARGET · ${targetTag}</text>`
+          ? `<text class="ship-glyph__target-tag" x="${center.x.toFixed(2)}" y="${(center.y + 32).toFixed(2)}">${targetTag}</text>`
           : ""
       }
     </g>
@@ -472,7 +483,7 @@ function renderOffscreenMarker(
   ship: ShipRuntimeState,
   label: string,
   targetCue: WeaponCue | null,
-  isTargeted: boolean,
+  contactTelemetry: ContactTelemetry | null,
   isTargetable: boolean,
   isSelf: boolean,
   playbackTone: "hit" | "destroyed" | "disengaged" | null
@@ -483,15 +494,17 @@ function renderOffscreenMarker(
   const labelX =
     labelAnchor === "start" ? anchor.x + 18 : labelAnchor === "end" ? anchor.x - 18 : anchor.x;
   const bearingDegrees = getHeadingDegreesInTacticalCamera(camera, ship.pose.heading_degrees) - 90;
-  const rangeText = viewpointShip
+  const rangeText = contactTelemetry?.range_label ?? (viewpointShip
     ? formatDistance(
         Math.hypot(ship.pose.position.x - viewpointShip.pose.position.x, ship.pose.position.y - viewpointShip.pose.position.y)
       )
-    : formatDistance(Math.hypot(ship.pose.position.x - camera.center_world.x, ship.pose.position.y - camera.center_world.y));
+    : formatDistance(Math.hypot(ship.pose.position.x - camera.center_world.x, ship.pose.position.y - camera.center_world.y)));
+  const engagementState = getWeaponCueEngagementState(targetCue);
+  const isTargeted = engagementState !== "none";
   const classes = [
     "offscreen-marker",
     isSelf ? "offscreen-marker--self" : "",
-    isTargeted ? "offscreen-marker--targeted" : "",
+    isTargeted ? `offscreen-marker--${engagementState}` : "",
     isTargetable ? "offscreen-marker--targetable" : "",
     playbackTone === "hit" ? "offscreen-marker--impact" : "",
     playbackTone === "destroyed" ? "offscreen-marker--destroyed" : "",
@@ -499,12 +512,9 @@ function renderOffscreenMarker(
   ]
     .filter(Boolean)
     .join(" ");
-  const targetStatus =
-    targetCue && isArmedWeaponCue(targetCue)
-      ? `TARGET · ${targetCue.charge_pips}P${
-          targetCue.predicted_hit_probability !== null ? ` · ${Math.round(targetCue.predicted_hit_probability * 100)}%` : ""
-        }`
-      : null;
+  const targetStatus = getWeaponCueEngagementLabel(targetCue);
+  const labelText = label ? `${label} · ${rangeText}` : rangeText;
+  const statusText = targetStatus ?? (!isSelf && contactTelemetry ? contactTelemetry.closure_label.toUpperCase() : null);
 
   return `
     <g class="${classes}">
@@ -525,11 +535,11 @@ function renderOffscreenMarker(
         y="${(anchor.y - 16).toFixed(2)}"
         text-anchor="${labelAnchor}"
       >
-        ${label} · ${rangeText}
+        ${labelText}
       </text>
       ${
-        targetStatus
-          ? `<text class="offscreen-marker__status" x="${labelX.toFixed(2)}" y="${(anchor.y + 20).toFixed(2)}" text-anchor="${labelAnchor}">${targetStatus}</text>`
+        statusText
+          ? `<text class="offscreen-marker__status" x="${labelX.toFixed(2)}" y="${(anchor.y + 20).toFixed(2)}" text-anchor="${labelAnchor}">${statusText}</text>`
           : ""
       }
     </g>
@@ -628,17 +638,20 @@ export function renderTacticalBoard({
     ? plotPreview?.weapon_cues ?? []
     : plotPreview?.weapon_cues.filter((cue) => cue.mount_id === focusedMountId) ?? []
   ).filter((cue) => cue.target_ship_instance_id !== null);
-  const armedCueByTargetShipId = new Map<ShipInstanceId, WeaponCue>();
+  const selectedCueByTargetShipId = new Map<ShipInstanceId, WeaponCue>();
 
   for (const cue of emphasizedCues) {
-    if (!isArmedWeaponCue(cue) || cue.target_ship_instance_id === null) {
+    if (cue.target_ship_instance_id === null) {
       continue;
     }
 
-    armedCueByTargetShipId.set(cue.target_ship_instance_id, cue);
+    const existingCue = selectedCueByTargetShipId.get(cue.target_ship_instance_id);
+
+    if (!existingCue || getWeaponCueEngagementPriority(cue) > getWeaponCueEngagementPriority(existingCue)) {
+      selectedCueByTargetShipId.set(cue.target_ship_instance_id, cue);
+    }
   }
 
-  const targetedShipIds = new Set(armedCueByTargetShipId.keys());
   const viewpointShip = camera.viewpoint_ship_instance_id
     ? sessionValue.battle_state.ships[camera.viewpoint_ship_instance_id] ?? null
     : null;
@@ -654,12 +667,12 @@ export function renderTacticalBoard({
     }
 
     const isSelf = identityValue?.ship_instance_id === ship.ship_instance_id;
-    const targetCue = armedCueByTargetShipId.get(ship.ship_instance_id) ?? null;
-    const isTargeted = targetedShipIds.has(ship.ship_instance_id);
+    const targetCue = selectedCueByTargetShipId.get(ship.ship_instance_id) ?? null;
     const isTargetable = focusedMountId !== null && !isSelf;
     const playbackTone = getShipPlaybackTone(playbackEvent, ship.ship_instance_id);
     const visible = isWorldPointVisibleInTacticalCamera(camera, ship.pose.position, 34);
     const label = getTacticalShipLabel(identityValue, ship, shipConfig);
+    const contactTelemetry = getContactTelemetry(viewpointShip, ship);
 
     if (visible) {
       visibleShips.push(
@@ -670,7 +683,7 @@ export function renderTacticalBoard({
           ship,
           shipConfig,
           targetCue,
-          isTargeted,
+          contactTelemetry?.summary_label ?? null,
           isTargetable,
           playbackTone
         )
@@ -683,7 +696,7 @@ export function renderTacticalBoard({
           ship,
           label,
           targetCue,
-          isTargeted,
+          contactTelemetry,
           isTargetable,
           isSelf,
           playbackTone

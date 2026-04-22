@@ -371,6 +371,48 @@ function formatShipContactLabel(
   return getPlayerFacingContactLabel(sessionValue, identityValue, shipInstanceId);
 }
 
+function getShipNarrationLabels(
+  sessionValue: MatchSessionView,
+  identityValue: SessionIdentity | null,
+  shipInstanceId: ShipInstanceId | null
+): {
+  subject: string;
+  object: string;
+  possessive: string;
+} {
+  if (!shipInstanceId) {
+    return {
+      subject: "Unknown contact",
+      object: "unknown contact",
+      possessive: "Unknown contact"
+    };
+  }
+
+  if (identityValue?.role === "player") {
+    if (identityValue.ship_instance_id === shipInstanceId) {
+      return {
+        subject: "You",
+        object: "you",
+        possessive: "Your"
+      };
+    }
+
+    return {
+      subject: "Contact",
+      object: "contact",
+      possessive: "Contact"
+    };
+  }
+
+  const slotLabel = capitalizeLabel(getShipSlotLabel(sessionValue, shipInstanceId).toLowerCase());
+
+  return {
+    subject: slotLabel,
+    object: slotLabel.toLowerCase(),
+    possessive: slotLabel.endsWith("s") ? `${slotLabel}'` : `${slotLabel}'s`
+  };
+}
+
 function formatSystemDisplayLabel(
   sessionValue: MatchSessionView,
   shipInstanceId: ShipInstanceId | null,
@@ -400,44 +442,60 @@ function formatResolutionEventSummary(
   let summary: string;
 
   switch (event.type) {
-    case "weapon_fired":
-      summary = `${formatShipContactLabel(sessionValue, identityValue, event.actor ?? null)} fired ${formatSystemDisplayLabel(
+    case "weapon_fired": {
+      const actor = getShipNarrationLabels(sessionValue, identityValue, event.actor ?? null);
+      const target = getShipNarrationLabels(sessionValue, identityValue, event.target ?? null);
+      summary = `${actor.subject} fired ${formatSystemDisplayLabel(
         sessionValue,
         event.actor ?? null,
         event.details.mountId
-      )} at ${formatShipContactLabel(sessionValue, identityValue, event.target ?? null)} · ${event.details.chargePips}P`;
+      )} at ${target.object} · ${event.details.chargePips}P`;
       break;
-    case "hit_registered":
-      summary = `${formatShipContactLabel(sessionValue, identityValue, event.details.fromActor)} hit ${formatShipContactLabel(
-        sessionValue,
-        identityValue,
-        event.target ?? null
-      )}${event.details.impactSystemId ? ` · ${formatSystemDisplayLabel(sessionValue, event.target ?? null, event.details.impactSystemId)}` : ""}`;
+    }
+    case "hit_registered": {
+      const attacker = getShipNarrationLabels(sessionValue, identityValue, event.details.fromActor);
+      const target = getShipNarrationLabels(sessionValue, identityValue, event.target ?? null);
+      summary = `${attacker.subject} hit ${target.object}${
+        event.details.impactSystemId
+          ? ` · ${formatSystemDisplayLabel(sessionValue, event.target ?? null, event.details.impactSystemId)}`
+          : ""
+      }`;
       break;
-    case "subsystem_damaged":
-      summary = `${formatShipContactLabel(sessionValue, identityValue, event.actor ?? null)} ${formatSystemDisplayLabel(
+    }
+    case "subsystem_damaged": {
+      const target = getShipNarrationLabels(sessionValue, identityValue, event.actor ?? null);
+      summary = `${target.possessive} ${formatSystemDisplayLabel(
         sessionValue,
         event.actor ?? null,
         event.details.systemId
       )} ${event.details.newState.toLowerCase()}`;
       break;
-    case "ship_destroyed":
-      summary = `${formatShipContactLabel(sessionValue, identityValue, event.target ?? null)} destroyed by ${formatShipContactLabel(
-        sessionValue,
-        identityValue,
-        event.details.causeActor
-      )}`;
+    }
+    case "ship_destroyed": {
+      const target = getShipNarrationLabels(sessionValue, identityValue, event.target ?? null);
+      summary = target.subject === "You" ? "You were destroyed" : `${target.subject} destroyed`;
       break;
-    case "ship_disengaged":
-      summary = `${formatShipContactLabel(sessionValue, identityValue, event.target ?? null)} withdrew beyond the boundary`;
+    }
+    case "ship_disengaged": {
+      const target = getShipNarrationLabels(sessionValue, identityValue, event.target ?? null);
+      summary = target.subject === "You" ? "You crossed the boundary" : `${target.subject} withdrew`;
       break;
-    case "turn_ended":
-      summary = `Turn ${event.details.turnNumber - 1} resolved${
-        event.details.winner
-          ? ` · winner ${formatShipContactLabel(sessionValue, identityValue, event.details.winner)}`
-          : ""
-      }`;
+    }
+    case "turn_ended": {
+      if (!event.details.winner) {
+        summary = `Turn ${event.details.turnNumber - 1} resolved`;
+        break;
+      }
+
+      const winner = getShipNarrationLabels(sessionValue, identityValue, event.details.winner);
+      summary =
+        winner.subject === "You"
+          ? `Turn ${event.details.turnNumber - 1} resolved · victory`
+          : winner.subject === "Contact"
+            ? `Turn ${event.details.turnNumber - 1} resolved · defeat`
+            : `Turn ${event.details.turnNumber - 1} resolved · ${winner.object} wins`;
       break;
+    }
     default:
       summary = event.type;
       break;
@@ -1031,7 +1089,7 @@ function getFooterStripPresentation(sessionValue: MatchSessionView | null, playb
     sessionValue && playbackEvent
       ? formatResolutionEventSummary(sessionValue, identity, playbackEvent)
       : sessionValue?.last_resolution
-        ? `Resolved T${sessionValue.last_resolution.resolved_from_turn_number}`
+        ? `Turn ${sessionValue.last_resolution.resolved_from_turn_number} resolved`
         : "No turn resolved yet";
   const combatFeedItems = sessionValue?.last_resolution
     ? getRecentResolutionEvents(sessionValue).map((event) => formatResolutionEventSummary(sessionValue, identity, event))
@@ -1040,7 +1098,7 @@ function getFooterStripPresentation(sessionValue: MatchSessionView | null, playb
   return {
     current_resolution_label: currentResolutionLabel,
     combat_feed_items: combatFeedItems,
-    empty_combat_feed_label: "Awaiting first turn resolution.",
+    empty_combat_feed_label: "Awaiting first exchange.",
     link_status_label: formatLinkStatusLabel(wsState),
     bridge_message: formatBridgeMessage(messages[0], identity)
   };
@@ -1163,8 +1221,8 @@ function render(): void {
   const tacticalTitle = cameraMode?.id === "player_centered" ? "Ship Relative Scope" : cameraMode?.label ?? "Shared sensor plot";
   const tacticalHint =
     selectedSystemContext?.system.type === "weapon_mount"
-      ? "Aim mode overlays the selected mount."
-      : "Drag burn and heading directly on the plot.";
+      ? "Click contact to lock. Click again to clear."
+      : "Drag burn and heading on the plot.";
   const stationLabel = getBridgeStationLabel(identity, displayed?.shipConfig.name ?? null);
   const situationalStatus =
     identity?.role === "player" ? capitalizeLabel(getOpponentStatusLabel(sessionValue, identity)) : "Spectator view";

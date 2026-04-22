@@ -164,11 +164,11 @@ function getWeaponIntentPresentation(
   if (!targetShipInstanceId) {
     return {
       tone: "idle",
-      banner_label: "NO CONTACT SELECTED",
+      banner_label: "NO TARGET LOCKED",
       target_label: "none",
-      status_label: "Await contact",
+      status_label: "Select contact",
       system_meta_label: "SAFE",
-      shot_quality_label: shotQualityLabel,
+      shot_quality_label: "Await contact",
       shot_state_label: shotStateLabel,
       is_armed: false
     };
@@ -177,11 +177,11 @@ function getWeaponIntentPresentation(
   if (!isArmed) {
     return {
       tone: "idle",
-      banner_label: `HOLD FIRE · ${targetShortLabel}`,
+      banner_label: `TRACKING ${targetShortLabel}`,
       target_label: targetLabel,
-      status_label: "Standby",
-      system_meta_label: "STBY",
-      shot_quality_label: shotQualityLabel,
+      status_label: "Target tracked",
+      system_meta_label: "TRACK",
+      shot_quality_label: "Hold fire",
       shot_state_label: shotStateLabel,
       is_armed: false
     };
@@ -192,7 +192,7 @@ function getWeaponIntentPresentation(
       tone: "armed",
       banner_label: `ARMED ON ${targetShortLabel} · ${chargePips}P`,
       target_label: targetLabel,
-      status_label: `${chargePips} pip shot armed`,
+      status_label: "Shot armed",
       system_meta_label: `ARM ${chargePips}P`,
       shot_quality_label: shotQualityLabel,
       shot_state_label: shotStateLabel,
@@ -202,9 +202,9 @@ function getWeaponIntentPresentation(
 
   return {
     tone: "warn",
-    banner_label: `NO LEGAL SHOT · ${targetShortLabel}`,
+    banner_label: `SHOT BLOCKED · ${targetShortLabel}`,
     target_label: targetLabel,
-    status_label: `${chargePips} pip shot blocked`,
+    status_label: "Target tracked · blocked",
     system_meta_label: "NO SHOT",
     shot_quality_label: shotQualityLabel,
     shot_state_label: shotStateLabel,
@@ -440,19 +440,19 @@ function renderSchematicControlDeck(
                 </span>
               </button>
             </div>
-            <div class="ssd-selected-readout">
+            <div class="ssd-selected-readout ssd-selected-readout--${intent.tone}">
               <span>Target</span>
               <strong>${intent.target_label}</strong>
             </div>
-            <div class="ssd-selected-readout">
+            <div class="ssd-selected-readout ssd-selected-readout--${intent.tone}">
               <span>Fire Control</span>
               <strong>${intent.status_label}</strong>
             </div>
-            <div class="ssd-selected-readout">
+            <div class="ssd-selected-readout ssd-selected-readout--${intent.tone}">
               <span>Solution</span>
               <strong>${intent.shot_quality_label}</strong>
             </div>
-            <div class="ssd-selected-readout">
+            <div class="ssd-selected-readout ssd-selected-readout--${intent.tone}">
               <span>Arc / Range</span>
               <strong>${intent.shot_state_label}</strong>
             </div>
