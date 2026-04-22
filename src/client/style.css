@@ -733,15 +733,18 @@ body.is-plot-dragging {
   fill: rgba(130, 212, 255, 0.16);
   stroke: rgba(166, 225, 255, 0.8);
   stroke-width: 1.5;
+  pointer-events: none;
 }
 
 .ship-glyph__heading {
   stroke: rgba(162, 233, 193, 0.9);
   stroke-width: 2;
+  pointer-events: none;
 }
 
 .ship-glyph__core {
   fill: var(--text-0);
+  pointer-events: none;
 }
 
 .ship-glyph__label {
@@ -750,6 +753,7 @@ body.is-plot-dragging {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-anchor: middle;
+  pointer-events: none;
 }
 
 .ship-glyph--self .ship-glyph__hull {
@@ -793,6 +797,7 @@ body.is-plot-dragging {
   stroke: rgba(242, 200, 121, 0.94);
   stroke-width: 2;
   stroke-dasharray: 5 4;
+  pointer-events: none;
 }
 
 .ship-glyph__target-tag {
@@ -801,6 +806,7 @@ body.is-plot-dragging {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-anchor: middle;
+  pointer-events: none;
 }
 
 .offscreen-marker__hit {
@@ -815,10 +821,12 @@ body.is-plot-dragging {
   fill: rgba(120, 191, 235, 0.18);
   stroke: rgba(166, 225, 255, 0.78);
   stroke-width: 1.5;
+  pointer-events: none;
 }
 
 .offscreen-marker__core {
   fill: rgba(226, 241, 250, 0.94);
+  pointer-events: none;
 }
 
 .offscreen-marker__label {
@@ -826,6 +834,7 @@ body.is-plot-dragging {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
+  pointer-events: none;
 }
 
 .offscreen-marker__status {
@@ -833,6 +842,11 @@ body.is-plot-dragging {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.tactical-board--aiming [data-tactical-viewport] {
+  cursor: crosshair;
 }
 
 .offscreen-marker--self .offscreen-marker__arrow {
@@ -873,6 +887,7 @@ body.is-plot-dragging {
   stroke: rgba(125, 213, 154, 0.56);
   stroke-width: 2;
   stroke-dasharray: 7 6;
+  pointer-events: none;
 }
 
 .plot-preview__ghost-hull {
@@ -880,16 +895,19 @@ body.is-plot-dragging {
   stroke: rgba(125, 213, 154, 0.54);
   stroke-width: 1.6;
   stroke-dasharray: 6 5;
+  pointer-events: none;
 }
 
 .plot-preview__ghost-heading {
   stroke: rgba(125, 213, 154, 0.56);
   stroke-width: 1.8;
   stroke-dasharray: 5 4;
+  pointer-events: none;
 }
 
 .plot-preview__ghost-core {
   fill: rgba(125, 213, 154, 0.56);
+  pointer-events: none;
 }
 
 .plot-preview__ghost-label,
@@ -899,10 +917,12 @@ body.is-plot-dragging {
   font-weight: 600;
   letter-spacing: 0.03em;
   text-anchor: middle;
+  pointer-events: none;
 }
 
 .plot-preview__cue .plot-preview__arc {
   stroke-width: 1.2;
+  pointer-events: none;
 }
 
 .plot-preview__cue--valid .plot-preview__arc {
@@ -937,6 +957,7 @@ body.is-plot-dragging {
 .plot-preview__target-line {
   stroke-width: 1.6;
   stroke-dasharray: 6 5;
+  pointer-events: none;
 }
 
 .plot-preview__cue--idle .plot-preview__target-line {
@@ -955,6 +976,7 @@ body.is-plot-dragging {
   fill: none;
   stroke-width: 1.5;
   stroke-dasharray: 4 4;
+  pointer-events: none;
 }
 
 .plot-preview__cue--valid .plot-preview__target-reticle {
@@ -1024,22 +1046,26 @@ body.is-plot-dragging {
   fill: rgba(255, 243, 197, 0.22);
   stroke: rgba(255, 220, 112, 0.98);
   stroke-width: 2;
+  pointer-events: none;
 }
 
 .resolution-playback__shot-line {
   stroke: rgba(255, 220, 112, 0.96);
   stroke-width: 2.4;
   stroke-dasharray: 9 4;
+  pointer-events: none;
 }
 
 .resolution-playback__impact-ring {
   fill: none;
   stroke: rgba(236, 126, 116, 0.96);
   stroke-width: 2.4;
+  pointer-events: none;
 }
 
 .resolution-playback__impact-core {
   fill: rgba(236, 126, 116, 0.96);
+  pointer-events: none;
 }
 
 .resolution-playback__terminal-ring {
@@ -1047,6 +1073,7 @@ body.is-plot-dragging {
   stroke: rgba(255, 178, 120, 0.98);
   stroke-width: 2.4;
   stroke-dasharray: 6 4;
+  pointer-events: none;
 }
 
 .resolution-playback__terminal-label {
@@ -1056,6 +1083,7 @@ body.is-plot-dragging {
   letter-spacing: 0.06em;
   text-anchor: middle;
   text-transform: uppercase;
+  pointer-events: none;
 }
 
 .tactical-scale-bar__line,

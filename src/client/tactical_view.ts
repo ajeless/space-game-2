@@ -78,7 +78,7 @@ function getTacticalShipLabel(
   shipConfig: ShipConfig
 ): string {
   if (identityValue?.role === "player") {
-    return identityValue.ship_instance_id === ship.ship_instance_id ? "YOU" : "CONTACT";
+    return identityValue.ship_instance_id === ship.ship_instance_id ? "" : "CONTACT";
   }
 
   return shipConfig.name.toUpperCase();
@@ -197,7 +197,7 @@ function renderShipGlyph(
           ? `<circle class="ship-glyph__target-ring" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="22" />`
           : ""
       }
-      ${showText ? `<text class="ship-glyph__label" x="${center.x.toFixed(2)}" y="${(center.y - 20).toFixed(2)}">${label}</text>` : ""}
+      ${showText && label ? `<text class="ship-glyph__label" x="${center.x.toFixed(2)}" y="${(center.y - 20).toFixed(2)}">${label}</text>` : ""}
       ${
         targetTag && showText
           ? `<text class="ship-glyph__target-tag" x="${center.x.toFixed(2)}" y="${(center.y + 32).toFixed(2)}">TARGET · ${targetTag}</text>`
@@ -716,7 +716,7 @@ export function renderTacticalBoard({
   const playbackOverlay = renderResolutionPlaybackOverlay(camera, playbackEvent);
 
   return `
-    <div class="tactical-board">
+    <div class="tactical-board${focusedMountId !== null ? " tactical-board--aiming" : ""}">
       <svg
         viewBox="0 0 ${TACTICAL_VIEWPORT.width} ${TACTICAL_VIEWPORT.height}"
         aria-label="Tactical viewport"
