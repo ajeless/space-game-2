@@ -1,4 +1,12 @@
 import "./style.css";
+import {
+  renderActionStripControls,
+  renderBridgeShell,
+  renderFooterStrip,
+  renderMatchOutcomeBanner,
+  renderReadoutStrip,
+  renderTacticalCameraControls
+} from "./bridge_shell_view.js";
 import { renderSchematicPanel } from "./schematic_view.js";
 import { renderTacticalBoard, TACTICAL_VIEWPORT } from "./tactical_view.js";
 import {
@@ -866,91 +874,6 @@ window.addEventListener("pointerup", handleGlobalTacticalPointerEnd);
 window.addEventListener("pointercancel", handleGlobalTacticalPointerEnd);
 window.addEventListener("keydown", handleGlobalKeydown);
 
-function renderReadoutStrip(sessionValue: MatchSessionView | null, plotSummary: PlotDraftSummary | null): string {
-  if (!plotSummary) {
-    return `
-      <div class="readout-strip">
-        <div class="readout-chip"><span>Turn</span><strong>...</strong></div>
-        <div class="readout-chip"><span>Drive</span><strong>...</strong></div>
-        <div class="readout-chip"><span>Railgun</span><strong>...</strong></div>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="readout-strip">
-      <div class="readout-chip">
-        <span>Turn</span>
-        <strong>${formatSignedNumber(plotSummary.draft.heading_delta_degrees)}°</strong>
-      </div>
-      <div class="readout-chip">
-        <span>Drive</span>
-        <strong>${plotSummary.power.drive_pips}</strong>
-      </div>
-      <div class="readout-chip">
-        <span>Railgun</span>
-        <strong>${plotSummary.power.railgun_pips}</strong>
-      </div>
-    </div>
-  `;
-}
-
-function renderMatchOutcomeBanner(
-  sessionValue: MatchSessionView | null,
-  identityValue: SessionIdentity | null
-): string {
-  const outcome = getMatchOutcomePresentation(sessionValue, identityValue);
-
-  if (!outcome) {
-    return "";
-  }
-
-  return `
-    <section class="match-outcome-banner match-outcome-banner--${outcome.tone}">
-      <div class="match-outcome-banner__copy">
-        <span class="section-kicker">Match Outcome</span>
-        <strong>${outcome.headline}</strong>
-        <p>${outcome.detail}</p>
-      </div>
-      <div class="match-outcome-banner__hint">${outcome.reset_hint}</div>
-    </section>
-  `;
-}
-
-function renderFooterStrip(sessionValue: MatchSessionView | null, playbackEvent: ResolverEvent | null): string {
-  const playbackSummary =
-    sessionValue && playbackEvent
-      ? formatResolutionEventSummary(sessionValue, identity, playbackEvent)
-      : sessionValue?.last_resolution
-        ? `Resolved T${sessionValue.last_resolution.resolved_from_turn_number}`
-        : "No turn resolved yet";
-  const recentResolutionMarkup = sessionValue?.last_resolution
-    ? `<ul class="resolution-feed">${getRecentResolutionEvents(sessionValue)
-        .map((event) => `<li>${formatResolutionEventSummary(sessionValue, identity, event)}</li>`)
-        .join("")}</ul>`
-    : `<div class="resolution-feed resolution-feed--empty">Awaiting first turn resolution.</div>`;
-  const linkStatus = formatLinkStatusLabel(wsState);
-  const bridgeMessage = formatBridgeMessage(messages[0], identity);
-
-  return `
-    <section class="footer-strip">
-      <div class="footer-strip__cell">
-        <span class="section-kicker">Current Resolution</span>
-        <strong data-current-resolution>${playbackSummary}</strong>
-      </div>
-      <div class="footer-strip__cell">
-        <span class="section-kicker">Combat Feed</span>
-        ${recentResolutionMarkup}
-      </div>
-      <div class="footer-strip__cell footer-strip__cell--log">
-        <span class="section-kicker">Bridge Link</span>
-        <strong>${linkStatus}</strong>
-        <span class="footer-strip__meta">${bridgeMessage}</span>
-      </div>
-    </section>
-  `;
-}
-
 function getRectangleBoundary(sessionValue: MatchSessionView): RectangleBoundary | null {
   const boundary = sessionValue.battle_state.match_setup.battlefield.boundary;
 
@@ -981,126 +904,6 @@ function getTacticalCamera(
     plot_preview: plotPreview
   });
 }
-function renderTacticalCameraControls(): string {
-  const zoomMarkup = TACTICAL_ZOOM_PRESETS.map((preset) => {
-    const active = tacticalCameraSelection.zoom_preset_id === preset.id;
-
-    return `<button class="camera-toggle ${active ? "camera-toggle--active" : ""}" data-camera-zoom="${
-      preset.id
-    }">${preset.short_label}</button>`;
-  }).join("");
-
-  return `
-    <div class="camera-controls">
-      <div class="camera-controls__group">
-        <span class="camera-controls__label">Zoom</span>
-        <div class="camera-toggle-row">${zoomMarkup}</div>
-      </div>
-    </div>
-  `;
-}
-
-function renderActionStripControls(
-  sessionValue: MatchSessionView | null,
-  identityValue: SessionIdentity | null,
-  plotSummary: PlotDraftSummary | null
-): string {
-  const claimableSlotStates = getClaimableSlotStates(sessionValue, identityValue);
-  const matchEnded = isMatchEnded(sessionValue);
-  const resetMatchButton = hasLocalHostResetAccess()
-    ? `
-      <div class="commit-strip__admin">
-        <button class="action-button action-button--danger" data-reset-session>
-          <span class="action-button__row">
-            <span class="action-button__label">Reset Match</span>
-            <small class="action-button__hint">Host</small>
-          </span>
-        </button>
-      </div>
-    `
-    : "";
-
-  if (!identityValue || identityValue.role !== "player") {
-    return `
-      <section class="commit-strip commit-strip--spectator">
-        <p class="action-strip__note">${
-          claimableSlotStates.length > 0
-            ? "Claim an open bridge seat to take command of a ship."
-            : "All bridge seats are occupied. Additional sessions join as spectators."
-        }</p>
-        <div class="commit-strip__actions">
-          ${claimableSlotStates
-            .map(
-              (slotState) =>
-                `<button class="action-button action-button--secondary" data-claim-slot="${slotState.slot_id}">
-                  <span class="action-button__row">
-                    <span class="action-button__label">${getClaimSeatLabel(sessionValue, slotState.slot_id)}</span>
-                  </span>
-                </button>`
-            )
-            .join("")}
-        </div>
-        ${resetMatchButton}
-      </section>
-    `;
-  }
-
-  if (matchEnded) {
-    const outcome = getMatchOutcomePresentation(sessionValue, identityValue);
-
-    return `
-      <section class="commit-strip commit-strip--ended">
-        <div class="commit-strip__status">
-          <span class="section-kicker">Match Status</span>
-          <strong data-turn-status>${outcome?.headline ?? "Match ended"}</strong>
-        </div>
-        ${resetMatchButton}
-      </section>
-    `;
-  }
-
-  if (!sessionValue || !plotSummary) {
-    return "<p class=\"action-strip__note\">Waiting for a playable ship and battle snapshot before enabling plot authoring.</p>";
-  }
-
-  const { context } = plotSummary;
-  const isPending = sessionValue.pending_plot_ship_ids.includes(context.ship_instance_id);
-
-  return `
-    <section class="commit-strip">
-      <div class="commit-strip__status">
-        <span class="section-kicker">Turn Status</span>
-        <strong data-turn-status>Turn ${context.turn_number} · ${isPending ? "Plot submitted" : "Plot in progress"}</strong>
-      </div>
-      <div class="commit-strip__actions">
-        ${claimableSlotStates
-          .map(
-            (slotState) =>
-              `<button class="action-button action-button--secondary" data-claim-slot="${slotState.slot_id}">
-                <span class="action-button__row">
-                  <span class="action-button__label">${getClaimSeatLabel(sessionValue, slotState.slot_id)}</span>
-                </span>
-              </button>`
-          )
-          .join("")}
-        <button class="action-button action-button--secondary" data-reset-plot>
-          <span class="action-button__row">
-            <span class="action-button__label">Reset Plot</span>
-            <small class="action-button__hotkey">R</small>
-          </span>
-        </button>
-        <button class="action-button action-button--primary" data-submit-plot>
-          <span class="action-button__row">
-            <span class="action-button__label">Submit Plot</span>
-            <small class="action-button__hotkey">␣</small>
-          </span>
-        </button>
-      </div>
-      ${resetMatchButton}
-    </section>
-  `;
-}
-
 function clearSelectedSystem(): void {
   if (selectedSystemId === null) {
     return;
@@ -1188,6 +991,118 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
   }
 }
 
+function getReadoutStripPresentation(plotSummary: PlotDraftSummary | null): {
+  turn_label: string;
+  drive_label: string;
+  railgun_label: string;
+} | null {
+  if (!plotSummary) {
+    return null;
+  }
+
+  return {
+    turn_label: `${formatSignedNumber(plotSummary.draft.heading_delta_degrees)}°`,
+    drive_label: `${plotSummary.power.drive_pips}`,
+    railgun_label: `${plotSummary.power.railgun_pips}`
+  };
+}
+
+function getFooterStripPresentation(sessionValue: MatchSessionView | null, playbackEvent: ResolverEvent | null): {
+  current_resolution_label: string;
+  combat_feed_items: string[];
+  empty_combat_feed_label: string;
+  link_status_label: string;
+  bridge_message: string;
+} {
+  const currentResolutionLabel =
+    sessionValue && playbackEvent
+      ? formatResolutionEventSummary(sessionValue, identity, playbackEvent)
+      : sessionValue?.last_resolution
+        ? `Resolved T${sessionValue.last_resolution.resolved_from_turn_number}`
+        : "No turn resolved yet";
+  const combatFeedItems = sessionValue?.last_resolution
+    ? getRecentResolutionEvents(sessionValue).map((event) => formatResolutionEventSummary(sessionValue, identity, event))
+    : [];
+
+  return {
+    current_resolution_label: currentResolutionLabel,
+    combat_feed_items: combatFeedItems,
+    empty_combat_feed_label: "Awaiting first turn resolution.",
+    link_status_label: formatLinkStatusLabel(wsState),
+    bridge_message: formatBridgeMessage(messages[0], identity)
+  };
+}
+
+function getActionStripPresentation(
+  sessionValue: MatchSessionView | null,
+  identityValue: SessionIdentity | null,
+  plotSummary: PlotDraftSummary | null,
+  outcomePresentation: MatchOutcomePresentation | null
+):
+  | {
+      kind: "waiting";
+      note: string;
+    }
+  | {
+      kind: "spectator";
+      note: string;
+      claim_actions: { slot_id: string; label: string }[];
+      show_reset_match: boolean;
+    }
+  | {
+      kind: "ended";
+      headline: string;
+      show_reset_match: boolean;
+    }
+  | {
+      kind: "player";
+      status_label: string;
+      claim_actions: { slot_id: string; label: string }[];
+      show_reset_match: boolean;
+    } {
+  const claimActions = getClaimableSlotStates(sessionValue, identityValue).map((slotState) => ({
+    slot_id: slotState.slot_id,
+    label: getClaimSeatLabel(sessionValue, slotState.slot_id)
+  }));
+  const showResetMatch = hasLocalHostResetAccess();
+
+  if (!identityValue || identityValue.role !== "player") {
+    return {
+      kind: "spectator",
+      note:
+        claimActions.length > 0
+          ? "Claim an open bridge seat to take command of a ship."
+          : "All bridge seats are occupied. Additional sessions join as spectators.",
+      claim_actions: claimActions,
+      show_reset_match: showResetMatch
+    };
+  }
+
+  if (isMatchEnded(sessionValue)) {
+    return {
+      kind: "ended",
+      headline: outcomePresentation?.headline ?? "Match ended",
+      show_reset_match: showResetMatch
+    };
+  }
+
+  if (!sessionValue || !plotSummary) {
+    return {
+      kind: "waiting",
+      note: "Waiting for a playable ship and battle snapshot before enabling plot authoring."
+    };
+  }
+
+  const isPending = sessionValue.pending_plot_ship_ids.includes(plotSummary.context.ship_instance_id);
+
+  return {
+    kind: "player",
+    status_label: `Turn ${plotSummary.context.turn_number} · ${isPending ? "Plot submitted" : "Plot in progress"}`,
+    claim_actions: claimActions,
+    show_reset_match: showResetMatch
+  };
+}
+
 function render(): void {
   const sessionValue = session;
   const displayed = getDisplayedShipContext(sessionValue, identity);
@@ -1196,6 +1111,7 @@ function render(): void {
   const plotPreview = sessionValue && plotSummary ? buildPlotPreview(sessionValue.battle_state, plotSummary.draft) : null;
   const camera = getTacticalCamera(sessionValue, plotPreview, displayed?.ship.ship_instance_id ?? null);
   const playbackEvent = getCurrentResolutionPlaybackEvent(sessionValue);
+  const outcomePresentation = getMatchOutcomePresentation(sessionValue, identity);
   const focusedMountId = selectedSystemContext?.system.type === "weapon_mount" ? selectedSystemContext.system.id : null;
   const tacticalViewport = !sessionValue
     ? "<p>Waiting for the session snapshot before rendering the tactical board.</p>"
@@ -1221,16 +1137,17 @@ function render(): void {
     playbackEvent,
     camera,
     selectedSystemId,
-    outcomePresentation: getMatchOutcomePresentation(sessionValue, identity),
+    outcomePresentation,
     getContactLabel: (shipInstanceId) =>
       sessionValue ? getPlayerFacingContactLabel(sessionValue, identity, shipInstanceId) : "none"
   });
-  const readoutStrip = renderReadoutStrip(sessionValue, plotSummary);
-  const actionStripControls = renderActionStripControls(sessionValue, identity, plotSummary);
-  const outcomeBanner = renderMatchOutcomeBanner(sessionValue, identity);
-  const footerStrip = renderFooterStrip(sessionValue, playbackEvent);
+  const readoutStrip = renderReadoutStrip(getReadoutStripPresentation(plotSummary));
+  const actionStripControls = renderActionStripControls(
+    getActionStripPresentation(sessionValue, identity, plotSummary, outcomePresentation)
+  );
+  const outcomeBanner = renderMatchOutcomeBanner(outcomePresentation);
+  const footerStrip = renderFooterStrip(getFooterStripPresentation(sessionValue, playbackEvent));
   const phaseLabel = getPhaseLabel(sessionValue, selectedSystemContext);
-  const missionBarClass = `mission-bar${selectedSystemContext?.system.type === "weapon_mount" ? " mission-bar--aim" : ""}`;
   const cameraMode = camera ? getTacticalCameraModeDefinition(camera.selection.mode_id) : null;
   const tacticalTitle = cameraMode?.id === "player_centered" ? "Ship Relative Scope" : cameraMode?.label ?? "Shared sensor plot";
   const tacticalHint =
@@ -1241,52 +1158,32 @@ function render(): void {
   const situationalStatus =
     identity?.role === "player" ? capitalizeLabel(getOpponentStatusLabel(sessionValue, identity)) : "Spectator view";
   const linkStatusLabel = formatLinkStatusLabel(wsState);
+  const cameraControls = renderTacticalCameraControls(
+    TACTICAL_ZOOM_PRESETS.map((preset) => ({
+      id: preset.id,
+      short_label: preset.short_label,
+      active: tacticalCameraSelection.zoom_preset_id === preset.id
+    }))
+  );
 
-  root.innerHTML = `
-    <main class="bridge-shell">
-      <header class="${missionBarClass}">
-        <div class="mission-bar__mode" data-phase-label>${phaseLabel}</div>
-        <div class="mission-bar__meta">
-          <span data-turn-number>Turn ${sessionValue?.battle_state.turn_number ?? "..."}</span>
-          <span>${stationLabel}</span>
-        </div>
-        <div class="mission-bar__status">
-          <span>${situationalStatus}</span>
-          <span class="${wsState === "connected" ? "status--ok" : "status--warn"}">${linkStatusLabel}</span>
-        </div>
-      </header>
-      <section class="bridge-main">
-        <article class="bridge-panel bridge-panel--schematic">
-          ${schematicViewport}
-        </article>
-        <article class="bridge-panel bridge-panel--tactical">
-          <div class="tactical-panel__header">
-            <div>
-              <span class="section-kicker">Tactical View</span>
-              <h2>${tacticalTitle}</h2>
-            </div>
-            <div class="tactical-panel__header-right">
-            <div class="tactical-panel__meta">
-                <span>${tacticalHint}</span>
-            </div>
-              ${renderTacticalCameraControls()}
-            </div>
-          </div>
-          ${tacticalViewport}
-        </article>
-      </section>
-      ${outcomeBanner}
-      <section class="action-strip">
-        <div class="action-strip__readouts">
-          ${readoutStrip}
-        </div>
-        <div class="action-strip__controls">
-          ${actionStripControls}
-        </div>
-      </section>
-      ${footerStrip}
-    </main>
-  `;
+  root.innerHTML = renderBridgeShell({
+    phase_label: phaseLabel,
+    turn_label: `Turn ${sessionValue?.battle_state.turn_number ?? "..."}`,
+    station_label: stationLabel,
+    situational_status: situationalStatus,
+    link_status_label: linkStatusLabel,
+    is_link_ok: wsState === "connected",
+    is_aim_mode: selectedSystemContext?.system.type === "weapon_mount",
+    schematic_viewport: schematicViewport,
+    tactical_title: tacticalTitle,
+    tactical_hint: tacticalHint,
+    camera_controls: cameraControls,
+    tactical_viewport: tacticalViewport,
+    outcome_banner: outcomeBanner,
+    readout_strip: readoutStrip,
+    action_strip_controls: actionStripControls,
+    footer_strip: footerStrip
+  });
 
   document.querySelector<HTMLInputElement>("[data-plot-heading]")?.addEventListener("input", (event) => {
     const target = event.currentTarget as HTMLInputElement;
