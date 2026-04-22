@@ -49,7 +49,7 @@ body.is-plot-dragging {
   margin: 0 auto;
   height: calc(100vh - 20px);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   border: 1px solid var(--line-1);
   background: rgba(8, 19, 30, 0.88);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
@@ -81,8 +81,7 @@ body.is-plot-dragging {
 }
 
 .mission-bar__meta,
-.mission-bar__status,
-.bridge-shell__subline {
+.mission-bar__status {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
@@ -92,10 +91,6 @@ body.is-plot-dragging {
 
 .mission-bar__status {
   justify-content: flex-end;
-}
-
-.bridge-shell__subline {
-  padding: 8px 16px 0;
 }
 
 .section-kicker {
@@ -1123,6 +1118,7 @@ body.is-plot-dragging {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .commit-strip--spectator {
@@ -1151,6 +1147,12 @@ body.is-plot-dragging {
   flex-wrap: wrap;
 }
 
+.commit-strip__admin {
+  display: flex;
+  padding-left: 12px;
+  border-left: 1px solid var(--line-0);
+}
+
 .action-button {
   min-width: 0;
   display: inline-flex;
@@ -1174,6 +1176,11 @@ body.is-plot-dragging {
   background: linear-gradient(180deg, rgba(18, 41, 60, 0.95), rgba(10, 24, 37, 0.95));
 }
 
+.action-button--danger {
+  border-color: rgba(236, 126, 116, 0.42);
+  background: linear-gradient(180deg, rgba(59, 28, 25, 0.96), rgba(34, 17, 16, 0.96));
+}
+
 .action-button--compact {
   padding: 7px 9px;
   font-size: 0.8rem;
@@ -1183,9 +1190,34 @@ body.is-plot-dragging {
   border-color: rgba(125, 176, 218, 0.72);
 }
 
-.action-button span,
-.action-button small {
+.action-button > span,
+.action-button > small {
   display: block;
+}
+
+.action-button .action-button__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.action-button__label {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.action-button__hotkey {
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.action-button__hint {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .action-button small,
@@ -1193,6 +1225,12 @@ body.is-plot-dragging {
   margin: 0;
   margin-top: 4px;
   color: var(--text-1);
+}
+
+.action-button .action-button__hotkey,
+.action-button .action-button__hint {
+  margin-top: 0;
+  color: var(--text-2);
 }
 
 .footer-strip {

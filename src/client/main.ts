@@ -160,12 +160,95 @@ function formatDistance(value: number): string {
   return `${Math.round(value)} km`;
 }
 
-function formatRole(identityValue: SessionIdentity | null): string {
-  if (!identityValue) {
-    return "...";
+function capitalizeLabel(label: string): string {
+  if (label.length === 0) {
+    return label;
   }
 
-  return `${identityValue.role}${identityValue.slot_id ? ` · ${identityValue.slot_id}` : ""}`;
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
+}
+
+function formatLinkStatusLabel(state: typeof wsState): string {
+  switch (state) {
+    case "connected":
+      return "Link connected";
+    case "connecting":
+      return "Link connecting";
+    case "closed":
+      return "Link closed";
+    case "error":
+      return "Link error";
+    default:
+      return "Link offline";
+  }
+}
+
+function hasLocalHostResetAccess(): boolean {
+  if (!health?.resetEnabled) {
+    return false;
+  }
+
+  if (readStoredValue(ADMIN_TOKEN_STORAGE_KEY)) {
+    return true;
+  }
+
+  return (
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "::1"
+  );
+}
+
+function getBridgeStationLabel(identityValue: SessionIdentity | null, shipName: string | null): string {
+  if (!identityValue) {
+    return "Awaiting bridge assignment";
+  }
+
+  if (identityValue.role === "player") {
+    return shipName ? `Aboard ${shipName}` : "Player station";
+  }
+
+  return shipName ? `Observer view · ${shipName}` : "Observer view";
+}
+
+function formatBridgeMessage(message: string | undefined, identityValue: SessionIdentity | null): string {
+  if (!message) {
+    return identityValue?.role === "player" ? "Ship controls live." : "Spectator feed live.";
+  }
+
+  if (message.startsWith("hello received")) {
+    return identityValue?.role === "player" ? "Bridge station assigned." : "Spectator feed connected.";
+  }
+
+  if (message.startsWith("submitted direct plot")) {
+    return "Plot sent to host.";
+  }
+
+  if (message.startsWith("plot accepted")) {
+    return "Plot accepted by host.";
+  }
+
+  if (message.startsWith("session updated")) {
+    return "Turn state updated.";
+  }
+
+  if (message.startsWith("session reset requested")) {
+    return "Reset request sent to host.";
+  }
+
+  if (message.startsWith("session reset")) {
+    return "Match reset.";
+  }
+
+  if (message.startsWith("claim requested")) {
+    return "Seat claim sent.";
+  }
+
+  if (message.includes("failed") || message.includes("error") || message.startsWith("plot rejected")) {
+    return capitalizeLabel(message);
+  }
+
+  return identityValue?.role === "player" ? "Ship controls live." : "Spectator feed live.";
 }
 
 function isResolutionFocusEvent(event: ResolverEvent): boolean {
@@ -356,32 +439,79 @@ function formatShipContactLabel(
   return getPlayerFacingContactLabel(sessionValue, identityValue, shipInstanceId);
 }
 
-function formatResolutionEventSummary(sessionValue: MatchSessionView, event: ResolverEvent): string {
+function formatSystemDisplayLabel(
+  sessionValue: MatchSessionView,
+  shipInstanceId: ShipInstanceId | null,
+  systemId: SystemId
+): string {
+  if (!shipInstanceId) {
+    return systemId.replaceAll("_", " ");
+  }
+
+  const ship = sessionValue.battle_state.ships[shipInstanceId];
+
+  if (!ship) {
+    return systemId.replaceAll("_", " ");
+  }
+
+  const shipConfig = getShipConfig(sessionValue.battle_state, ship);
+  const system = shipConfig.systems.find((candidate) => candidate.id === systemId);
+
+  return (system?.render?.label ?? system?.render?.short_label ?? systemId.replaceAll("_", " ")).toLowerCase();
+}
+
+function formatResolutionEventSummary(
+  sessionValue: MatchSessionView,
+  identityValue: SessionIdentity | null,
+  event: ResolverEvent
+): string {
+  let summary: string;
+
   switch (event.type) {
     case "weapon_fired":
-      return `${getShipSlotLabel(sessionValue, event.actor ?? null)} fired ${event.details.mountId} at ${getShipSlotLabel(
+      summary = `${formatShipContactLabel(sessionValue, identityValue, event.actor ?? null)} fired ${formatSystemDisplayLabel(
         sessionValue,
-        event.target ?? null
-      )} · ${event.details.chargePips}P`;
+        event.actor ?? null,
+        event.details.mountId
+      )} at ${formatShipContactLabel(sessionValue, identityValue, event.target ?? null)} · ${event.details.chargePips}P`;
+      break;
     case "hit_registered":
-      return `${getShipSlotLabel(sessionValue, event.details.fromActor)} hit ${getShipSlotLabel(
+      summary = `${formatShipContactLabel(sessionValue, identityValue, event.details.fromActor)} hit ${formatShipContactLabel(
         sessionValue,
+        identityValue,
         event.target ?? null
-      )}${event.details.impactSystemId ? ` · ${event.details.impactSystemId}` : ""}`;
+      )}${event.details.impactSystemId ? ` · ${formatSystemDisplayLabel(sessionValue, event.target ?? null, event.details.impactSystemId)}` : ""}`;
+      break;
     case "subsystem_damaged":
-      return `${getShipSlotLabel(sessionValue, event.actor ?? null)} ${event.details.systemId} ${event.details.newState.toUpperCase()}`;
-    case "ship_destroyed":
-      return `${getShipSlotLabel(sessionValue, event.target ?? null)} destroyed by ${getShipSlotLabel(
+      summary = `${formatShipContactLabel(sessionValue, identityValue, event.actor ?? null)} ${formatSystemDisplayLabel(
         sessionValue,
+        event.actor ?? null,
+        event.details.systemId
+      )} ${event.details.newState.toLowerCase()}`;
+      break;
+    case "ship_destroyed":
+      summary = `${formatShipContactLabel(sessionValue, identityValue, event.target ?? null)} destroyed by ${formatShipContactLabel(
+        sessionValue,
+        identityValue,
         event.details.causeActor
       )}`;
+      break;
     case "ship_disengaged":
-      return `${getShipSlotLabel(sessionValue, event.target ?? null)} disengaged beyond boundary`;
+      summary = `${formatShipContactLabel(sessionValue, identityValue, event.target ?? null)} withdrew beyond the boundary`;
+      break;
     case "turn_ended":
-      return `Turn ${event.details.turnNumber - 1} resolved${event.details.winner ? ` · winner ${getShipSlotLabel(sessionValue, event.details.winner)}` : ""}`;
+      summary = `Turn ${event.details.turnNumber - 1} resolved${
+        event.details.winner
+          ? ` · winner ${formatShipContactLabel(sessionValue, identityValue, event.details.winner)}`
+          : ""
+      }`;
+      break;
     default:
-      return event.type;
+      summary = event.type;
+      break;
   }
+
+  return capitalizeLabel(summary);
 }
 
 function getDisplayedShipContext(
@@ -434,25 +564,24 @@ function getSlotConnectionState(
   return sessionValue.slot_states.find((slotState) => slotState.slot_id === slotId)?.connection_state ?? null;
 }
 
-function formatSlotConnectionLabel(
-  sessionValue: MatchSessionView | null,
-  slotId: string | null
-): string {
-  const connectionState = getSlotConnectionState(sessionValue, slotId);
-
-  if (!slotId || !connectionState) {
-    return "unknown";
+function getClaimSeatLabel(sessionValue: MatchSessionView | null, slotId: string): string {
+  if (!sessionValue) {
+    return "Take open seat";
   }
 
-  if (connectionState === "connected") {
-    return `${slotId} connected`;
+  const participant = sessionValue.battle_state.match_setup.participants.find((candidate) => candidate.slot_id === slotId);
+
+  if (!participant) {
+    return "Take open seat";
   }
 
-  if (connectionState === "reconnecting") {
-    return `${slotId} reconnecting`;
+  const ship = sessionValue.battle_state.ships[participant.ship_instance_id];
+
+  if (!ship) {
+    return "Take open seat";
   }
 
-  return `${slotId} open`;
+  return `Take ${getShipConfig(sessionValue.battle_state, ship).name}`;
 }
 
 function getClaimableSlotStates(
@@ -496,7 +625,7 @@ function getMatchOutcomePresentation(
   }
 
   const { winner_ship_instance_id: winnerShipId, end_reason: endReason } = sessionValue.battle_state.outcome;
-  const winnerLabel = winnerShipId ? getShipSlotLabel(sessionValue, winnerShipId) : "NO WINNER";
+  const winnerLabel = winnerShipId ? capitalizeLabel(formatShipContactLabel(sessionValue, identityValue, winnerShipId)) : "No winner";
   const playerWon =
     identityValue?.role === "player" &&
     identityValue.ship_instance_id !== null &&
@@ -513,7 +642,7 @@ function getMatchOutcomePresentation(
     return {
       tone: "victory",
       headline: "Victory",
-      detail: `${winnerLabel} holds the field. ${reasonLabel}`,
+      detail: `You hold the field. ${reasonLabel}`,
       reset_hint: "Host can reset the match to start a new duel."
     };
   }
@@ -551,28 +680,28 @@ function getOpponentStatusLabel(sessionValue: MatchSessionView | null, identityV
   const opponentShip = sessionValue.battle_state.ships[opponent.ship_instance_id];
 
   if (opponentShip?.status === "destroyed") {
-    return `${opponent.slot_id} destroyed`;
+    return "contact destroyed";
   }
 
   if (opponentShip?.status === "disengaged") {
-    return `${opponent.slot_id} disengaged`;
+    return "contact withdrew";
   }
 
   const opponentConnectionState = getSlotConnectionState(sessionValue, opponent.slot_id);
 
   if (opponentConnectionState === "reconnecting") {
-    return `${opponent.slot_id} reconnecting`;
+    return "contact reconnecting";
   }
 
   if (opponentConnectionState === "open") {
-    return `${opponent.slot_id} open`;
+    return "contact seat open";
   }
 
   if (sessionValue.pending_plot_ship_ids.includes(opponent.ship_instance_id)) {
-    return `${opponent.slot_id} ready`;
+    return "contact ready";
   }
 
-  return `${opponent.slot_id} plotting`;
+  return "contact plotting";
 }
 
 function getPhaseLabel(
@@ -930,6 +1059,7 @@ function handleGlobalTacticalPointerEnd(event: PointerEvent): void {
 window.addEventListener("pointermove", handleGlobalTacticalPointerMove);
 window.addEventListener("pointerup", handleGlobalTacticalPointerEnd);
 window.addEventListener("pointercancel", handleGlobalTacticalPointerEnd);
+window.addEventListener("keydown", handleGlobalKeydown);
 
 function localToSchematic(point: Vector2): Vector2 {
   return {
@@ -1129,7 +1259,12 @@ function renderSchematicControlDeck(
               <span class="section-kicker">Aim Mode</span>
               <strong>${mountContext?.label ?? selectedSystemContext.system.id}</strong>
             </div>
-            <button class="action-button action-button--secondary action-button--compact" data-clear-system-selection>Close</button>
+            <button class="action-button action-button--secondary action-button--compact" data-clear-system-selection>
+              <span class="action-button__row">
+                <span class="action-button__label">Close</span>
+                <small class="action-button__hotkey">Esc</small>
+              </span>
+            </button>
           </div>
           <div class="ssd-selection-banner ssd-selection-banner--${intent.tone}">
             ${intent.banner_label}
@@ -1169,7 +1304,12 @@ function renderSchematicControlDeck(
               <span class="section-kicker">System Detail</span>
               <strong>${selectedSystemContext.system.render?.label ?? selectedSystemContext.system.id}</strong>
             </div>
-            <button class="action-button action-button--secondary action-button--compact" data-clear-system-selection>Close</button>
+            <button class="action-button action-button--secondary action-button--compact" data-clear-system-selection>
+              <span class="action-button__row">
+                <span class="action-button__label">Close</span>
+                <small class="action-button__hotkey">Esc</small>
+              </span>
+            </button>
           </div>
           <div class="ssd-selected-panel__grid">
             <div class="ssd-selected-readout">
@@ -1195,7 +1335,7 @@ function renderSchematicControlDeck(
           <strong>Turn ${context.turn_number}</strong>
         </div>
         <span class="ssd-control-deck__status ${isPending ? "ssd-control-deck__status--pending" : ""}">
-          ${isPending ? "plot on file" : "drafting"}
+          ${isPending ? "submitted" : "editing"}
         </span>
       </div>
       <div class="ssd-control-grid">
@@ -1258,7 +1398,8 @@ function renderSchematicViewport(
   plotSummary: PlotDraftSummary | null,
   selectedSystemContext: ReturnType<typeof getSelectedSystemContext>,
   plotPreview: PlotPreview | null,
-  playbackEvent: ResolverEvent | null
+  playbackEvent: ResolverEvent | null,
+  camera: TacticalCamera | null
 ): string {
   const displayed = getDisplayedShipContext(sessionValue, identityValue);
 
@@ -1305,6 +1446,9 @@ function renderSchematicViewport(
     .join("");
   const controlDeck = renderSchematicControlDeck(sessionValue, identityValue, plotSummary, selectedSystemContext, plotPreview);
   const schematicKicker = identityValue?.role === "player" ? "Your Ship" : participant.slot_id.toUpperCase();
+  const displayHeadingDegrees = camera
+    ? getHeadingDegreesInTacticalCamera(camera, ship.pose.heading_degrees)
+    : ship.pose.heading_degrees;
 
   return `
     <section class="schematic-shell">
@@ -1330,7 +1474,7 @@ function renderSchematicViewport(
             </article>
           </div>
         </div>
-        ${renderHeadingCompass(ship.pose.heading_degrees)}
+        ${renderHeadingCompass(displayHeadingDegrees)}
       </div>
       <div class="schematic-shell__body">
         <div class="ssd-viewport">
@@ -1402,43 +1546,32 @@ function renderMatchOutcomeBanner(
 function renderFooterStrip(sessionValue: MatchSessionView | null, playbackEvent: ResolverEvent | null): string {
   const playbackSummary =
     sessionValue && playbackEvent
-      ? formatResolutionEventSummary(sessionValue, playbackEvent)
+      ? formatResolutionEventSummary(sessionValue, identity, playbackEvent)
       : sessionValue?.last_resolution
         ? `Resolved T${sessionValue.last_resolution.resolved_from_turn_number}`
         : "No turn resolved yet";
   const recentResolutionMarkup = sessionValue?.last_resolution
     ? `<ul class="resolution-feed">${getRecentResolutionEvents(sessionValue)
-        .map((event) => `<li>${formatResolutionEventSummary(sessionValue, event)}</li>`)
+        .map((event) => `<li>${formatResolutionEventSummary(sessionValue, identity, event)}</li>`)
         .join("")}</ul>`
     : `<div class="resolution-feed resolution-feed--empty">Awaiting first turn resolution.</div>`;
-  const contactText =
-    sessionValue?.battle_state.match_setup.participants
-      .map((participant) => {
-        const ship = sessionValue.battle_state.ships[participant.ship_instance_id];
-
-        if (!ship) {
-          return `${participant.slot_id}: unknown`;
-        }
-
-        return `${participant.slot_id} ${ship.status} ${formatNumber(ship.pose.heading_degrees)}°`;
-      })
-      .join(" · ") ?? "No contact data";
-  const latestMessage = messages[0] ?? "No websocket traffic yet";
+  const linkStatus = formatLinkStatusLabel(wsState);
+  const bridgeMessage = formatBridgeMessage(messages[0], identity);
 
   return `
     <section class="footer-strip">
       <div class="footer-strip__cell">
-        <span class="section-kicker">Resolution Playback</span>
+        <span class="section-kicker">Current Resolution</span>
         <strong>${playbackSummary}</strong>
       </div>
       <div class="footer-strip__cell">
-        <span class="section-kicker">Recent Events</span>
+        <span class="section-kicker">Combat Feed</span>
         ${recentResolutionMarkup}
       </div>
       <div class="footer-strip__cell footer-strip__cell--log">
-        <span class="section-kicker">Status</span>
-        <strong>${contactText}</strong>
-        <span class="footer-strip__meta">${latestMessage}</span>
+        <span class="section-kicker">Bridge Link</span>
+        <strong>${linkStatus}</strong>
+        <span class="footer-strip__meta">${bridgeMessage}</span>
       </div>
     </section>
   `;
@@ -2236,22 +2369,40 @@ function renderActionStripControls(
 ): string {
   const claimableSlotStates = getClaimableSlotStates(sessionValue, identityValue);
   const matchEnded = isMatchEnded(sessionValue);
+  const resetMatchButton = hasLocalHostResetAccess()
+    ? `
+      <div class="commit-strip__admin">
+        <button class="action-button action-button--danger" data-reset-session>
+          <span class="action-button__row">
+            <span class="action-button__label">Reset Match</span>
+            <small class="action-button__hint">Host</small>
+          </span>
+        </button>
+      </div>
+    `
+    : "";
 
   if (!identityValue || identityValue.role !== "player") {
     return `
       <section class="commit-strip commit-strip--spectator">
-        <p class="action-strip__note">Player slots: ${sessionValue?.slot_states
-          .map((slotState) => formatSlotConnectionLabel(sessionValue, slotState.slot_id))
-          .join(" · ") || "awaiting session state"}. Additional sessions join as spectators.</p>
+        <p class="action-strip__note">${
+          claimableSlotStates.length > 0
+            ? "Claim an open bridge seat to take command of a ship."
+            : "All bridge seats are occupied. Additional sessions join as spectators."
+        }</p>
         <div class="commit-strip__actions">
           ${claimableSlotStates
             .map(
               (slotState) =>
-                `<button class="action-button action-button--secondary" data-claim-slot="${slotState.slot_id}">Claim ${slotState.slot_id}</button>`
+                `<button class="action-button action-button--secondary" data-claim-slot="${slotState.slot_id}">
+                  <span class="action-button__row">
+                    <span class="action-button__label">${getClaimSeatLabel(sessionValue, slotState.slot_id)}</span>
+                  </span>
+                </button>`
             )
             .join("")}
-          ${health?.resetEnabled ? `<button class="action-button action-button--secondary" data-reset-session>Reset match</button>` : ""}
         </div>
+        ${resetMatchButton}
       </section>
     `;
   }
@@ -2262,12 +2413,10 @@ function renderActionStripControls(
     return `
       <section class="commit-strip commit-strip--ended">
         <div class="commit-strip__status">
-          <span class="section-kicker">Plot Status</span>
+          <span class="section-kicker">Match Status</span>
           <strong>${outcome?.headline ?? "Match ended"}</strong>
         </div>
-        <div class="commit-strip__actions">
-          ${health?.resetEnabled ? `<button class="action-button action-button--primary" data-reset-session>Reset match</button>` : ""}
-        </div>
+        ${resetMatchButton}
       </section>
     `;
   }
@@ -2282,22 +2431,123 @@ function renderActionStripControls(
   return `
     <section class="commit-strip">
       <div class="commit-strip__status">
-        <span class="section-kicker">Plot Status</span>
-        <strong>${isPending ? "Plot on file" : "Drafting turn"} ${context.turn_number}</strong>
+        <span class="section-kicker">Turn Status</span>
+        <strong>Turn ${context.turn_number} · ${isPending ? "Plot submitted" : "Plot in progress"}</strong>
       </div>
       <div class="commit-strip__actions">
         ${claimableSlotStates
           .map(
             (slotState) =>
-              `<button class="action-button action-button--secondary" data-claim-slot="${slotState.slot_id}">Claim ${slotState.slot_id}</button>`
+              `<button class="action-button action-button--secondary" data-claim-slot="${slotState.slot_id}">
+                <span class="action-button__row">
+                  <span class="action-button__label">${getClaimSeatLabel(sessionValue, slotState.slot_id)}</span>
+                </span>
+              </button>`
           )
           .join("")}
-        ${health?.resetEnabled ? `<button class="action-button action-button--secondary" data-reset-session>Reset match</button>` : ""}
-        <button class="action-button action-button--secondary" data-reset-plot>Reset draft</button>
-        <button class="action-button action-button--primary" data-submit-plot>Submit plot</button>
+        <button class="action-button action-button--secondary" data-reset-plot>
+          <span class="action-button__row">
+            <span class="action-button__label">Reset Plot</span>
+            <small class="action-button__hotkey">R</small>
+          </span>
+        </button>
+        <button class="action-button action-button--primary" data-submit-plot>
+          <span class="action-button__row">
+            <span class="action-button__label">Submit Plot</span>
+            <small class="action-button__hotkey">␣</small>
+          </span>
+        </button>
       </div>
+      ${resetMatchButton}
     </section>
   `;
+}
+
+function clearSelectedSystem(): void {
+  if (selectedSystemId === null) {
+    return;
+  }
+
+  selectedSystemId = null;
+  render();
+}
+
+function resetCurrentPlotDraft(): void {
+  if (!session || !identity || identity.role !== "player" || !identity.ship_instance_id) {
+    return;
+  }
+
+  plotDraft = createPlotDraft(session.battle_state, identity.ship_instance_id);
+  render();
+}
+
+function submitCurrentPlot(): void {
+  if (!socket || socket.readyState !== WebSocket.OPEN || !session) {
+    return;
+  }
+
+  try {
+    const summary = getPlayerPlotSummary(session, identity);
+
+    if (!summary) {
+      throw new Error("No playable ship is assigned to this client");
+    }
+
+    const plot = buildPlotSubmissionFromDraft(session.battle_state, summary.draft);
+
+    socket.send(
+      JSON.stringify({
+        type: "submit_plot",
+        plot
+      })
+    );
+    logMessage(`submitted direct plot for ${plot.ship_instance_id} on turn ${plot.turn_number}`);
+    render();
+  } catch (error) {
+    logMessage(error instanceof Error ? error.message : "failed to build plot");
+    render();
+  }
+}
+
+function shouldIgnoreGlobalHotkeys(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(target.closest("input, select, textarea, button, [contenteditable='true']"));
+}
+
+function handleGlobalKeydown(event: KeyboardEvent): void {
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.repeat || activeTacticalDrag) {
+    return;
+  }
+
+  if (shouldIgnoreGlobalHotkeys(event.target)) {
+    return;
+  }
+
+  if (event.key === "Escape") {
+    if (selectedSystemId !== null) {
+      event.preventDefault();
+      clearSelectedSystem();
+    }
+    return;
+  }
+
+  if (!identity || identity.role !== "player" || isMatchEnded(session)) {
+    return;
+  }
+
+  if (event.code === "KeyR") {
+    event.preventDefault();
+    resetCurrentPlotDraft();
+    return;
+  }
+
+  if (event.code === "Space") {
+    event.preventDefault();
+    submitCurrentPlot();
+  }
 }
 
 function render(): void {
@@ -2323,7 +2573,8 @@ function render(): void {
     plotSummary,
     selectedSystemContext,
     plotPreview,
-    playbackEvent
+    playbackEvent,
+    camera
   );
   const readoutStrip = renderReadoutStrip(sessionValue, plotSummary);
   const actionStripControls = renderActionStripControls(sessionValue, identity, plotSummary);
@@ -2337,6 +2588,10 @@ function render(): void {
     selectedSystemContext?.system.type === "weapon_mount"
       ? "Aim mode overlays the selected mount."
       : "Drag burn and end-heading handles directly on the plot.";
+  const stationLabel = getBridgeStationLabel(identity, displayed?.shipConfig.name ?? null);
+  const situationalStatus =
+    identity?.role === "player" ? capitalizeLabel(getOpponentStatusLabel(sessionValue, identity)) : "Spectator view";
+  const linkStatusLabel = formatLinkStatusLabel(wsState);
 
   root.innerHTML = `
     <main class="bridge-shell">
@@ -2344,20 +2599,13 @@ function render(): void {
         <div class="mission-bar__mode">${phaseLabel}</div>
         <div class="mission-bar__meta">
           <span>Turn ${sessionValue?.battle_state.turn_number ?? "..."}</span>
-          <span>${health?.rulesId ?? "..."}</span>
-          <span>${formatRole(identity)}</span>
+          <span>${stationLabel}</span>
         </div>
         <div class="mission-bar__status">
-          <span>Opponent ${getOpponentStatusLabel(sessionValue, identity)}</span>
-          <span class="${wsState === "connected" ? "status--ok" : "status--warn"}">WS ${wsState}</span>
+          <span>${situationalStatus}</span>
+          <span class="${wsState === "connected" ? "status--ok" : "status--warn"}">${linkStatusLabel}</span>
         </div>
       </header>
-      <div class="bridge-shell__subline">
-        <span>Match ${health?.matchId ?? "..."}</span>
-        <span>Displayed ship ${displayed?.ship.ship_instance_id ?? "..."}</span>
-        <span>Slots ${sessionValue?.slot_states.map((slotState) => formatSlotConnectionLabel(sessionValue, slotState.slot_id)).join(" · ") || "..."}</span>
-        <span>Pending ${sessionValue?.pending_plot_ship_ids.join(", ") || "none"}</span>
-      </div>
       <section class="bridge-main">
         <article class="bridge-panel bridge-panel--schematic">
           ${schematicViewport}
@@ -2438,8 +2686,7 @@ function render(): void {
   });
 
   document.querySelector<HTMLButtonElement>("[data-clear-system-selection]")?.addEventListener("click", () => {
-    selectedSystemId = null;
-    render();
+    clearSelectedSystem();
   });
 
   document.querySelectorAll<HTMLSelectElement>("[data-aim-charge]").forEach((select) => {
@@ -2524,12 +2771,7 @@ function render(): void {
   });
 
   document.querySelector<HTMLButtonElement>("[data-reset-plot]")?.addEventListener("click", () => {
-    if (!session || !identity || identity.role !== "player" || !identity.ship_instance_id) {
-      return;
-    }
-
-    plotDraft = createPlotDraft(session.battle_state, identity.ship_instance_id);
-    render();
+    resetCurrentPlotDraft();
   });
 
   document.querySelector<HTMLButtonElement>("[data-reset-session]")?.addEventListener("click", () => {
@@ -2560,31 +2802,7 @@ function render(): void {
   });
 
   document.querySelector<HTMLButtonElement>("[data-submit-plot]")?.addEventListener("click", () => {
-    if (!socket || socket.readyState !== WebSocket.OPEN || !session) {
-      return;
-    }
-
-    try {
-      const summary = getPlayerPlotSummary(session, identity);
-
-      if (!summary) {
-        throw new Error("No playable ship is assigned to this client");
-      }
-
-      const plot = buildPlotSubmissionFromDraft(session.battle_state, summary.draft);
-
-      socket.send(
-        JSON.stringify({
-          type: "submit_plot",
-          plot
-        })
-      );
-      logMessage(`submitted direct plot for ${plot.ship_instance_id} on turn ${plot.turn_number}`);
-      render();
-    } catch (error) {
-      logMessage(error instanceof Error ? error.message : "failed to build plot");
-      render();
-    }
+    submitCurrentPlot();
   });
 }
 
@@ -2595,6 +2813,10 @@ async function loadHealth(): Promise<void> {
 }
 
 async function requestSessionReset(): Promise<void> {
+  if (!window.confirm("Reset the current match? This clears both crews' plots and the battle state.")) {
+    return;
+  }
+
   const storedToken = readStoredValue(ADMIN_TOKEN_STORAGE_KEY);
   const adminToken = storedToken ?? window.prompt("Enter the host reset token");
 
