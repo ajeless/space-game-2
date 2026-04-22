@@ -31,13 +31,5 @@ export default defineConfig({
           }
         }
       : {})
-  },
-  webServer: process.env.PLAYWRIGHT_BASE_URL
-    ? undefined
-    : {
-        command: "node scripts/start-browser-smoke-server.mjs",
-        url: `${baseURL}/api/health`,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120_000
-      }
+  }
 });

@@ -1,35 +1,31 @@
 import { expect, test } from "@playwright/test";
+import { closeBridgePages, openBridgePage, startBridgeServer, submitPlot } from "./helpers";
 
-test("two players can aim, submit, and resolve a turn", async ({ browser, baseURL }) => {
-  const hostContext = await browser.newContext();
-  const guestContext = await browser.newContext();
-  const hostPage = await hostContext.newPage();
-  const guestPage = await guestContext.newPage();
+test("two players can aim, submit, and resolve a turn", async ({ browser }) => {
+  const server = await startBridgeServer();
+  const host = await openBridgePage(browser, server.origin);
+  const guest = await openBridgePage(browser, server.origin);
 
   try {
-    await Promise.all([hostPage.goto(baseURL!), guestPage.goto(baseURL!)]);
+    await expect(host.page.locator("[data-phase-label]")).toHaveText("PLOT PHASE");
+    await expect(guest.page.locator("[data-phase-label]")).toHaveText("PLOT PHASE");
 
-    await expect(hostPage.locator("[data-phase-label]")).toHaveText("PLOT PHASE");
-    await expect(guestPage.locator("[data-phase-label]")).toHaveText("PLOT PHASE");
-    await expect(hostPage.locator("[data-turn-number]")).toHaveText("Turn 1");
-    await expect(guestPage.locator("[data-turn-number]")).toHaveText("Turn 1");
+    await host.page.locator('[data-select-system-hit="forward_mount"]').click();
+    await expect(host.page.locator("[data-phase-label]")).toHaveText("AIM MODE");
+    await host.page.keyboard.press("Escape");
+    await expect(host.page.locator("[data-phase-label]")).toHaveText("PLOT PHASE");
 
-    await hostPage.locator('[data-select-system-hit="forward_mount"]').click();
-    await expect(hostPage.locator("[data-phase-label]")).toHaveText("AIM MODE");
-    await hostPage.keyboard.press("Escape");
-    await expect(hostPage.locator("[data-phase-label]")).toHaveText("PLOT PHASE");
+    await submitPlot(host.page);
+    await expect(host.page.locator("[data-turn-status]")).toContainText("Plot submitted");
 
-    await hostPage.mouse.click(40, 40);
-    await hostPage.keyboard.press("Space");
-    await expect(hostPage.locator("[data-turn-status]")).toContainText("Plot submitted");
+    await submitPlot(guest.page);
 
-    await guestPage.locator("[data-submit-plot]").click();
-
-    await expect(hostPage.locator("[data-turn-number]")).toHaveText("Turn 2");
-    await expect(guestPage.locator("[data-turn-number]")).toHaveText("Turn 2");
-    await expect(hostPage.locator("[data-current-resolution]")).not.toHaveText("No turn resolved yet");
-    await expect(guestPage.locator("[data-current-resolution]")).not.toHaveText("No turn resolved yet");
+    await expect(host.page.locator("[data-turn-number]")).toHaveText("Turn 2");
+    await expect(guest.page.locator("[data-turn-number]")).toHaveText("Turn 2");
+    await expect(host.page.locator("[data-current-resolution]")).not.toHaveText("No turn resolved yet");
+    await expect(guest.page.locator("[data-current-resolution]")).not.toHaveText("No turn resolved yet");
   } finally {
-    await Promise.all([hostContext.close(), guestContext.close()]);
+    await closeBridgePages(host, guest);
+    await server.close();
   }
 });

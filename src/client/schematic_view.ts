@@ -370,7 +370,8 @@ function renderSchematicControlDeck(
         </div>
         <div class="ssd-control-deck__note">
           <strong>${outcomePresentation?.headline ?? "Match ended"}</strong><br />
-          ${outcomePresentation?.detail ?? "Plotting is disabled until the host resets the duel."}
+          ${outcomePresentation?.detail ?? "The duel is over."}<br />
+          Plotting is disabled until the host resets the duel.
         </div>
       </div>
     `;

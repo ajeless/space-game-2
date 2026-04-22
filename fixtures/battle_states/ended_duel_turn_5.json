@@ -1,0 +1,283 @@
+{
+  "schema_version": "sg2/v0.1",
+  "match_setup": {
+    "match_id": "ended_duel_fixture_v0_1",
+    "seed_root": "ended-duel-seed-root",
+    "rules": {
+      "schema_version": "sg2/v0.1",
+      "id": "default_duel_v0_1",
+      "name": "Default Duel v0.1",
+      "turn": {
+        "sub_ticks": 60,
+        "duration_seconds": 120
+      },
+      "fire_control": {
+        "timing_policy": "best_legal_shot",
+        "tie_break": "earliest"
+      },
+      "hit_probability": {
+        "min_probability": 0.05,
+        "max_probability": 0.95,
+        "range_factor": {
+          "max_factor": 1.05,
+          "min_factor": 0.65,
+          "slope": 0.4
+        },
+        "transverse_factor": {
+          "max_factor": 1.0,
+          "min_factor": 0.5,
+          "reference_bearing_sweep_deg": 40,
+          "measurement_window_sub_ticks": 10,
+          "edge_mode": "clamp"
+        }
+      },
+      "damage": {
+        "subsystem_state_thresholds": {
+          "operational_min_fraction": 0.67,
+          "degraded_min_fraction": 0.34
+        },
+        "local_hit_resolution": {
+          "kind": "nearest_system_within_radius",
+          "radius_hull_units": 0.12,
+          "subsystem_damage_ratio": 0.6
+        },
+        "effects_by_system_type": {
+          "drive": {
+            "operational": {
+              "drive_authority_factor": 1.0
+            },
+            "degraded": {
+              "drive_authority_factor": 0.55
+            },
+            "offline": {
+              "drive_authority_factor": 0.0
+            }
+          },
+          "reactor": {
+            "operational": {
+              "discretionary_pips_factor": 1.0,
+              "rounding": "floor"
+            },
+            "degraded": {
+              "discretionary_pips_factor": 0.625,
+              "rounding": "floor"
+            },
+            "offline": {
+              "discretionary_pips_override": 0
+            }
+          },
+          "bridge": {
+            "operational": {
+              "turn_cap_factor": 1.0,
+              "track_quality_factor": 1.0
+            },
+            "degraded": {
+              "turn_cap_factor": 0.75,
+              "track_quality_factor": 0.85
+            },
+            "offline": {
+              "turn_cap_factor": 0.5,
+              "track_quality_factor": 0.6
+            }
+          },
+          "weapon_mount": {
+            "operational": {
+              "track_quality_factor": 1.0,
+              "charge_penalty_pips": 0,
+              "firing_enabled": true
+            },
+            "degraded": {
+              "track_quality_factor": 0.85,
+              "charge_penalty_pips": 1,
+              "firing_enabled": true
+            },
+            "offline": {
+              "track_quality_factor": 0.0,
+              "charge_penalty_pips": 0,
+              "firing_enabled": false
+            }
+          }
+        }
+      },
+      "victory": {
+        "hull_destroyed_at_or_below": 0,
+        "boundary_disengage_enabled": true
+      }
+    },
+    "ship_catalog": {
+      "css_meridian": {
+        "schema_version": "sg2/v0.1",
+        "id": "css_meridian",
+        "name": "CSS Meridian",
+        "class": "frigate",
+        "hull": {
+          "silhouette": [
+            { "x": 0, "y": -0.5 },
+            { "x": 0.15, "y": -0.35 },
+            { "x": 0.18, "y": 0.1 },
+            { "x": 0.14, "y": 0.3 },
+            { "x": 0.3, "y": 0.42 },
+            { "x": 0.2, "y": 0.55 },
+            { "x": 0, "y": 0.6 },
+            { "x": -0.2, "y": 0.55 },
+            { "x": -0.3, "y": 0.42 },
+            { "x": -0.14, "y": 0.3 },
+            { "x": -0.18, "y": 0.1 },
+            { "x": -0.15, "y": -0.35 }
+          ],
+          "max_integrity": 100
+        },
+        "dynamics": {
+          "mass": 1000,
+          "moment_of_inertia": 500,
+          "max_turn_degrees_per_turn": 120
+        },
+        "power": {
+          "discretionary_allocation_ids": ["drive", "railgun"]
+        },
+        "systems": [
+          {
+            "id": "forward_mount",
+            "type": "weapon_mount",
+            "physical_position": { "x": 0, "y": -0.35 },
+            "max_integrity": 24,
+            "render": {
+              "label": "BOW RAILGUN",
+              "short_label": "RAILGUN",
+              "style_role": "weapon_mount"
+            },
+            "parameters": {
+              "arc_degrees": 60,
+              "bearing_degrees": 0,
+              "baseline_track_quality": 0.7,
+              "charge_table": [
+                { "pips": 1, "max_range_km": 140, "damage": 8 },
+                { "pips": 2, "max_range_km": 220, "damage": 12 },
+                { "pips": 3, "max_range_km": 300, "damage": 15 }
+              ]
+            }
+          },
+          {
+            "id": "reactor",
+            "type": "reactor",
+            "physical_position": { "x": 0, "y": 0.15 },
+            "max_integrity": 32,
+            "render": {
+              "label": "REACTOR",
+              "style_role": "reactor"
+            },
+            "parameters": {
+              "discretionary_pips": 8
+            }
+          },
+          {
+            "id": "bridge",
+            "type": "bridge",
+            "physical_position": { "x": 0, "y": -0.05 },
+            "max_integrity": 22,
+            "render": {
+              "label": "BRIDGE",
+              "style_role": "bridge"
+            },
+            "parameters": {}
+          },
+          {
+            "id": "drive",
+            "type": "drive",
+            "physical_position": { "x": 0, "y": 0.45 },
+            "max_integrity": 28,
+            "render": {
+              "label": "DRIVE",
+              "style_role": "drive"
+            },
+            "parameters": {
+              "max_thrust": 1.8
+            }
+          }
+        ]
+      }
+    },
+    "participants": [
+      {
+        "slot_id": "alpha",
+        "ship_instance_id": "alpha_ship",
+        "ship_config_id": "css_meridian"
+      },
+      {
+        "slot_id": "bravo",
+        "ship_instance_id": "bravo_ship",
+        "ship_config_id": "css_meridian"
+      }
+    ],
+    "battlefield": {
+      "boundary": {
+        "kind": "rectangle",
+        "min": { "x": -400, "y": -400 },
+        "max": { "x": 400, "y": 400 }
+      }
+    }
+  },
+  "turn_number": 5,
+  "ships": {
+    "alpha_ship": {
+      "ship_instance_id": "alpha_ship",
+      "ship_config_id": "css_meridian",
+      "slot_id": "alpha",
+      "status": "active",
+      "pose": {
+        "position": { "x": -60, "y": -20 },
+        "velocity": { "x": 0.15, "y": 0.02 },
+        "heading_degrees": 12
+      },
+      "hull": {
+        "current_integrity": 72
+      },
+      "systems": {
+        "forward_mount": {
+          "current_integrity": 18
+        },
+        "reactor": {
+          "current_integrity": 32
+        },
+        "bridge": {
+          "current_integrity": 18
+        },
+        "drive": {
+          "current_integrity": 21
+        }
+      }
+    },
+    "bravo_ship": {
+      "ship_instance_id": "bravo_ship",
+      "ship_config_id": "css_meridian",
+      "slot_id": "bravo",
+      "status": "destroyed",
+      "pose": {
+        "position": { "x": 58, "y": 14 },
+        "velocity": { "x": -0.08, "y": -0.02 },
+        "heading_degrees": 188
+      },
+      "hull": {
+        "current_integrity": 0
+      },
+      "systems": {
+        "forward_mount": {
+          "current_integrity": 0
+        },
+        "reactor": {
+          "current_integrity": 0
+        },
+        "bridge": {
+          "current_integrity": 0
+        },
+        "drive": {
+          "current_integrity": 0
+        }
+      }
+    }
+  },
+  "outcome": {
+    "winner_ship_instance_id": "alpha_ship",
+    "end_reason": "destroyed"
+  }
+}
