@@ -7,6 +7,15 @@ import {
   renderReadoutStrip,
   renderTacticalCameraControls
 } from "./bridge_shell_view.js";
+import {
+  applyResolutionPlaybackStepToBattleState,
+  buildResolutionPlaybackState,
+  getCurrentResolutionPlaybackStep,
+  getResolutionKey,
+  isResolutionFocusEvent,
+  type ResolutionPlaybackState,
+  type ResolutionPlaybackStep
+} from "./resolution_playback.js";
 import { renderSchematicPanel } from "./schematic_view.js";
 import { renderTacticalBoard, TACTICAL_VIEWPORT } from "./tactical_view.js";
 import {
@@ -30,6 +39,7 @@ import {
 } from "../shared/index.js";
 import type { MatchSessionView, ResolverEvent, ServerToClientMessage, SessionIdentity } from "../shared/index.js";
 import type {
+  BattleState,
   BattleBoundary,
   PlotDraft,
   PlotDraftSummary,
@@ -86,14 +96,10 @@ type ActiveTacticalDrag = {
   pointer_id: number;
 };
 let activeTacticalDrag: ActiveTacticalDrag | null = null;
-type ResolutionPlaybackState = {
-  key: string;
-  focus_events: ResolverEvent[];
-  current_index: number;
-};
 let resolutionPlayback: ResolutionPlaybackState | null = null;
 let resolutionPlaybackTimer: number | null = null;
 let lastPresentedResolutionKey: string | null = readStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY);
+let hostToolsOpen = false;
 // Keep discrete zoom support wired up, but hide the controls until tactical scale tuning resumes.
 const SHOW_TACTICAL_ZOOM_CONTROLS = false;
 
@@ -227,25 +233,6 @@ function formatBridgeMessage(message: string | undefined, identityValue: Session
   return identityValue?.role === "player" ? "Ship controls live." : "Spectator feed live.";
 }
 
-function isResolutionFocusEvent(event: ResolverEvent): boolean {
-  return (
-    event.type === "weapon_fired" ||
-    event.type === "hit_registered" ||
-    event.type === "subsystem_damaged" ||
-    event.type === "ship_destroyed" ||
-    event.type === "ship_disengaged" ||
-    event.type === "turn_ended"
-  );
-}
-
-function getResolutionKey(sessionValue: MatchSessionView | null): string | null {
-  if (!sessionValue?.last_resolution) {
-    return null;
-  }
-
-  return `${sessionValue.battle_state.match_setup.match_id}:${sessionValue.last_resolution.resolved_from_turn_number}:${sessionValue.last_resolution.event_count}`;
-}
-
 function clearResolutionPlaybackTimer(): void {
   if (resolutionPlaybackTimer !== null) {
     window.clearTimeout(resolutionPlaybackTimer);
@@ -261,16 +248,9 @@ function clearResolutionPlayback(): void {
 function queueResolutionPlaybackAdvance(): void {
   clearResolutionPlaybackTimer();
 
-  if (!resolutionPlayback) {
-    return;
-  }
+  const currentStep = getCurrentResolutionPlaybackStep(resolutionPlayback, session);
 
-  if (resolutionPlayback.current_index >= resolutionPlayback.focus_events.length - 1) {
-    resolutionPlaybackTimer = window.setTimeout(() => {
-      resolutionPlayback = null;
-      resolutionPlaybackTimer = null;
-      render();
-    }, 1400);
+  if (!resolutionPlayback || !currentStep) {
     return;
   }
 
@@ -279,13 +259,26 @@ function queueResolutionPlaybackAdvance(): void {
       return;
     }
 
-    resolutionPlayback.current_index += 1;
+    if (resolutionPlayback.current_step_index >= resolutionPlayback.steps.length - 1) {
+      resolutionPlayback = null;
+      resolutionPlaybackTimer = null;
+      render();
+      return;
+    }
+
+    resolutionPlayback = {
+      ...resolutionPlayback,
+      current_step_index: resolutionPlayback.current_step_index + 1
+    };
     queueResolutionPlaybackAdvance();
     render();
-  }, 700);
+  }, currentStep.duration_ms);
 }
 
-function syncResolutionPlayback(sessionValue: MatchSessionView | null): void {
+function syncResolutionPlayback(
+  sessionValue: MatchSessionView | null,
+  previousBattleState: BattleState | null = null
+): void {
   const key = getResolutionKey(sessionValue);
 
   if (!key || !sessionValue?.last_resolution) {
@@ -302,33 +295,35 @@ function syncResolutionPlayback(sessionValue: MatchSessionView | null): void {
     return;
   }
 
-  const focusEvents = sessionValue.last_resolution.events.filter(isResolutionFocusEvent);
+  const nextPlayback = buildResolutionPlaybackState({
+    sessionValue,
+    previousBattleState
+  });
 
-  if (focusEvents.length === 0) {
+  if (!nextPlayback) {
     clearResolutionPlayback();
     return;
   }
 
-  resolutionPlayback = {
-    key,
-    focus_events: focusEvents,
-    current_index: 0
-  };
+  resolutionPlayback = nextPlayback;
   lastPresentedResolutionKey = key;
   writeStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY, key);
   queueResolutionPlaybackAdvance();
 }
 
-function getCurrentResolutionPlaybackEvent(sessionValue: MatchSessionView | null): ResolverEvent | null {
-  if (!resolutionPlayback || resolutionPlayback.key !== getResolutionKey(sessionValue)) {
-    return null;
-  }
-
-  return resolutionPlayback.focus_events[resolutionPlayback.current_index] ?? null;
+function getCurrentResolutionPlaybackStepForSession(
+  sessionValue: MatchSessionView | null
+): ResolutionPlaybackStep | null {
+  return getCurrentResolutionPlaybackStep(resolutionPlayback, sessionValue);
 }
 
 function getRecentResolutionEvents(sessionValue: MatchSessionView | null): ResolverEvent[] {
-  return sessionValue?.last_resolution?.events.filter(isResolutionFocusEvent).slice(-4).reverse() ?? [];
+  return (
+    sessionValue?.last_resolution?.events
+      .filter((event) => isResolutionFocusEvent(event) && event.type !== "turn_ended")
+      .slice(-4)
+      .reverse() ?? []
+  );
 }
 
 function getShipSlotLabel(sessionValue: MatchSessionView, shipInstanceId: ShipInstanceId | null): string {
@@ -502,6 +497,35 @@ function formatResolutionEventSummary(
   }
 
   return capitalizeLabel(summary);
+}
+
+function getResolutionEventDisplaySubTick(sessionValue: MatchSessionView, event: ResolverEvent): number {
+  const totalSubTicks = sessionValue.battle_state.match_setup.rules.turn.sub_ticks;
+
+  if (event.type === "turn_ended") {
+    return totalSubTicks;
+  }
+
+  return Math.min(totalSubTicks, event.sub_tick + 1);
+}
+
+function getResolutionPlaybackMetaLabel(
+  sessionValue: MatchSessionView | null,
+  playbackStep: ResolutionPlaybackStep | null
+): string {
+  if (!sessionValue?.last_resolution || !playbackStep) {
+    return sessionValue?.last_resolution
+      ? `Turn ${sessionValue.last_resolution.resolved_from_turn_number} replay complete`
+      : "Awaiting first exchange.";
+  }
+
+  if (playbackStep.focus_event && playbackStep.focus_event_index !== null) {
+    return `Replay turn ${sessionValue.last_resolution.resolved_from_turn_number} · event ${
+      playbackStep.focus_event_index + 1
+    } of ${playbackStep.focus_event_count}`;
+  }
+
+  return `Replay turn ${sessionValue.last_resolution.resolved_from_turn_number} · motion ${playbackStep.display_sub_tick} of ${playbackStep.total_sub_ticks}`;
 }
 
 function getDisplayedShipContext(
@@ -774,7 +798,7 @@ function getPlayerTacticalAuthoringContext():
   }
 
   const plotPreview = buildPlotPreview(session.battle_state, plotSummary.draft);
-  const camera = getTacticalCamera(session, plotPreview, displayed.ship.ship_instance_id);
+  const camera = getTacticalCamera(session, session.battle_state, plotPreview, displayed.ship.ship_instance_id);
 
   if (!camera) {
     return null;
@@ -953,10 +977,11 @@ function getRectangleBoundary(sessionValue: MatchSessionView): RectangleBoundary
 
 function getTacticalCamera(
   sessionValue: MatchSessionView | null,
+  battleStateValue: BattleState | null,
   plotPreview: PlotPreview | null,
   preferredShipInstanceId: ShipInstanceId | null
 ): TacticalCamera | null {
-  if (!sessionValue) {
+  if (!sessionValue || !battleStateValue) {
     return null;
   }
 
@@ -967,7 +992,7 @@ function getTacticalCamera(
   }
 
   return buildTacticalCamera({
-    state: sessionValue.battle_state,
+    state: battleStateValue,
     boundary,
     viewport: TACTICAL_VIEWPORT,
     selection: tacticalCameraSelection,
@@ -1080,29 +1105,51 @@ function getReadoutStripPresentation(plotSummary: PlotDraftSummary | null): {
 
 function getFooterStripPresentation(sessionValue: MatchSessionView | null, playbackEvent: ResolverEvent | null): {
   current_resolution_label: string;
-  combat_feed_items: string[];
+  current_resolution_meta_label: string;
+  current_resolution_progress_ratio: number | null;
+  combat_feed_items: Array<{
+    step_label: string;
+    summary: string;
+    is_active: boolean;
+  }>;
   empty_combat_feed_label: string;
   link_status_label: string;
   bridge_message: string;
   show_host_tools: boolean;
+  is_host_tools_open: boolean;
 } {
+  const playbackStep = getCurrentResolutionPlaybackStepForSession(sessionValue);
   const currentResolutionLabel =
     sessionValue && playbackEvent
       ? formatResolutionEventSummary(sessionValue, identity, playbackEvent)
+      : sessionValue && playbackStep
+        ? `Replaying turn ${sessionValue.last_resolution?.resolved_from_turn_number ?? "?"}`
       : sessionValue?.last_resolution
         ? `Turn ${sessionValue.last_resolution.resolved_from_turn_number} resolved`
         : "No turn resolved yet";
   const combatFeedItems = sessionValue?.last_resolution
-    ? getRecentResolutionEvents(sessionValue).map((event) => formatResolutionEventSummary(sessionValue, identity, event))
+    ? getRecentResolutionEvents(sessionValue).map((event) => ({
+        step_label: `T${getResolutionEventDisplaySubTick(sessionValue, event).toString().padStart(2, "0")}`,
+        summary: formatResolutionEventSummary(sessionValue, identity, event),
+        is_active: playbackEvent === event
+      }))
     : [];
 
   return {
     current_resolution_label: currentResolutionLabel,
+    current_resolution_meta_label: getResolutionPlaybackMetaLabel(sessionValue, playbackStep),
+    current_resolution_progress_ratio: playbackStep?.progress_ratio ?? null,
     combat_feed_items: combatFeedItems,
-    empty_combat_feed_label: "Awaiting first exchange.",
+    empty_combat_feed_label:
+      sessionValue?.last_resolution
+        ? playbackStep
+          ? "No weapon contacts. Movement replay only."
+        : "No weapon contacts in the last exchange."
+        : "Awaiting first exchange.",
     link_status_label: formatLinkStatusLabel(wsState),
     bridge_message: formatBridgeMessage(messages[0], identity),
-    show_host_tools: hasLocalHostResetAccess()
+    show_host_tools: hasLocalHostResetAccess(),
+    is_host_tools_open: hostToolsOpen
   };
 }
 
@@ -1161,10 +1208,17 @@ function getActionStripPresentation(
   }
 
   const isPending = sessionValue.pending_plot_ship_ids.includes(plotSummary.context.ship_instance_id);
+  const playbackStep = getCurrentResolutionPlaybackStepForSession(sessionValue);
+  const replaySuffix =
+    sessionValue?.last_resolution && playbackStep
+      ? ` · replaying turn ${sessionValue.last_resolution.resolved_from_turn_number}`
+      : "";
 
   return {
     kind: "player",
-    status_label: `Turn ${plotSummary.context.turn_number} · ${isPending ? "Plot submitted" : "Plot in progress"}`,
+    status_label: `Turn ${plotSummary.context.turn_number} · ${
+      isPending ? "Plot submitted" : "Plot in progress"
+    }${replaySuffix}`,
     claim_actions: claimActions
   };
 }
@@ -1175,8 +1229,18 @@ function render(): void {
   const plotSummary = getPlayerPlotSummary(sessionValue, identity);
   const selectedSystemContext = getSelectedSystemContext(sessionValue, identity);
   const plotPreview = sessionValue && plotSummary ? buildPlotPreview(sessionValue.battle_state, plotSummary.draft) : null;
-  const camera = getTacticalCamera(sessionValue, plotPreview, displayed?.ship.ship_instance_id ?? null);
-  const playbackEvent = getCurrentResolutionPlaybackEvent(sessionValue);
+  const playbackStep = getCurrentResolutionPlaybackStepForSession(sessionValue);
+  const tacticalBattleState =
+    sessionValue && playbackStep
+      ? applyResolutionPlaybackStepToBattleState(sessionValue.battle_state, playbackStep)
+      : sessionValue?.battle_state ?? null;
+  const camera = getTacticalCamera(
+    sessionValue,
+    sessionValue?.battle_state ?? null,
+    plotPreview,
+    displayed?.ship.ship_instance_id ?? null
+  );
+  const playbackEvent = playbackStep?.focus_event ?? null;
   const outcomePresentation = getMatchOutcomePresentation(sessionValue, identity);
   const focusedMountId = selectedSystemContext?.system.type === "weapon_mount" ? selectedSystemContext.system.id : null;
   const tacticalViewport = !sessionValue
@@ -1185,11 +1249,13 @@ function render(): void {
       ? "<p>The current battlefield boundary is not yet supported by the tactical viewport.</p>"
       : renderTacticalBoard({
           sessionValue,
+          battleStateValue: tacticalBattleState ?? sessionValue.battle_state,
           identityValue: identity,
           plotSummary,
           plotPreview,
           focusedMountId,
           camera,
+          playbackStep,
           playbackEvent
         });
   const schematicViewport = renderSchematicPanel({
@@ -1217,7 +1283,9 @@ function render(): void {
   const tacticalHint =
     selectedSystemContext?.system.type === "weapon_mount"
       ? "Click contact to lock. Click again to clear."
-      : "Drag burn and heading on the plot.";
+      : sessionValue?.last_resolution && playbackStep
+        ? `Resolution replay running · drag burn and heading to plot turn ${sessionValue.battle_state.turn_number}.`
+        : "Drag burn and heading on the plot.";
   const stationLabel = getBridgeStationLabel(identity, displayed?.shipConfig.name ?? null);
   const situationalStatus =
     identity?.role === "player" ? capitalizeLabel(getOpponentStatusLabel(sessionValue, identity)) : "Spectator view";
@@ -1391,6 +1459,10 @@ function render(): void {
     void requestSessionReset();
   });
 
+  document.querySelector<HTMLDetailsElement>("[data-host-tools]")?.addEventListener("toggle", (event) => {
+    hostToolsOpen = (event.currentTarget as HTMLDetailsElement).open;
+  });
+
   document.querySelectorAll<HTMLButtonElement>("[data-claim-slot]").forEach((button) => {
     button.addEventListener("click", () => {
       if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -1454,6 +1526,7 @@ async function requestSessionReset(): Promise<void> {
     return;
   }
 
+  hostToolsOpen = false;
   writeStoredValue(ADMIN_TOKEN_STORAGE_KEY, adminToken);
   logMessage(`session reset requested · turn ${payload.turnNumber ?? "?"}`);
   render();
@@ -1461,6 +1534,7 @@ async function requestSessionReset(): Promise<void> {
 
 function handleServerMessage(message: ServerToClientMessage): void {
   if (message.type === "hello") {
+    const previousBattleState = session?.battle_state ?? null;
     identity = message.identity;
     session = message.session;
     writeStoredValue(RECONNECT_TOKEN_STORAGE_KEY, message.identity.reconnect_token);
@@ -1468,7 +1542,7 @@ function handleServerMessage(message: ServerToClientMessage): void {
       window.clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
-    syncResolutionPlayback(session);
+    syncResolutionPlayback(session, previousBattleState);
     logMessage(
       `hello received · ${message.identity.role}${message.identity.slot_id ? ` · ${message.identity.slot_id}` : ""}`
     );
@@ -1479,6 +1553,7 @@ function handleServerMessage(message: ServerToClientMessage): void {
   if (message.type === "session_reset") {
     plotDraft = null;
     selectedSystemId = null;
+    hostToolsOpen = false;
     lastPresentedResolutionKey = null;
     writeStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY, null);
     clearResolutionPlayback();
@@ -1488,8 +1563,9 @@ function handleServerMessage(message: ServerToClientMessage): void {
   }
 
   if (message.type === "session_state") {
+    const previousBattleState = session?.battle_state ?? null;
     session = message.session;
-    syncResolutionPlayback(session);
+    syncResolutionPlayback(session, previousBattleState);
     logMessage(`session updated · turn ${message.session.battle_state.turn_number}`);
     render();
     return;

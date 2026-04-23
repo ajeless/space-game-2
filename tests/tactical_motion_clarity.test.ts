@@ -57,6 +57,7 @@ describe("tactical motion clarity", () => {
         slot_states: [],
         last_resolution: null
       },
+      battleStateValue: state,
       identityValue: {
         client_id: "alpha-client",
         role: "player",
@@ -68,6 +69,7 @@ describe("tactical motion clarity", () => {
       plotPreview,
       focusedMountId: null,
       camera,
+      playbackStep: null,
       playbackEvent: null
     });
 
@@ -105,6 +107,7 @@ describe("tactical motion clarity", () => {
         slot_states: [],
         last_resolution: null
       },
+      battleStateValue: state,
       identityValue: {
         client_id: "alpha-client",
         role: "player",
@@ -116,6 +119,7 @@ describe("tactical motion clarity", () => {
       plotPreview,
       focusedMountId: null,
       camera,
+      playbackStep: null,
       playbackEvent: null
     });
 

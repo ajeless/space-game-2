@@ -8,6 +8,7 @@ import {
   worldToTacticalViewport
 } from "../shared/index.js";
 import type {
+  BattleState,
   MatchSessionView,
   PlotDraftSummary,
   PlotPreview,
@@ -27,6 +28,7 @@ import {
   getWeaponCueEngagementState,
   type ContactTelemetry
 } from "./combat_readability.js";
+import type { ResolutionPlaybackStep } from "./resolution_playback.js";
 
 export const TACTICAL_VIEWPORT = {
   width: 960,
@@ -48,11 +50,13 @@ type WeaponCue = PlotPreview["weapon_cues"][number];
 
 type RenderTacticalBoardArgs = {
   sessionValue: MatchSessionView;
+  battleStateValue: BattleState;
   identityValue: SessionIdentity | null;
   plotSummary: PlotDraftSummary | null;
   plotPreview: PlotPreview | null;
   focusedMountId: SystemId | null;
   camera: TacticalCamera;
+  playbackStep: ResolutionPlaybackStep | null;
   playbackEvent: ResolverEvent | null;
 };
 
@@ -717,11 +721,13 @@ function renderScaleBar(camera: TacticalCamera): string {
 
 export function renderTacticalBoard({
   sessionValue,
+  battleStateValue,
   identityValue,
   plotSummary,
   plotPreview,
   focusedMountId,
   camera,
+  playbackStep,
   playbackEvent
 }: RenderTacticalBoardArgs): string {
   const emphasizedCues = (focusedMountId === null
@@ -742,15 +748,13 @@ export function renderTacticalBoard({
     }
   }
 
-  const viewpointShip = camera.viewpoint_ship_instance_id
-    ? sessionValue.battle_state.ships[camera.viewpoint_ship_instance_id] ?? null
-    : null;
+  const viewpointShip = camera.viewpoint_ship_instance_id ? battleStateValue.ships[camera.viewpoint_ship_instance_id] ?? null : null;
   const visibleShips: string[] = [];
   const offscreenMarkers: string[] = [];
 
-  for (const participant of sessionValue.battle_state.match_setup.participants) {
-    const ship = sessionValue.battle_state.ships[participant.ship_instance_id];
-    const shipConfig = sessionValue.battle_state.match_setup.ship_catalog[participant.ship_config_id];
+  for (const participant of battleStateValue.match_setup.participants) {
+    const ship = battleStateValue.ships[participant.ship_instance_id];
+    const shipConfig = battleStateValue.match_setup.ship_catalog[participant.ship_config_id];
 
     if (!ship || !shipConfig) {
       continue;
@@ -798,9 +802,10 @@ export function renderTacticalBoard({
   const overlay = renderPlotPreviewOverlay(sessionValue, camera, plotPreview, focusedMountId);
   const interactionHandles = renderPlotInteractionHandles(sessionValue, camera, plotSummary, plotPreview);
   const playbackOverlay = renderResolutionPlaybackOverlay(camera, playbackEvent);
+  const playbackClass = playbackStep ? " tactical-board--replaying" : "";
 
   return `
-    <div class="tactical-board${focusedMountId !== null ? " tactical-board--aiming" : ""}">
+    <div class="tactical-board${focusedMountId !== null ? " tactical-board--aiming" : ""}${playbackClass}">
       <svg
         viewBox="0 0 ${TACTICAL_VIEWPORT.width} ${TACTICAL_VIEWPORT.height}"
         aria-label="Tactical viewport"

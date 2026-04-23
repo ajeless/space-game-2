@@ -13,11 +13,18 @@ type ReadoutStripPresentation = {
 
 type FooterStripPresentation = {
   current_resolution_label: string;
-  combat_feed_items: string[];
+  current_resolution_meta_label: string;
+  current_resolution_progress_ratio: number | null;
+  combat_feed_items: Array<{
+    step_label: string;
+    summary: string;
+    is_active: boolean;
+  }>;
   empty_combat_feed_label: string;
   link_status_label: string;
   bridge_message: string;
   show_host_tools: boolean;
+  is_host_tools_open: boolean;
 };
 
 type ClaimSeatAction = {
@@ -70,13 +77,13 @@ type RenderBridgeShellArgs = {
   footer_strip: string;
 };
 
-function renderHostToolsMenu(showHostTools: boolean): string {
+function renderHostToolsMenu(showHostTools: boolean, isOpen: boolean): string {
   if (!showHostTools) {
     return "";
   }
 
   return `
-    <details class="host-tools" data-host-tools>
+    <details class="host-tools" data-host-tools ${isOpen ? "open" : ""}>
       <summary class="host-tools__toggle" data-host-tools-toggle>
         <span class="host-tools__copy">
           <span class="host-tools__label">Host Tools</span>
@@ -158,14 +165,33 @@ export function renderMatchOutcomeBanner(outcome: MatchOutcomePresentation | nul
 export function renderFooterStrip(footer: FooterStripPresentation): string {
   const recentResolutionMarkup =
     footer.combat_feed_items.length > 0
-      ? `<ul class="resolution-feed">${footer.combat_feed_items.map((item) => `<li>${item}</li>`).join("")}</ul>`
+      ? `<ul class="resolution-feed">${footer.combat_feed_items
+          .map(
+            (item) => `<li class="${item.is_active ? "resolution-feed__item resolution-feed__item--active" : "resolution-feed__item"}">
+              <span class="resolution-feed__step">${item.step_label}</span>
+              <span class="resolution-feed__summary">${item.summary}</span>
+            </li>`
+          )
+          .join("")}</ul>`
       : `<div class="resolution-feed resolution-feed--empty">${footer.empty_combat_feed_label}</div>`;
+  const progressMarkup =
+    footer.current_resolution_progress_ratio !== null
+      ? `<div class="resolution-progress" aria-hidden="true">
+          <span class="resolution-progress__bar">
+            <span class="resolution-progress__fill" style="width:${(footer.current_resolution_progress_ratio * 100).toFixed(
+              1
+            )}%"></span>
+          </span>
+        </div>`
+      : "";
 
   return `
     <section class="footer-strip">
       <div class="footer-strip__cell">
         <span class="section-kicker">Current Resolution</span>
         <strong data-current-resolution>${footer.current_resolution_label}</strong>
+        <span class="footer-strip__meta" data-current-resolution-meta>${footer.current_resolution_meta_label}</span>
+        ${progressMarkup}
       </div>
       <div class="footer-strip__cell">
         <span class="section-kicker">Combat Feed</span>
@@ -175,7 +201,7 @@ export function renderFooterStrip(footer: FooterStripPresentation): string {
         <span class="section-kicker">Bridge Link</span>
         <strong>${footer.link_status_label}</strong>
         <span class="footer-strip__meta">${footer.bridge_message}</span>
-        ${renderHostToolsMenu(footer.show_host_tools)}
+        ${renderHostToolsMenu(footer.show_host_tools, footer.is_host_tools_open)}
       </div>
     </section>
   `;

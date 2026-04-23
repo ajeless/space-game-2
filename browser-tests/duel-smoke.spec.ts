@@ -22,6 +22,8 @@ test("two players can aim, submit, and resolve a turn", async ({ browser }) => {
 
     await expect(host.page.locator("[data-turn-number]")).toHaveText("Turn 2");
     await expect(guest.page.locator("[data-turn-number]")).toHaveText("Turn 2");
+    await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1.*replay|replay turn 1/i);
+    await expect(guest.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1.*replay|replay turn 1/i);
     await expect(host.page.locator("[data-current-resolution]")).not.toHaveText("No turn resolved yet");
     await expect(guest.page.locator("[data-current-resolution]")).not.toHaveText("No turn resolved yet");
   } finally {
