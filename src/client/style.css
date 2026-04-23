@@ -761,6 +761,29 @@ body.is-plot-dragging {
   stroke: rgba(125, 176, 218, 0.34);
   stroke-width: 1.6;
   stroke-dasharray: 5 5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.ship-glyph__velocity-ring {
+  fill: rgba(10, 24, 37, 0.92);
+  stroke: rgba(125, 176, 218, 0.72);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.ship-glyph__velocity-core {
+  fill: rgba(166, 225, 255, 0.94);
+  pointer-events: none;
+}
+
+.ship-glyph__velocity-label {
+  fill: rgba(166, 212, 242, 0.94);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-anchor: middle;
+  pointer-events: none;
 }
 
 .ship-glyph__hit {
@@ -824,6 +847,15 @@ body.is-plot-dragging {
 
 .ship-glyph--pending .ship-glyph__velocity {
   stroke: rgba(242, 200, 121, 0.68);
+}
+
+.ship-glyph--pending .ship-glyph__velocity-ring {
+  stroke: rgba(242, 200, 121, 0.82);
+}
+
+.ship-glyph--pending .ship-glyph__velocity-core,
+.ship-glyph--pending .ship-glyph__velocity-label {
+  fill: rgba(255, 214, 149, 0.96);
 }
 
 .ship-glyph--tracked .ship-glyph__core {
@@ -990,29 +1022,57 @@ body.is-plot-dragging {
 
 .plot-preview__path {
   fill: none;
-  stroke: rgba(125, 213, 154, 0.56);
-  stroke-width: 2;
-  stroke-dasharray: 7 6;
+  stroke: rgba(142, 223, 236, 0.72);
+  stroke-width: 2.2;
+  stroke-dasharray: 9 6;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.plot-preview__path-end-ring {
+  fill: rgba(11, 24, 35, 0.9);
+  stroke: rgba(173, 236, 245, 0.86);
+  stroke-width: 1.6;
+  pointer-events: none;
+}
+
+.plot-preview__path-end-core {
+  fill: rgba(197, 244, 250, 0.96);
+  pointer-events: none;
+}
+
+.plot-preview__ghost-ring {
+  fill: none;
+  stroke: rgba(173, 236, 245, 0.34);
+  stroke-width: 1.4;
+  stroke-dasharray: 6 5;
+  pointer-events: none;
+}
+
+.plot-preview__ghost-anchor {
+  fill: rgba(10, 24, 37, 0.9);
+  stroke: rgba(173, 236, 245, 0.66);
+  stroke-width: 1.4;
   pointer-events: none;
 }
 
 .plot-preview__ghost-hull {
-  fill: rgba(125, 213, 154, 0.04);
-  stroke: rgba(125, 213, 154, 0.54);
+  fill: rgba(173, 236, 245, 0.04);
+  stroke: rgba(173, 236, 245, 0.5);
   stroke-width: 1.6;
   stroke-dasharray: 6 5;
   pointer-events: none;
 }
 
 .plot-preview__ghost-heading {
-  stroke: rgba(125, 213, 154, 0.56);
+  stroke: rgba(173, 236, 245, 0.62);
   stroke-width: 1.8;
   stroke-dasharray: 5 4;
   pointer-events: none;
 }
 
 .plot-preview__ghost-core {
-  fill: rgba(125, 213, 154, 0.56);
+  fill: rgba(173, 236, 245, 0.72);
   pointer-events: none;
 }
 
@@ -1111,6 +1171,7 @@ body.is-plot-dragging {
 .plot-handles__vector {
   stroke: rgba(125, 213, 154, 0.62);
   stroke-width: 2;
+  stroke-linecap: round;
 }
 
 .plot-handles__vector--heading {
@@ -1144,8 +1205,19 @@ body.is-plot-dragging {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
+  paint-order: stroke fill;
+  stroke: rgba(5, 13, 21, 0.98);
+  stroke-width: 3px;
   text-anchor: middle;
   text-transform: uppercase;
+}
+
+.plot-handles__label--thrust {
+  fill: rgba(125, 213, 154, 0.98);
+}
+
+.plot-handles__label--heading {
+  fill: rgba(255, 214, 149, 0.98);
 }
 
 .resolution-playback__flash {
@@ -1157,8 +1229,9 @@ body.is-plot-dragging {
 
 .resolution-playback__shot-line {
   stroke: rgba(255, 220, 112, 0.96);
-  stroke-width: 2.4;
+  stroke-width: 2;
   stroke-dasharray: 9 4;
+  stroke-linecap: round;
   pointer-events: none;
 }
 
@@ -1405,15 +1478,19 @@ body.is-plot-dragging {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
   gap: 8px;
   padding: 0 12px 10px;
+  align-items: stretch;
 }
 
 .footer-strip__cell {
   min-width: 0;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 3px;
+  min-height: 118px;
   padding: 7px 9px;
   border: 1px solid var(--line-0);
   background: rgba(11, 24, 36, 0.68);
+  align-content: start;
 }
 
 .footer-strip__cell strong {
@@ -1437,18 +1514,24 @@ body.is-plot-dragging {
   padding: 0;
   list-style: none;
   display: grid;
+  align-content: start;
   gap: 3px;
+  min-height: calc(1.3em * 4 + 9px);
   color: var(--text-1);
   font-size: 0.78rem;
 }
 
 .resolution-feed li {
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .resolution-feed--empty {
   color: var(--text-2);
   font-size: 0.78rem;
+  line-height: 1.3;
 }
 
 @media (max-width: 1180px) {
