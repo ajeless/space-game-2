@@ -23,7 +23,7 @@ async function readBattleStateFixture() {
 }
 
 describe("tactical motion clarity", () => {
-  it("renders explicit drift, projected endpoint, and handle labels for active plotting", async () => {
+  it("renders explicit drift cues and a compact legend for active plotting", async () => {
     const state = await readBattleStateFixture();
     state.ships.alpha_ship!.pose.velocity = { x: 0.24, y: 0.06 };
 
@@ -74,8 +74,7 @@ describe("tactical motion clarity", () => {
     });
 
     expect(markup).toContain("ship-glyph__velocity-arrow");
-    expect(markup).toContain("plot-preview__path-end-ring");
-    expect(markup).toContain("PROJECTED · 025°");
+    expect(markup).toContain(">025°</text>");
     expect(markup).toContain("tactical-board__legend");
     expect(markup).toContain(">Drift<");
     expect(markup).toContain(">Burn<");
@@ -83,6 +82,8 @@ describe("tactical motion clarity", () => {
     expect(markup).not.toContain("ship-glyph__velocity-ring");
     expect(markup).not.toContain(">BURN</text>");
     expect(markup).not.toContain(">HEADING</text>");
+    expect(markup).not.toContain("PROJECTED ·");
+    expect(markup).not.toContain("plot-preview__path-end-ring");
   });
 
   it("renders lock chevrons instead of a target reticle when aiming a selected contact", async () => {
@@ -142,6 +143,8 @@ describe("tactical motion clarity", () => {
     expect(markup).toContain("ship-glyph__target-lock");
     expect(markup).toContain("animateTransform");
     expect(markup).toContain("plot-preview__target-line");
+    expect(markup).toContain(">90 km</text>");
+    expect(markup).not.toContain(">CONTACT<");
     expect(markup).not.toContain("plot-preview__target-reticle");
   });
 
@@ -200,6 +203,7 @@ describe("tactical motion clarity", () => {
     });
 
     expect(markup).toContain("offscreen-marker__target-lock");
+    expect(markup).toContain("200 km");
     expect(markup).toContain("data-target-ship=\"bravo_ship\"");
   });
 

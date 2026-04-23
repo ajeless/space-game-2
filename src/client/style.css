@@ -771,7 +771,7 @@ body.is-plot-dragging {
 }
 
 .ship-glyph__velocity {
-  stroke: rgba(125, 176, 218, 0.28);
+  stroke: rgba(125, 176, 218, 0.46);
   stroke-width: 1.35;
   stroke-dasharray: 4 6;
   stroke-linecap: round;
@@ -779,7 +779,7 @@ body.is-plot-dragging {
 }
 
 .ship-glyph__velocity-arrow {
-  fill: rgba(166, 225, 255, 0.8);
+  fill: rgba(166, 225, 255, 0.82);
   pointer-events: none;
 }
 
@@ -878,16 +878,16 @@ body.is-plot-dragging {
 }
 
 .ship-glyph__target-lock-ring {
-  fill: rgba(126, 19, 19, 0.12);
-  stroke: rgba(214, 80, 80, 0.44);
-  stroke-width: 1.15;
+  fill: rgba(126, 19, 19, 0.1);
+  stroke: rgba(214, 80, 80, 0.34);
+  stroke-width: 1;
   pointer-events: none;
 }
 
 .ship-glyph__target-lock-chevron {
   fill: none;
-  stroke: rgba(214, 80, 80, 0.88);
-  stroke-width: 2;
+  stroke: rgba(214, 80, 80, 0.72);
+  stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: none;
@@ -931,6 +931,15 @@ body.is-plot-dragging {
 .offscreen-marker__core {
   fill: rgba(226, 241, 250, 0.94);
   pointer-events: none;
+}
+
+.offscreen-marker__target-lock .ship-glyph__target-lock-ring {
+  fill: rgba(126, 19, 19, 0.12);
+  stroke: rgba(214, 80, 80, 0.42);
+}
+
+.offscreen-marker__target-lock .ship-glyph__target-lock-chevron {
+  stroke: rgba(214, 80, 80, 0.8);
 }
 
 .offscreen-marker__label {
@@ -1015,18 +1024,6 @@ body.is-plot-dragging {
   stroke-width: 2.2;
   stroke-dasharray: 9 6;
   stroke-linecap: round;
-  pointer-events: none;
-}
-
-.plot-preview__path-end-ring {
-  fill: rgba(11, 24, 35, 0.9);
-  stroke: rgba(173, 236, 245, 0.86);
-  stroke-width: 1.6;
-  pointer-events: none;
-}
-
-.plot-preview__path-end-core {
-  fill: rgba(197, 244, 250, 0.96);
   pointer-events: none;
 }
 
@@ -1222,10 +1219,11 @@ body.is-plot-dragging {
 }
 
 .tactical-board__legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-  align-items: center;
+  display: grid;
+  justify-content: start;
+  align-content: start;
+  gap: 4px;
+  width: fit-content;
   padding: 0 2px;
   color: var(--text-2);
   font-size: 0.72rem;
@@ -1234,14 +1232,15 @@ body.is-plot-dragging {
 }
 
 .tactical-legend__item {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 30px auto;
   align-items: center;
   gap: 6px;
 }
 
 .tactical-legend__sample {
-  width: 44px;
-  height: 14px;
+  width: 28px;
+  height: 12px;
   overflow: visible;
 }
 
@@ -1250,7 +1249,7 @@ body.is-plot-dragging {
 }
 
 .tactical-legend__line--drift {
-  stroke: rgba(125, 176, 218, 0.38);
+  stroke: rgba(125, 176, 218, 0.46);
   stroke-width: 1.35;
   stroke-dasharray: 4 6;
 }
@@ -1281,6 +1280,7 @@ body.is-plot-dragging {
 
 .tactical-legend__label {
   color: var(--text-2);
+  line-height: 1;
 }
 
 .tactical-scale-bar__line,

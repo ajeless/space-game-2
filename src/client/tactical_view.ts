@@ -130,7 +130,7 @@ function getTacticalShipLabel(
   shipConfig: ShipConfig
 ): string {
   if (identityValue?.role === "player") {
-    return identityValue.ship_instance_id === ship.ship_instance_id ? "" : "CONTACT";
+    return "";
   }
 
   return shipConfig.name.toUpperCase();
@@ -183,7 +183,7 @@ function renderShipGlyph(
   ship: ShipRuntimeState,
   shipConfig: ShipConfig,
   targetCue: WeaponCue | null,
-  contactTelemetry: string | null,
+  contactTelemetry: ContactTelemetry | null,
   isTargetable: boolean,
   playbackTone: "hit" | "destroyed" | "disengaged" | null
 ): string {
@@ -238,9 +238,19 @@ function renderShipGlyph(
     .join(" ");
   const targetAttribute = isTargetable ? `data-target-ship="${ship.ship_instance_id}"` : "";
   const targetTag = getWeaponCueEngagementLabel(targetCue);
-  const label = getTacticalShipLabel(identityValue, ship, shipConfig);
+  const baseLabel = getTacticalShipLabel(identityValue, ship, shipConfig);
+  const label =
+    identityValue?.role === "player" && !isSelf
+      ? contactTelemetry?.range_label ?? ""
+      : baseLabel;
+  const metaLabel =
+    identityValue?.role === "player" && !isSelf
+      ? contactTelemetry?.closure_label ?? null
+      : label && contactTelemetry
+        ? contactTelemetry.summary_label
+        : null;
   const showText = shouldRenderTacticalText(camera);
-  const labelY = contactTelemetry ? center.y - 28 : center.y - 20;
+  const labelY = metaLabel ? center.y - 28 : center.y - 20;
   const metaY = center.y - 14;
 
   return `
@@ -296,11 +306,7 @@ function renderShipGlyph(
           : ""
       }
       ${showText && label ? `<text class="ship-glyph__label" x="${center.x.toFixed(2)}" y="${labelY.toFixed(2)}">${label}</text>` : ""}
-      ${
-        showText && label && contactTelemetry
-          ? `<text class="ship-glyph__meta" x="${center.x.toFixed(2)}" y="${metaY.toFixed(2)}">${contactTelemetry}</text>`
-          : ""
-      }
+      ${showText && metaLabel ? `<text class="ship-glyph__meta" x="${center.x.toFixed(2)}" y="${metaY.toFixed(2)}">${metaLabel}</text>` : ""}
       ${
         targetTag && showText
           ? `<text class="ship-glyph__target-tag" x="${center.x.toFixed(2)}" y="${(center.y + 32).toFixed(2)}">${targetTag}</text>`
@@ -318,25 +324,9 @@ function renderPreviewPath(camera: TacticalCamera, plotPreview: PlotPreview): st
     return "";
   }
 
-  const firstPoint = projectedPoints[0] ?? null;
-  const lastPoint = projectedPoints.at(-1) ?? null;
-  const hasPathTravel = Boolean(
-    firstPoint &&
-      lastPoint &&
-      Math.hypot(lastPoint.x - firstPoint.x, lastPoint.y - firstPoint.y) >= 10
-  );
-
   return `
     <g class="plot-preview__path-layer">
       <polyline class="plot-preview__path" points="${points}" />
-      ${
-        hasPathTravel && lastPoint
-          ? `
-      <circle class="plot-preview__path-end-ring" cx="${lastPoint.x.toFixed(2)}" cy="${lastPoint.y.toFixed(2)}" r="12" />
-      <circle class="plot-preview__path-end-core" cx="${lastPoint.x.toFixed(2)}" cy="${lastPoint.y.toFixed(2)}" r="4" />
-      `
-          : ""
-      }
     </g>
   `;
 }
@@ -378,7 +368,7 @@ function renderPreviewGhost(sessionValue: MatchSessionView, camera: TacticalCame
       <circle class="plot-preview__ghost-core" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="4" />
       ${
         shouldRenderTacticalText(camera) && hasProjectedChange
-          ? `<text class="plot-preview__ghost-label" x="${labelX.toFixed(2)}" y="${labelY.toFixed(2)}" text-anchor="end">PROJECTED · ${formatHeading(plotPreview.projected_pose.heading_degrees)}</text>`
+          ? `<text class="plot-preview__ghost-label" x="${labelX.toFixed(2)}" y="${labelY.toFixed(2)}" text-anchor="end">${formatHeading(plotPreview.projected_pose.heading_degrees)}</text>`
           : ""
       }
     </g>
@@ -510,23 +500,23 @@ function renderTacticalLegend(): string {
   return `
     <div class="tactical-board__legend" aria-label="Tactical legend">
       <div class="tactical-legend__item">
-        <svg class="tactical-legend__sample" viewBox="0 0 44 14" aria-hidden="true">
-          <line class="tactical-legend__line tactical-legend__line--drift" x1="2" y1="7" x2="30" y2="7" />
-          <polygon class="tactical-legend__arrow tactical-legend__arrow--drift" points="42,7 30,2 30,12" />
+        <svg class="tactical-legend__sample" viewBox="0 0 28 12" aria-hidden="true">
+          <line class="tactical-legend__line tactical-legend__line--drift" x1="1" y1="6" x2="18" y2="6" />
+          <polygon class="tactical-legend__arrow tactical-legend__arrow--drift" points="27,6 18,2 18,10" />
         </svg>
         <span class="tactical-legend__label">Drift</span>
       </div>
       <div class="tactical-legend__item">
-        <svg class="tactical-legend__sample" viewBox="0 0 44 14" aria-hidden="true">
-          <line class="tactical-legend__line tactical-legend__line--burn" x1="2" y1="7" x2="30" y2="7" />
-          <polygon class="tactical-legend__arrow tactical-legend__arrow--burn" points="42,7 30,2 30,12" />
+        <svg class="tactical-legend__sample" viewBox="0 0 28 12" aria-hidden="true">
+          <line class="tactical-legend__line tactical-legend__line--burn" x1="1" y1="6" x2="18" y2="6" />
+          <polygon class="tactical-legend__arrow tactical-legend__arrow--burn" points="27,6 18,2 18,10" />
         </svg>
         <span class="tactical-legend__label">Burn</span>
       </div>
       <div class="tactical-legend__item">
-        <svg class="tactical-legend__sample" viewBox="0 0 44 14" aria-hidden="true">
-          <line class="tactical-legend__line tactical-legend__line--heading" x1="2" y1="7" x2="32" y2="7" />
-          <circle class="tactical-legend__handle" cx="36" cy="7" r="4" />
+        <svg class="tactical-legend__sample" viewBox="0 0 28 12" aria-hidden="true">
+          <line class="tactical-legend__line tactical-legend__line--heading" x1="1" y1="6" x2="20" y2="6" />
+          <circle class="tactical-legend__handle" cx="24" cy="6" r="3" />
         </svg>
         <span class="tactical-legend__label">Heading</span>
       </div>
@@ -621,6 +611,7 @@ function getOffscreenMarkerTextAnchor(camera: TacticalCamera, anchor: Vector2): 
 
 function renderOffscreenMarker(
   camera: TacticalCamera,
+  identityValue: SessionIdentity | null,
   viewpointShip: ShipRuntimeState | null,
   ship: ShipRuntimeState,
   label: string,
@@ -643,7 +634,7 @@ function renderOffscreenMarker(
     : formatDistance(Math.hypot(ship.pose.position.x - camera.center_world.x, ship.pose.position.y - camera.center_world.y)));
   const engagementState = getWeaponCueEngagementState(targetCue);
   const isTargeted = engagementState !== "none";
-  const showTargetLock = isTargeted && Boolean(targetCue?.target_in_range);
+  const showTargetLock = !isSelf && Boolean(targetCue?.target_in_range);
   const classes = [
     "offscreen-marker",
     isSelf ? "offscreen-marker--self" : "",
@@ -656,7 +647,8 @@ function renderOffscreenMarker(
     .filter(Boolean)
     .join(" ");
   const targetStatus = getWeaponCueEngagementLabel(targetCue);
-  const labelText = label ? `${label} · ${rangeText}` : rangeText;
+  const labelText =
+    identityValue?.role === "player" && !isSelf ? rangeText : label ? `${label} · ${rangeText}` : rangeText;
   const statusText = targetStatus ?? (!isSelf && contactTelemetry ? contactTelemetry.closure_label.toUpperCase() : null);
 
   return `
@@ -671,15 +663,15 @@ function renderOffscreenMarker(
       <g transform="translate(${anchor.x.toFixed(2)} ${anchor.y.toFixed(2)}) rotate(${bearingDegrees.toFixed(2)})">
         <path class="offscreen-marker__arrow" d="M-12 -9 L12 0 L-12 9 Z" />
       </g>
+      <circle class="offscreen-marker__core" cx="${anchor.x.toFixed(2)}" cy="${anchor.y.toFixed(2)}" r="4" />
       ${
         showTargetLock
           ? renderTargetLock(anchor, {
               className: "offscreen-marker__target-lock",
-              scale: 0.78
+              scale: 0.84
             })
           : ""
       }
-      <circle class="offscreen-marker__core" cx="${anchor.x.toFixed(2)}" cy="${anchor.y.toFixed(2)}" r="4" />
       <text
         class="offscreen-marker__label"
         x="${labelX.toFixed(2)}"
@@ -844,7 +836,7 @@ export function renderTacticalBoard({
           ship,
           shipConfig,
           targetCue,
-          contactTelemetry?.summary_label ?? null,
+          contactTelemetry,
           isTargetable,
           playbackTone
         )
@@ -853,6 +845,7 @@ export function renderTacticalBoard({
       offscreenMarkers.push(
         renderOffscreenMarker(
           camera,
+          identityValue,
           viewpointShip,
           ship,
           label,
