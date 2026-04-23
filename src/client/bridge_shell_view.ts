@@ -17,6 +17,7 @@ type FooterStripPresentation = {
   empty_combat_feed_label: string;
   link_status_label: string;
   bridge_message: string;
+  show_host_tools: boolean;
 };
 
 type ClaimSeatAction = {
@@ -33,18 +34,15 @@ type ActionStripPresentation =
       kind: "spectator";
       note: string;
       claim_actions: ClaimSeatAction[];
-      show_reset_match: boolean;
     }
   | {
       kind: "ended";
       headline: string;
-      show_reset_match: boolean;
     }
   | {
       kind: "player";
       status_label: string;
       claim_actions: ClaimSeatAction[];
-      show_reset_match: boolean;
     };
 
 type ZoomPresetPresentation = {
@@ -72,20 +70,29 @@ type RenderBridgeShellArgs = {
   footer_strip: string;
 };
 
-function renderResetMatchButton(showResetMatch: boolean): string {
-  if (!showResetMatch) {
+function renderHostToolsMenu(showHostTools: boolean): string {
+  if (!showHostTools) {
     return "";
   }
 
   return `
-    <div class="commit-strip__admin">
-      <button class="action-button action-button--danger" data-reset-session>
-        <span class="action-button__row">
-          <span class="action-button__label">Reset Match</span>
-          <small class="action-button__hint">Host</small>
+    <details class="host-tools" data-host-tools>
+      <summary class="host-tools__toggle" data-host-tools-toggle>
+        <span class="host-tools__copy">
+          <span class="host-tools__label">Host Tools</span>
+          <small class="host-tools__hint">Admin</small>
         </span>
-      </button>
-    </div>
+        <span class="host-tools__chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="host-tools__menu">
+        <button class="action-button action-button--danger action-button--compact" data-reset-session>
+          <span class="action-button__row">
+            <span class="action-button__label">Reset Match</span>
+            <small class="action-button__hint">Host</small>
+          </span>
+        </button>
+      </div>
+    </details>
   `;
 }
 
@@ -168,6 +175,7 @@ export function renderFooterStrip(footer: FooterStripPresentation): string {
         <span class="section-kicker">Bridge Link</span>
         <strong>${footer.link_status_label}</strong>
         <span class="footer-strip__meta">${footer.bridge_message}</span>
+        ${renderHostToolsMenu(footer.show_host_tools)}
       </div>
     </section>
   `;
@@ -205,7 +213,6 @@ export function renderActionStripControls(actionStrip: ActionStripPresentation):
         <div class="commit-strip__actions">
           ${renderClaimSeatButtons(actionStrip.claim_actions)}
         </div>
-        ${renderResetMatchButton(actionStrip.show_reset_match)}
       </section>
     `;
   }
@@ -217,7 +224,6 @@ export function renderActionStripControls(actionStrip: ActionStripPresentation):
           <span class="section-kicker">Match Status</span>
           <strong data-turn-status>${actionStrip.headline}</strong>
         </div>
-        ${renderResetMatchButton(actionStrip.show_reset_match)}
       </section>
     `;
   }
@@ -243,7 +249,6 @@ export function renderActionStripControls(actionStrip: ActionStripPresentation):
           </span>
         </button>
       </div>
-      ${renderResetMatchButton(actionStrip.show_reset_match)}
     </section>
   `;
 }

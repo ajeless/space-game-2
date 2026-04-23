@@ -1378,12 +1378,6 @@ body.is-plot-dragging {
   flex-wrap: wrap;
 }
 
-.commit-strip__admin {
-  display: flex;
-  padding-left: 12px;
-  border-left: 1px solid var(--line-0);
-}
-
 .action-button {
   min-width: 0;
   display: inline-flex;
@@ -1507,6 +1501,70 @@ body.is-plot-dragging {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.host-tools {
+  margin-top: 6px;
+  align-self: start;
+}
+
+.host-tools__toggle {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 1px solid rgba(125, 176, 218, 0.22);
+  background: rgba(15, 33, 49, 0.72);
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.host-tools__toggle::-webkit-details-marker {
+  display: none;
+}
+
+.host-tools__toggle:hover {
+  border-color: rgba(125, 176, 218, 0.46);
+}
+
+.host-tools__copy {
+  display: grid;
+  gap: 2px;
+}
+
+.host-tools__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.host-tools__hint {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.host-tools__chevron {
+  color: var(--text-2);
+  font-size: 0.78rem;
+  transition: transform 120ms ease;
+}
+
+.host-tools[open] .host-tools__chevron {
+  transform: rotate(180deg);
+}
+
+.host-tools__menu {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(125, 176, 218, 0.12);
 }
 
 .resolution-feed {

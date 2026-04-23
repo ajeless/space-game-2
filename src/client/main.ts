@@ -1084,6 +1084,7 @@ function getFooterStripPresentation(sessionValue: MatchSessionView | null, playb
   empty_combat_feed_label: string;
   link_status_label: string;
   bridge_message: string;
+  show_host_tools: boolean;
 } {
   const currentResolutionLabel =
     sessionValue && playbackEvent
@@ -1100,7 +1101,8 @@ function getFooterStripPresentation(sessionValue: MatchSessionView | null, playb
     combat_feed_items: combatFeedItems,
     empty_combat_feed_label: "Awaiting first exchange.",
     link_status_label: formatLinkStatusLabel(wsState),
-    bridge_message: formatBridgeMessage(messages[0], identity)
+    bridge_message: formatBridgeMessage(messages[0], identity),
+    show_host_tools: hasLocalHostResetAccess()
   };
 }
 
@@ -1118,24 +1120,20 @@ function getActionStripPresentation(
       kind: "spectator";
       note: string;
       claim_actions: { slot_id: string; label: string }[];
-      show_reset_match: boolean;
     }
   | {
       kind: "ended";
       headline: string;
-      show_reset_match: boolean;
     }
   | {
       kind: "player";
       status_label: string;
       claim_actions: { slot_id: string; label: string }[];
-      show_reset_match: boolean;
     } {
   const claimActions = getClaimableSlotStates(sessionValue, identityValue).map((slotState) => ({
     slot_id: slotState.slot_id,
     label: getClaimSeatLabel(sessionValue, slotState.slot_id)
   }));
-  const showResetMatch = hasLocalHostResetAccess();
 
   if (!identityValue || identityValue.role !== "player") {
     return {
@@ -1144,16 +1142,14 @@ function getActionStripPresentation(
         claimActions.length > 0
           ? "Claim an open bridge seat to take command of a ship."
           : "All bridge seats are occupied. Additional sessions join as spectators.",
-      claim_actions: claimActions,
-      show_reset_match: showResetMatch
+      claim_actions: claimActions
     };
   }
 
   if (isMatchEnded(sessionValue)) {
     return {
       kind: "ended",
-      headline: outcomePresentation?.headline ?? "Match ended",
-      show_reset_match: showResetMatch
+      headline: outcomePresentation?.headline ?? "Match ended"
     };
   }
 
@@ -1169,8 +1165,7 @@ function getActionStripPresentation(
   return {
     kind: "player",
     status_label: `Turn ${plotSummary.context.turn_number} · ${isPending ? "Plot submitted" : "Plot in progress"}`,
-    claim_actions: claimActions,
-    show_reset_match: showResetMatch
+    claim_actions: claimActions
   };
 }
 

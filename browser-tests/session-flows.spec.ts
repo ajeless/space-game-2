@@ -83,6 +83,7 @@ test("host reset returns both connected crews to a fresh turn-one duel", async (
 
     await setStoredAdminToken(host.page);
     await acceptNextConfirm(host.page);
+    await host.page.locator("[data-host-tools-toggle]").click();
     await host.page.locator("[data-reset-session]").click();
 
     await expect(host.page.locator("[data-turn-number]")).toHaveText("Turn 1");

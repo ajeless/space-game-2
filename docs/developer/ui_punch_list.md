@@ -28,6 +28,7 @@
 - Tactical header and overlay copy should get one more compression pass now that the main interactions are stable.
 - The SSD trim sliders are useful, but they should stay visibly secondary to direct tactical plotting.
 - The bottom strip and footer copy need a later compression pass once the final information hierarchy is clearer.
+- Host/admin destructive controls should eventually move out of the main commit strip; keeping `Reset Match` adjacent to player commit actions is acceptable for the current host-is-player assumption, but it becomes a usability foot-gun once host duties and player duties can diverge.
 - Combat and outcome events need a cleaner player-facing presentation than raw-ish resolution summaries.
 - Aim-mode overlays need another readability pass once more real combat cases are exercised.
 - The SSD schematic should keep a fixed footprint while selection/aim panels change; selecting a mount should not visibly bump or compress the schematic viewport.
