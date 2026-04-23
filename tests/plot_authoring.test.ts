@@ -156,6 +156,22 @@ describe("plot authoring", () => {
     expect(summary.world_thrust_fraction.y).toBeCloseTo(0, 10);
   });
 
+  it("maps station-keeping into local controls for a rotated ship without changing the world counter-burn", async () => {
+    const state = await readBattleStateFixture();
+    const draft = createPlotDraft(state, "alpha_ship");
+
+    state.ships.alpha_ship!.pose.heading_degrees = 90;
+    state.ships.alpha_ship!.pose.velocity = { x: 0.06, y: 0.12 };
+
+    const updated = setPlotDraftStationKeeping(state, draft);
+    const summary = summarizePlotDraft(state, updated);
+
+    expect(summary.world_thrust_fraction.x).toBeCloseTo(-0.2777777778, 10);
+    expect(summary.world_thrust_fraction.y).toBeCloseTo(-0.5555555556, 10);
+    expect(summary.draft.thrust_input.lateral_fraction).toBeCloseTo(0.5555555556, 10);
+    expect(summary.draft.thrust_input.axial_fraction).toBeCloseTo(-0.2777777778, 10);
+  });
+
   it("can arm and explicitly clear a weapon target without reselecting a default contact", async () => {
     const state = await readBattleStateFixture();
     const draft = createPlotDraft(state, "alpha_ship");

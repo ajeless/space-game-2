@@ -211,7 +211,17 @@ describe("resolution playback", () => {
     const eventTypes = playback?.steps
       .filter((step) => step.kind === "event")
       .map((step) => step.focus_event?.type);
+    const lastImmediateEventIndex =
+      playback?.steps.findLastIndex((step) => step.kind === "event" && step.focus_event?.type !== "turn_ended") ?? -1;
+    const turnEndedIndex =
+      playback?.steps.findIndex((step) => step.kind === "event" && step.focus_event?.type === "turn_ended") ?? -1;
+    const settleStepsBetweenEvents =
+      playback?.steps.slice(lastImmediateEventIndex + 1, turnEndedIndex).filter((step) => step.kind === "settle")
+        .length ?? 0;
 
     expect(eventTypes).toEqual(["weapon_fired", "hit_registered", "subsystem_damaged", "turn_ended"]);
+    expect(lastImmediateEventIndex).toBeGreaterThanOrEqual(0);
+    expect(turnEndedIndex).toBeGreaterThan(lastImmediateEventIndex);
+    expect(settleStepsBetweenEvents).toBeGreaterThan(0);
   });
 });
