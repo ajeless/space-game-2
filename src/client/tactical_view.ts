@@ -61,8 +61,18 @@ function normalizeDegrees(angle: number): number {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
+function getShortestSignedAngleDelta(fromDegrees: number, toDegrees: number): number {
+  const delta = (toDegrees - fromDegrees + 540) % 360 - 180;
+
+  return delta === -180 ? 180 : delta;
+}
+
 function formatDistance(value: number): string {
   return `${Math.round(value)} km`;
+}
+
+function formatHeading(headingDegrees: number): string {
+  return `${normalizeDegrees(headingDegrees).toFixed(0).padStart(3, "0")}°`;
 }
 
 function isArmedWeaponCue(cue: WeaponCue | null | undefined): boolean {
@@ -145,16 +155,29 @@ function renderShipGlyph(
   const hullPoints = getShipHullPoints(shipConfig, center);
   const displayHeadingDegrees = getHeadingDegreesInTacticalCamera(camera, ship.pose.heading_degrees);
   const headingVector = getHeadingVector(displayHeadingDegrees, TACTICAL_VIEWPORT.headingVectorLengthPx);
+  const isSelf = identityValue?.ship_instance_id === ship.ship_instance_id;
   const oneTurnDriftSeconds = sessionValue.battle_state.match_setup.rules.turn.duration_seconds;
   const velocityProjection = worldToTacticalViewport(camera, {
     x: ship.pose.position.x + ship.pose.velocity.x * oneTurnDriftSeconds,
     y: ship.pose.position.y + ship.pose.velocity.y * oneTurnDriftSeconds
   });
+  const velocityScreenDelta = {
+    x: velocityProjection.x - center.x,
+    y: velocityProjection.y - center.y
+  };
+  const velocityScreenDistance = Math.hypot(velocityScreenDelta.x, velocityScreenDelta.y);
+  const hasVelocityCue = velocityScreenDistance >= 10;
+  const velocityDirection = hasVelocityCue
+    ? {
+        x: velocityScreenDelta.x / velocityScreenDistance,
+        y: velocityScreenDelta.y / velocityScreenDistance
+      }
+    : null;
   const engagementState = getWeaponCueEngagementState(targetCue);
   const isTargeted = engagementState !== "none";
   const classes = [
     "ship-glyph",
-    identityValue?.ship_instance_id === ship.ship_instance_id ? "ship-glyph--self" : "",
+    isSelf ? "ship-glyph--self" : "",
     sessionValue.pending_plot_ship_ids.includes(ship.ship_instance_id) ? "ship-glyph--pending" : "",
     isTargeted ? `ship-glyph--${engagementState}` : "",
     playbackTone === "hit" ? "ship-glyph--impact" : "",
@@ -186,6 +209,14 @@ function renderShipGlyph(
         x2="${velocityProjection.x.toFixed(2)}"
         y2="${velocityProjection.y.toFixed(2)}"
       />
+      ${
+        hasVelocityCue
+          ? `
+      <circle class="ship-glyph__velocity-ring" cx="${velocityProjection.x.toFixed(2)}" cy="${velocityProjection.y.toFixed(2)}" r="8" />
+      <circle class="ship-glyph__velocity-core" cx="${velocityProjection.x.toFixed(2)}" cy="${velocityProjection.y.toFixed(2)}" r="3" />
+      `
+          : ""
+      }
       <polygon class="ship-glyph__hull" points="${hullPoints}" transform="rotate(${displayHeadingDegrees.toFixed(
         2
       )} ${center.x.toFixed(2)} ${center.y.toFixed(2)})" />
@@ -213,23 +244,44 @@ function renderShipGlyph(
           ? `<text class="ship-glyph__target-tag" x="${center.x.toFixed(2)}" y="${(center.y + 32).toFixed(2)}">${targetTag}</text>`
           : ""
       }
+      ${
+        showText && isSelf && hasVelocityCue && velocityDirection
+          ? `<text class="ship-glyph__velocity-label" x="${(velocityProjection.x + velocityDirection.x * 22).toFixed(2)}" y="${(velocityProjection.y + velocityDirection.y * 22 - 4).toFixed(2)}">DRIFT</text>`
+          : ""
+      }
     </g>
   `;
 }
 
 function renderPreviewPath(camera: TacticalCamera, plotPreview: PlotPreview): string {
-  const points = plotPreview.projected_path
-    .map((sample) => {
-      const point = worldToTacticalViewport(camera, sample.position);
-      return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
-    })
-    .join(" ");
+  const projectedPoints = plotPreview.projected_path.map((sample) => worldToTacticalViewport(camera, sample.position));
+  const points = projectedPoints.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
 
   if (!points) {
     return "";
   }
 
-  return `<polyline class="plot-preview__path" points="${points}" />`;
+  const firstPoint = projectedPoints[0] ?? null;
+  const lastPoint = projectedPoints.at(-1) ?? null;
+  const hasPathTravel = Boolean(
+    firstPoint &&
+      lastPoint &&
+      Math.hypot(lastPoint.x - firstPoint.x, lastPoint.y - firstPoint.y) >= 10
+  );
+
+  return `
+    <g class="plot-preview__path-layer">
+      <polyline class="plot-preview__path" points="${points}" />
+      ${
+        hasPathTravel && lastPoint
+          ? `
+      <circle class="plot-preview__path-end-ring" cx="${lastPoint.x.toFixed(2)}" cy="${lastPoint.y.toFixed(2)}" r="12" />
+      <circle class="plot-preview__path-end-core" cx="${lastPoint.x.toFixed(2)}" cy="${lastPoint.y.toFixed(2)}" r="4" />
+      `
+          : ""
+      }
+    </g>
+  `;
 }
 
 function renderPreviewGhost(sessionValue: MatchSessionView, camera: TacticalCamera, plotPreview: PlotPreview): string {
@@ -244,10 +296,24 @@ function renderPreviewGhost(sessionValue: MatchSessionView, camera: TacticalCame
   const hullPoints = getShipHullPoints(shipConfig, center);
   const displayHeadingDegrees = getHeadingDegreesInTacticalCamera(camera, plotPreview.projected_pose.heading_degrees);
   const headingVector = getHeadingVector(displayHeadingDegrees, TACTICAL_VIEWPORT.headingVectorLengthPx);
-  const labelY = center.y - 22;
+  const hasProjectedChange =
+    Math.hypot(
+      plotPreview.projected_pose.position.x - ship.pose.position.x,
+      plotPreview.projected_pose.position.y - ship.pose.position.y
+    ) >= 0.01 || Math.abs(getShortestSignedAngleDelta(ship.pose.heading_degrees, plotPreview.projected_pose.heading_degrees)) >= 0.1;
+  const labelY = center.y - 30;
+  const labelX = center.x - 14;
 
   return `
     <g class="plot-preview__ghost">
+      ${
+        hasProjectedChange
+          ? `
+      <circle class="plot-preview__ghost-ring" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="24" />
+      <circle class="plot-preview__ghost-anchor" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="10" />
+      `
+          : ""
+      }
       <polygon
         class="plot-preview__ghost-hull"
         points="${hullPoints}"
@@ -262,8 +328,8 @@ function renderPreviewGhost(sessionValue: MatchSessionView, camera: TacticalCame
       />
       <circle class="plot-preview__ghost-core" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="4" />
       ${
-        shouldRenderTacticalText(camera)
-          ? `<text class="plot-preview__ghost-label" x="${center.x.toFixed(2)}" y="${labelY.toFixed(2)}">${plotPreview.projected_pose.heading_degrees.toFixed(0).padStart(3, "0")}°</text>`
+        shouldRenderTacticalText(camera) && hasProjectedChange
+          ? `<text class="plot-preview__ghost-label" x="${labelX.toFixed(2)}" y="${labelY.toFixed(2)}" text-anchor="end">PROJECTED · ${formatHeading(plotPreview.projected_pose.heading_degrees)}</text>`
           : ""
       }
     </g>
@@ -318,10 +384,24 @@ function renderPlotInteractionHandles(
   const headingAnchor = worldToTacticalViewport(camera, plotPreview.projected_pose.position);
   const displayHeadingDegrees = getHeadingDegreesInTacticalCamera(camera, plotPreview.desired_end_heading_degrees);
   const headingVector = getHeadingVector(displayHeadingDegrees, TACTICAL_PLOT_HANDLES.headingRadiusPx);
+  const headingDirection = {
+    x: headingVector.x / TACTICAL_PLOT_HANDLES.headingRadiusPx,
+    y: headingVector.y / TACTICAL_PLOT_HANDLES.headingRadiusPx
+  };
+  const thrustPerpendicular = {
+    x: -thrustDirection.y,
+    y: thrustDirection.x
+  };
+  const headingPerpendicular = {
+    x: -headingDirection.y,
+    y: headingDirection.x
+  };
   const headingHandle = {
     x: headingAnchor.x + headingVector.x,
     y: headingAnchor.y + headingVector.y
   };
+  const showLabels = shouldRenderTacticalText(camera);
+  const thrustLabelDistance = Math.max(24, thrustMagnitude * TACTICAL_PLOT_HANDLES.thrustRadiusPx * 0.6);
   const thrustRotationDegrees =
     Math.abs(thrustHandle.x - shipAnchor.x) < 0.01 && Math.abs(thrustHandle.y - shipAnchor.y) < 0.01
       ? 0
@@ -357,6 +437,11 @@ function renderPlotInteractionHandles(
             data-plot-drag-handle="thrust"
           />
         </g>
+        ${
+          showLabels
+            ? `<text class="plot-handles__label plot-handles__label--thrust" x="${(shipAnchor.x + thrustDirection.x * thrustLabelDistance + thrustPerpendicular.x * 12).toFixed(2)}" y="${(shipAnchor.y + thrustDirection.y * thrustLabelDistance + thrustPerpendicular.y * 12 - 4).toFixed(2)}">BURN</text>`
+            : ""
+        }
       </g>
       <g class="plot-handles__heading">
         <circle
@@ -386,6 +471,11 @@ function renderPlotInteractionHandles(
           r="9"
           data-plot-drag-handle="heading"
         />
+        ${
+          showLabels
+            ? `<text class="plot-handles__label plot-handles__label--heading" x="${(headingHandle.x + headingDirection.x * 18 - headingPerpendicular.x * 10).toFixed(2)}" y="${(headingHandle.y + headingDirection.y * 18 - headingPerpendicular.y * 10 - 4).toFixed(2)}">HEADING</text>`
+            : ""
+        }
       </g>
     </g>
   `;
