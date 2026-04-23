@@ -33,6 +33,7 @@
 - Aim-mode overlays need another readability pass once more real combat cases are exercised.
 - The SSD schematic should keep a fixed footprint while selection/aim panels change; selecting a mount should not visibly bump or compress the schematic viewport.
 - The SSD plot HUD still carries some redundant or low-value readouts; a later cleanup pass should compress or remove static/repeated information before asking the schematic to give up more space.
+- The plot-controls HUD likely still shows more fields than earn their keep. A later redesign pass should bias toward a more minimalist HUD, remove redundant readouts, and consider moving some state communication into tactical visual cues instead of more chrome.
 - The SSD trim sliders are a likely candidate for retirement or redesign once the broader plotting/control layout is revisited, but that decision should wait until we are clearer on how additional ship systems will use the same space.
 - Basic sounds and modest replay-motion polish still need a deliberate pass.
 - The current UI is structurally close to the intended SSD shell, but not yet at the final spacing / typography / visual-consistency pass.
