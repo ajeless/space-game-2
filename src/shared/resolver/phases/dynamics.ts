@@ -41,10 +41,7 @@ export function runDynamicsPhase(input: DynamicsPhaseInput): DynamicsPhaseOutput
     }
 
     const { applied_thrust: appliedThrust } = advanceShipDynamics(state, ship, plot, subTick);
-
-    if (appliedThrust.x !== 0 || appliedThrust.y !== 0) {
-      events.push(makeThrustAppliedEvent(subTick, ship, appliedThrust));
-    }
+    events.push(makeThrustAppliedEvent(subTick, ship, appliedThrust));
   }
 
   return {

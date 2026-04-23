@@ -362,6 +362,13 @@ body.is-plot-dragging {
   gap: 8px;
 }
 
+.ssd-control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .ssd-summary-chip {
   min-width: 92px;
   padding: 7px 9px;
@@ -1232,10 +1239,24 @@ body.is-plot-dragging {
 }
 
 .resolution-playback__shot-line {
-  stroke: rgba(255, 220, 112, 0.96);
-  stroke-width: 2;
+  stroke: rgba(255, 220, 112, 0.76);
+  stroke-width: 1.7;
   stroke-dasharray: 9 4;
   stroke-linecap: round;
+  pointer-events: none;
+}
+
+.resolution-playback__projectile-streak {
+  stroke: rgba(255, 229, 149, 0.94);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.resolution-playback__projectile-core {
+  fill: rgba(255, 243, 197, 0.98);
+  stroke: rgba(255, 220, 112, 0.94);
+  stroke-width: 1.2;
   pointer-events: none;
 }
 

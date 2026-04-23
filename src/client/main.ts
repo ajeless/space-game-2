@@ -29,6 +29,7 @@ import {
   getTacticalZoomPresetDefinition,
   getShipConfig,
   getSystemStateAndEffects,
+  setPlotDraftStationKeeping,
   setPlotDraftWeaponTarget,
   setPlotDraftDesiredEndHeading,
   setPlotDraftWorldThrust,
@@ -140,6 +141,12 @@ const TACTICAL_PLOT_HANDLES = {
 function normalizeDegrees(angle: number): number {
   const normalized = angle % 360;
   return normalized < 0 ? normalized + 360 : normalized;
+}
+
+function getShortestSignedAngleDelta(fromDegrees: number, toDegrees: number): number {
+  const delta = (toDegrees - fromDegrees + 540) % 360 - 180;
+
+  return delta === -180 ? 180 : delta;
 }
 
 function capitalizeLabel(label: string): string {
@@ -519,6 +526,10 @@ function getResolutionPlaybackMetaLabel(
       : "Awaiting first exchange.";
   }
 
+  if (playbackStep.kind === "settle") {
+    return `Replay turn ${sessionValue.last_resolution.resolved_from_turn_number} · re-centering scope`;
+  }
+
   if (playbackStep.focus_event && playbackStep.focus_event_index !== null) {
     return `Replay turn ${sessionValue.last_resolution.resolved_from_turn_number} · event ${
       playbackStep.focus_event_index + 1
@@ -740,6 +751,12 @@ function getPhaseLabel(
 function formatSignedNumber(value: number, digits = 0): string {
   const rounded = value.toFixed(digits);
   return value > 0 ? `+${rounded}` : rounded;
+}
+
+function smoothstep(value: number): number {
+  const clamped = Math.min(1, Math.max(0, value));
+
+  return clamped * clamped * (3 - 2 * clamped);
 }
 
 function getPlayerPlotSummary(
@@ -1000,6 +1017,68 @@ function getTacticalCamera(
     plot_preview: plotPreview
   });
 }
+
+function withTacticalCameraView(
+  camera: TacticalCamera,
+  centerWorld: Vector2,
+  viewRotationDegrees: number
+): TacticalCamera {
+  const visibleHalfWidth = camera.world_units_per_px * (camera.drawable.width / 2);
+  const visibleHalfHeight = camera.world_units_per_px * (camera.drawable.height / 2);
+
+  return {
+    ...camera,
+    center_world: centerWorld,
+    view_rotation_degrees: normalizeDegrees(viewRotationDegrees),
+    visible_world_bounds: {
+      min: {
+        x: centerWorld.x - visibleHalfWidth,
+        y: centerWorld.y - visibleHalfHeight
+      },
+      max: {
+        x: centerWorld.x + visibleHalfWidth,
+        y: centerWorld.y + visibleHalfHeight
+      }
+    }
+  };
+}
+
+function getResolutionPlaybackCamera(
+  camera: TacticalCamera | null,
+  playbackState: ResolutionPlaybackState | null,
+  playbackStep: ResolutionPlaybackStep | null,
+  preferredShipInstanceId: ShipInstanceId | null
+): TacticalCamera | null {
+  if (!camera || !playbackState || !playbackStep || camera.selection.mode_id !== "player_centered") {
+    return camera;
+  }
+
+  const viewpointShipId = preferredShipInstanceId ?? camera.viewpoint_ship_instance_id;
+
+  if (!viewpointShipId) {
+    return camera;
+  }
+
+  const initialPose = playbackState.steps[0]?.ship_poses[viewpointShipId];
+  const finalPose = playbackState.steps.at(-1)?.ship_poses[viewpointShipId];
+
+  if (!initialPose || !finalPose) {
+    return camera;
+  }
+
+  const transitionRatio = smoothstep(playbackStep.camera_transition_ratio);
+  const headingDelta = getShortestSignedAngleDelta(initialPose.heading_degrees, finalPose.heading_degrees);
+
+  return withTacticalCameraView(
+    camera,
+    {
+      x: initialPose.position.x + (finalPose.position.x - initialPose.position.x) * transitionRatio,
+      y: initialPose.position.y + (finalPose.position.y - initialPose.position.y) * transitionRatio
+    },
+    initialPose.heading_degrees + headingDelta * transitionRatio
+  );
+}
+
 function clearSelectedSystem(): void {
   if (selectedSystemId === null) {
     return;
@@ -1120,7 +1199,9 @@ function getFooterStripPresentation(sessionValue: MatchSessionView | null, playb
 } {
   const playbackStep = getCurrentResolutionPlaybackStepForSession(sessionValue);
   const currentResolutionLabel =
-    sessionValue && playbackEvent
+    sessionValue && playbackStep?.kind === "settle"
+      ? "Re-centering ship-relative scope"
+      : sessionValue && playbackEvent
       ? formatResolutionEventSummary(sessionValue, identity, playbackEvent)
       : sessionValue && playbackStep
         ? `Replaying turn ${sessionValue.last_resolution?.resolved_from_turn_number ?? "?"}`
@@ -1234,10 +1315,16 @@ function render(): void {
     sessionValue && playbackStep
       ? applyResolutionPlaybackStepToBattleState(sessionValue.battle_state, playbackStep)
       : sessionValue?.battle_state ?? null;
-  const camera = getTacticalCamera(
+  const baseCamera = getTacticalCamera(
     sessionValue,
     sessionValue?.battle_state ?? null,
     plotPreview,
+    displayed?.ship.ship_instance_id ?? null
+  );
+  const camera = getResolutionPlaybackCamera(
+    baseCamera,
+    resolutionPlayback,
+    playbackStep,
     displayed?.ship.ship_instance_id ?? null
   );
   const playbackEvent = playbackStep?.focus_event ?? null;
@@ -1453,6 +1540,14 @@ function render(): void {
 
   document.querySelector<HTMLButtonElement>("[data-reset-plot]")?.addEventListener("click", () => {
     resetCurrentPlotDraft();
+  });
+
+  document.querySelector<HTMLButtonElement>("[data-station-keep]")?.addEventListener("click", () => {
+    if (!sessionValue) {
+      return;
+    }
+
+    updatePlotDraft((draft) => setPlotDraftStationKeeping(sessionValue.battle_state, draft));
   });
 
   document.querySelector<HTMLButtonElement>("[data-reset-session]")?.addEventListener("click", () => {

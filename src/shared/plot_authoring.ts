@@ -120,6 +120,31 @@ function getWeaponMountChargeOptions(mount: WeaponMountSystemConfig): number[] {
   return [...new Set(mount.parameters.charge_table.map((entry) => entry.pips))].sort((left, right) => left - right);
 }
 
+function getAvailableDriveThrustForDraft(state: BattleState, draft: PlotDraft): number {
+  const ship = state.ships[draft.ship_instance_id];
+
+  if (!ship) {
+    throw new Error(`Unknown ship '${draft.ship_instance_id}'`);
+  }
+
+  const shipConfig = getShipConfig(state, ship);
+  const driveConfig = shipConfig.systems.find((system) => system.type === "drive");
+
+  if (!driveConfig || driveConfig.type !== "drive") {
+    throw new Error(`Ship config '${shipConfig.id}' does not have a drive system`);
+  }
+
+  const availableReactorPips = getAvailableReactorPips(state, ship);
+  const allocatedRailgunPips = draft.weapons.reduce((sum, weapon) => sum + weapon.charge_pips, 0);
+  const drivePips = Math.max(0, availableReactorPips - allocatedRailgunPips);
+  const driveState = getSystemStateAndEffects(state, ship, driveConfig.id);
+  const driveAuthorityFactor =
+    typeof driveState.effects.drive_authority_factor === "number" ? driveState.effects.drive_authority_factor : 1;
+  const driveFraction = availableReactorPips <= 0 ? 0 : drivePips / availableReactorPips;
+
+  return driveConfig.parameters.max_thrust * driveFraction * driveAuthorityFactor;
+}
+
 function getWeaponMountContexts(state: BattleState, shipInstanceId: ShipInstanceId): PlotAuthoringMountContext[] {
   const ship = state.ships[shipInstanceId];
 
@@ -346,6 +371,33 @@ export function setPlotDraftWorldThrust(state: BattleState, draft: PlotDraft, wo
       lateral_fraction: localThrust.x,
       axial_fraction: localThrust.y
     }
+  });
+}
+
+export function setPlotDraftStationKeeping(state: BattleState, draft: PlotDraft): PlotDraft {
+  const normalizedDraft = normalizePlotDraft(state, draft);
+  const ship = state.ships[normalizedDraft.ship_instance_id];
+
+  if (!ship) {
+    throw new Error(`Unknown ship '${normalizedDraft.ship_instance_id}'`);
+  }
+
+  const availableThrustThisTurn = getAvailableDriveThrustForDraft(state, normalizedDraft);
+
+  if (availableThrustThisTurn <= 0) {
+    return setPlotDraftWorldThrust(state, normalizedDraft, { x: 0, y: 0 });
+  }
+
+  const shipConfig = getShipConfig(state, ship);
+  const turnDurationSeconds = state.match_setup.rules.turn.duration_seconds;
+  const requiredThrust = {
+    x: (-ship.pose.velocity.x * shipConfig.dynamics.mass) / turnDurationSeconds,
+    y: (-ship.pose.velocity.y * shipConfig.dynamics.mass) / turnDurationSeconds
+  };
+
+  return setPlotDraftWorldThrust(state, normalizedDraft, {
+    x: requiredThrust.x / availableThrustThisTurn,
+    y: requiredThrust.y / availableThrustThisTurn
   });
 }
 

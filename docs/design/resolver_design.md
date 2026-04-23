@@ -155,7 +155,7 @@ Emitted at sub-tick 0 for each ship. Records the plot as accepted by the resolve
 
 ### `thrust_applied`
 
-Emitted whenever a ship's velocity changes due to thrust. May be emitted every sub-tick during active thrust.
+Emitted once per active ship per dynamics sample. The thrust vector may be zero; the event still records the resulting pose so replay consumers can render drift-only motion and heading changes without reconstructing intermediate state.
 
 ```
 { type: "thrust_applied", actor: shipInstanceId, details: {

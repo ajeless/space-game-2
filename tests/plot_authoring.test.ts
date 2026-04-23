@@ -5,6 +5,7 @@ import {
   buildPlotSubmissionFromDraft,
   clearPlotDraftWeaponIntent,
   createPlotDraft,
+  setPlotDraftStationKeeping,
   setPlotDraftWeaponTarget,
   setPlotDraftDesiredEndHeading,
   setPlotDraftWorldThrust,
@@ -126,6 +127,32 @@ describe("plot authoring", () => {
     expect(summary.draft.thrust_input.axial_fraction).toBeCloseTo(1, 10);
     expect(summary.draft.thrust_input.lateral_fraction).toBeCloseTo(0, 10);
     expect(summary.world_thrust_fraction.x).toBeCloseTo(1, 10);
+    expect(summary.world_thrust_fraction.y).toBeCloseTo(0, 10);
+  });
+
+  it("can set a station-keeping burn that attempts to null current drift", async () => {
+    const state = await readBattleStateFixture();
+    const draft = createPlotDraft(state, "alpha_ship");
+
+    state.ships.alpha_ship!.pose.velocity = { x: 0.12, y: -0.06 };
+
+    const updated = setPlotDraftStationKeeping(state, draft);
+    const summary = summarizePlotDraft(state, updated);
+
+    expect(summary.world_thrust_fraction.x).toBeCloseTo(-0.5555555556, 10);
+    expect(summary.world_thrust_fraction.y).toBeCloseTo(0.2777777778, 10);
+  });
+
+  it("clamps station-keeping burn when the ship cannot fully arrest drift this turn", async () => {
+    const state = await readBattleStateFixture();
+    const draft = createPlotDraft(state, "alpha_ship");
+
+    state.ships.alpha_ship!.pose.velocity = { x: 0.5, y: 0 };
+
+    const updated = setPlotDraftStationKeeping(state, draft);
+    const summary = summarizePlotDraft(state, updated);
+
+    expect(summary.world_thrust_fraction.x).toBeCloseTo(-1, 10);
     expect(summary.world_thrust_fraction.y).toBeCloseTo(0, 10);
   });
 

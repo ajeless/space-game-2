@@ -7,6 +7,19 @@ import {
   submitPlot
 } from "./helpers";
 
+async function getLocatorCenter(page: Parameters<typeof submitPlot>[0], selector: string): Promise<{ x: number; y: number }> {
+  const box = await page.locator(selector).first().boundingBox();
+
+  if (!box) {
+    throw new Error(`Unable to read bounding box for ${selector}`);
+  }
+
+  return {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2
+  };
+}
+
 test("movement-only replay settles into a completed turn summary", async ({ browser }) => {
   const server = await startBridgeServer();
   const host = await openBridgePage(browser, server.origin);
@@ -25,6 +38,60 @@ test("movement-only replay settles into a completed turn summary", async ({ brow
     await expect(guest.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
       timeout: 8_000
     });
+  } finally {
+    await closeBridgePages(host, guest);
+    await server.close();
+  }
+});
+
+test("drift-only replay keeps the ship centered before and after the playback settle", async ({ browser }) => {
+  const battleState = await loadBattleStateFixture();
+
+  battleState.match_setup.match_id = "drift_replay_fixture_v0_1";
+  battleState.match_setup.seed_root = "drift-browser-1";
+  battleState.ships.alpha_ship!.pose.velocity = { x: 0.2, y: 0 };
+  battleState.ships.alpha_ship!.pose.heading_degrees = 0;
+
+  const server = await startBridgeServer({
+    initialBattleState: battleState
+  });
+  const host = await openBridgePage(browser, server.origin);
+  const guest = await openBridgePage(browser, server.origin);
+
+  try {
+    const tacticalBounds = await host.page.locator("[data-tactical-viewport]").boundingBox();
+
+    if (!tacticalBounds) {
+      throw new Error("Unable to read tactical viewport bounds");
+    }
+
+    const tacticalCenter = {
+      x: tacticalBounds.x + tacticalBounds.width / 2,
+      y: tacticalBounds.y + tacticalBounds.height / 2
+    };
+    const initialShipCenter = await getLocatorCenter(host.page, '[data-ship-core="alpha_ship"]');
+
+    expect(Math.hypot(initialShipCenter.x - tacticalCenter.x, initialShipCenter.y - tacticalCenter.y)).toBeLessThan(8);
+
+    await submitPlot(host.page);
+    await submitPlot(guest.page);
+
+    await expect(host.page.locator("[data-turn-number]")).toHaveText("Turn 2");
+    await expect(host.page.locator("[data-turn-status]")).toContainText("replaying turn 1");
+    await expect
+      .poll(async () => {
+        const currentShipCenter = await getLocatorCenter(host.page, '[data-ship-core="alpha_ship"]');
+
+        return Math.hypot(currentShipCenter.x - initialShipCenter.x, currentShipCenter.y - initialShipCenter.y);
+      }, { timeout: 3_000 })
+      .toBeGreaterThan(30);
+    await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
+      timeout: 8_000
+    });
+
+    const settledShipCenter = await getLocatorCenter(host.page, '[data-ship-core="alpha_ship"]');
+
+    expect(Math.hypot(settledShipCenter.x - initialShipCenter.x, settledShipCenter.y - initialShipCenter.y)).toBeLessThan(8);
   } finally {
     await closeBridgePages(host, guest);
     await server.close();
@@ -61,6 +128,7 @@ test("combat replay keeps fire and hit events visible in the feed", async ({ bro
 
     await expect(host.page.locator("[data-turn-number]")).toHaveText("Turn 2");
     await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/replay turn 1/i);
+    await expect(host.page.locator("[data-resolution-projectile]")).toHaveCount(1);
     await expect(host.page.locator("[data-combat-feed-summary]")).toContainText([
       "Contact drive degraded",
       "You hit contact · drive",

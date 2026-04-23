@@ -103,12 +103,12 @@ describe("resolution playback", () => {
     });
 
     expect(playback).not.toBeNull();
-    expect(playback?.steps).toHaveLength(62);
     expect(playback?.steps[0]).toMatchObject({
       kind: "motion",
       display_sub_tick: 0,
       focus_event: null
     });
+    expect(playback?.steps.some((step) => step.kind === "settle")).toBe(true);
     expect(playback?.steps[1]?.ship_poses.alpha_ship?.position).not.toEqual(previousState.ships.alpha_ship?.pose.position);
     expect(playback?.steps.at(-1)).toMatchObject({
       kind: "event",
@@ -117,6 +117,49 @@ describe("resolution playback", () => {
         type: "turn_ended"
       })
     });
+  });
+
+  it("captures drift-only motion from zero-thrust dynamics samples", async () => {
+    const previousState = await readBattleStateFixture();
+
+    previousState.ships.alpha_ship!.pose.velocity = { x: 0.2, y: 0 };
+    previousState.ships.bravo_ship!.pose.velocity = { x: 0, y: 0 };
+
+    const result = resolve({
+      state: structuredClone(previousState),
+      plots_by_ship: {
+        alpha_ship: makePlot(previousState, {
+          ship_instance_id: "alpha_ship",
+          drive_pips: 8,
+          railgun_pips: 0,
+          desired_end_heading_degrees: previousState.ships.alpha_ship!.pose.heading_degrees,
+          weapons: []
+        }),
+        bravo_ship: makePlot(previousState, {
+          ship_instance_id: "bravo_ship",
+          drive_pips: 8,
+          railgun_pips: 0,
+          desired_end_heading_degrees: previousState.ships.bravo_ship!.pose.heading_degrees,
+          weapons: []
+        })
+      },
+      seed: "drift-only-replay"
+    });
+    const sessionView = makeSessionView({
+      previousState,
+      nextState: result.next_state,
+      events: result.events
+    });
+    const playback = buildResolutionPlaybackState({
+      sessionValue: sessionView,
+      previousBattleState: previousState
+    });
+
+    expect(playback?.steps[1]?.ship_poses.alpha_ship?.position.x).toBeGreaterThan(
+      previousState.ships.alpha_ship!.pose.position.x
+    );
+    expect(playback?.steps.at(-2)?.kind).toBe("settle");
+    expect(playback?.steps.at(-1)?.focus_event?.type).toBe("turn_ended");
   });
 
   it("preserves distinct focus events even when they happen on the same sub-tick", async () => {

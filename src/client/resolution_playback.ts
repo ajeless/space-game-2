@@ -8,6 +8,8 @@ import type {
 
 const MOTION_STEP_DURATION_MS = 42;
 const EVENT_STEP_DURATION_MS = 420;
+const CAMERA_SETTLE_STEP_DURATION_MS = 80;
+const CAMERA_SETTLE_STEP_COUNT = 6;
 const FINAL_STEP_DURATION_MS = 1100;
 
 type ShipPoseMap = Record<
@@ -16,7 +18,7 @@ type ShipPoseMap = Record<
 >;
 
 export type ResolutionPlaybackStep = {
-  kind: "motion" | "event";
+  kind: "motion" | "event" | "settle";
   duration_ms: number;
   display_sub_tick: number;
   total_sub_ticks: number;
@@ -24,6 +26,7 @@ export type ResolutionPlaybackStep = {
   focus_event: ResolverEvent | null;
   focus_event_index: number | null;
   focus_event_count: number;
+  camera_transition_ratio: number;
   progress_ratio: number;
 };
 
@@ -149,18 +152,30 @@ export function buildResolutionPlaybackState(input: {
       focus_event: null,
       focus_event_index: null,
       focus_event_count: focusEvents.length,
+      camera_transition_ratio: 0,
       progress_ratio: 0
     }
   ];
   let focusEventIndex = 0;
+  const deferredFinalEvents: ResolverEvent[] = [];
 
   for (let displaySubTick = 1; displaySubTick <= totalSubTicks; displaySubTick += 1) {
     const focusEventsAtStep = focusEventsByDisplaySubTick.get(displaySubTick) ?? [];
+    const deferredTurnEndedEvents =
+      displaySubTick === totalSubTicks
+        ? focusEventsAtStep.filter((event) => event.type === "turn_ended")
+        : [];
+    const immediateFocusEvents =
+      displaySubTick === totalSubTicks
+        ? focusEventsAtStep.filter((event) => event.type !== "turn_ended")
+        : focusEventsAtStep;
 
     steps.push({
       kind: "motion",
       duration_ms:
-        displaySubTick === totalSubTicks && focusEventsAtStep.length === 0
+        displaySubTick === totalSubTicks &&
+        immediateFocusEvents.length === 0 &&
+        deferredTurnEndedEvents.length === 0
           ? FINAL_STEP_DURATION_MS
           : MOTION_STEP_DURATION_MS,
       display_sub_tick: displaySubTick,
@@ -170,13 +185,12 @@ export function buildResolutionPlaybackState(input: {
       focus_event: null,
       focus_event_index: null,
       focus_event_count: focusEvents.length,
+      camera_transition_ratio: 0,
       progress_ratio: displaySubTick / totalSubTicks
     });
 
-    for (const event of focusEventsAtStep) {
-      const isFinalEvent =
-        displaySubTick === totalSubTicks &&
-        focusEventIndex === focusEvents.length - 1;
+    for (const event of immediateFocusEvents) {
+      const isFinalEvent = displaySubTick === totalSubTicks && focusEventIndex === focusEvents.length - 1;
 
       steps.push({
         kind: "event",
@@ -188,17 +202,62 @@ export function buildResolutionPlaybackState(input: {
         focus_event: event,
         focus_event_index: focusEventIndex,
         focus_event_count: focusEvents.length,
+        camera_transition_ratio: 0,
         progress_ratio: displaySubTick / totalSubTicks
       });
       focusEventIndex += 1;
     }
+
+    deferredFinalEvents.push(...deferredTurnEndedEvents);
   }
+
+  const finalShipPoses =
+    shipPosesByFrame.at(-1) ?? shipPosesByFrame[totalSubTicks] ?? cloneShipPoses(previousBattleState);
+
+  for (let settleIndex = 0; settleIndex < CAMERA_SETTLE_STEP_COUNT; settleIndex += 1) {
+    steps.push({
+      kind: "settle",
+      duration_ms: CAMERA_SETTLE_STEP_DURATION_MS,
+      display_sub_tick: totalSubTicks,
+      total_sub_ticks: totalSubTicks,
+      ship_poses: cloneShipPoseMap(finalShipPoses),
+      focus_event: null,
+      focus_event_index: null,
+      focus_event_count: focusEvents.length,
+      camera_transition_ratio: (settleIndex + 1) / CAMERA_SETTLE_STEP_COUNT,
+      progress_ratio: 1
+    });
+  }
+
+  for (const event of deferredFinalEvents) {
+    const isFinalEvent = focusEventIndex === focusEvents.length - 1;
+
+    steps.push({
+      kind: "event",
+      duration_ms: isFinalEvent ? FINAL_STEP_DURATION_MS : EVENT_STEP_DURATION_MS,
+      display_sub_tick: totalSubTicks,
+      total_sub_ticks: totalSubTicks,
+      ship_poses: cloneShipPoseMap(finalShipPoses),
+      focus_event: event,
+      focus_event_index: focusEventIndex,
+      focus_event_count: focusEvents.length,
+      camera_transition_ratio: 1,
+      progress_ratio: 1
+    });
+    focusEventIndex += 1;
+  }
+
+  const progressDenominator = Math.max(1, steps.length - 1);
+  const finalizedSteps = steps.map((step, index) => ({
+    ...step,
+    progress_ratio: index / progressDenominator
+  }));
 
   return {
     key,
     resolved_from_turn_number: sessionValue.last_resolution.resolved_from_turn_number,
     current_step_index: 0,
-    steps
+    steps: finalizedSteps
   };
 }
 

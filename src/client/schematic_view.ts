@@ -383,6 +383,10 @@ function renderSchematicControlDeck(
 
   const { context, draft, power, desired_end_heading_degrees: desiredHeading, world_thrust_fraction: worldThrust } = plotSummary;
   const isPending = sessionValue.pending_plot_ship_ids.includes(context.ship_instance_id);
+  const driftSpeed = Math.hypot(
+    sessionValue.battle_state.ships[context.ship_instance_id]?.pose.velocity.x ?? 0,
+    sessionValue.battle_state.ships[context.ship_instance_id]?.pose.velocity.y ?? 0
+  );
   let selectedPanel = `<div class="ssd-control-deck__note">Select a system on the SSD. Weapon mounts enter aim mode and use tactical contact clicks for fire intent.</div>`;
 
   if (selectedSystemContext) {
@@ -551,6 +555,14 @@ function renderSchematicControlDeck(
           worldThrust.x,
           2
         )}, ${formatSignedNumber(worldThrust.y, 2)}</strong></div>
+      </div>
+      <div class="ssd-control-actions">
+        <button class="action-button action-button--secondary action-button--compact" data-station-keep>
+          <span class="action-button__row">
+            <span class="action-button__label">Station Keep</span>
+          </span>
+          <small class="action-button__hint">Attempt null drift · ${formatNumber(driftSpeed)}</small>
+        </button>
       </div>
       ${selectedPanel}
     </div>

@@ -92,6 +92,13 @@ function getHeadingVector(headingDegrees: number, length: number): Vector2 {
   };
 }
 
+function interpolatePoint(start: Vector2, end: Vector2, ratio: number): Vector2 {
+  return {
+    x: start.x + (end.x - start.x) * ratio,
+    y: start.y + (end.y - start.y) * ratio
+  };
+}
+
 function getTacticalShipLabel(
   identityValue: SessionIdentity | null,
   ship: ShipRuntimeState,
@@ -231,7 +238,13 @@ function renderShipGlyph(
         x2="${(center.x + headingVector.x).toFixed(2)}"
         y2="${(center.y + headingVector.y).toFixed(2)}"
       />
-      <circle class="ship-glyph__core" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="4" />
+      <circle
+        class="ship-glyph__core"
+        cx="${center.x.toFixed(2)}"
+        cy="${center.y.toFixed(2)}"
+        r="4"
+        data-ship-core="${ship.ship_instance_id}"
+      />
       ${
         isTargeted
           ? `<circle class="ship-glyph__target-ring" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="22" />`
@@ -648,6 +661,8 @@ function renderResolutionPlaybackOverlay(camera: TacticalCamera, playbackEvent: 
   if (playbackEvent.type === "weapon_fired") {
     const mountPoint = worldToTacticalViewport(camera, playbackEvent.details.mountPosition);
     const targetPoint = worldToTacticalViewport(camera, playbackEvent.details.targetPosition);
+    const projectilePoint = interpolatePoint(mountPoint, targetPoint, 0.58);
+    const projectileBearingDegrees = (Math.atan2(targetPoint.y - mountPoint.y, targetPoint.x - mountPoint.x) * 180) / Math.PI;
 
     return `
       <g class="resolution-playback resolution-playback--shot">
@@ -659,6 +674,14 @@ function renderResolutionPlaybackOverlay(camera: TacticalCamera, playbackEvent: 
           x2="${targetPoint.x.toFixed(2)}"
           y2="${targetPoint.y.toFixed(2)}"
         />
+        <g
+          class="resolution-playback__projectile"
+          data-resolution-projectile
+          transform="translate(${projectilePoint.x.toFixed(2)} ${projectilePoint.y.toFixed(2)}) rotate(${projectileBearingDegrees.toFixed(2)})"
+        >
+          <line class="resolution-playback__projectile-streak" x1="-14" y1="0" x2="1" y2="0" />
+          <circle class="resolution-playback__projectile-core" cx="2.5" cy="0" r="3.2" />
+        </g>
       </g>
     `;
   }
