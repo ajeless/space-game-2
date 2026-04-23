@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   closeBridgePages,
+  fixturePath,
   loadBattleStateFixture,
   openBridgePage,
   startBridgeServer,
@@ -18,6 +19,16 @@ async function getLocatorCenter(page: Parameters<typeof submitPlot>[0], selector
     x: box.x + box.width / 2,
     y: box.y + box.height / 2
   };
+}
+
+async function armForwardRailgun(
+  page: Parameters<typeof submitPlot>[0],
+  targetShipId: string,
+  chargePips: string
+): Promise<void> {
+  await page.locator('[data-select-system-hit="forward_mount"]').click();
+  await page.locator(`[data-target-ship="${targetShipId}"]`).first().click();
+  await page.locator('[data-aim-charge="forward_mount"]').selectOption(chargePips);
 }
 
 test("movement-only replay settles into a completed turn summary", async ({ browser }) => {
@@ -119,9 +130,7 @@ test("combat replay keeps fire and hit events visible in the feed", async ({ bro
   const guest = await openBridgePage(browser, server.origin);
 
   try {
-    await host.page.locator('[data-select-system-hit="forward_mount"]').click();
-    await host.page.locator('[data-target-ship="bravo_ship"]').first().click();
-    await host.page.locator('[data-aim-charge="forward_mount"]').selectOption("3");
+    await armForwardRailgun(host.page, "bravo_ship", "3");
 
     await submitPlot(host.page);
     await submitPlot(guest.page);
@@ -137,6 +146,42 @@ test("combat replay keeps fire and hit events visible in the feed", async ({ bro
     await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
       timeout: 18_000
     });
+  } finally {
+    await closeBridgePages(host, guest);
+    await server.close();
+  }
+});
+
+test("close-action fixture degrades both bow guns in the opening replay", async ({ browser }) => {
+  const server = await startBridgeServer({
+    fixturePath: fixturePath("fixtures/battle_states/close_action_duel_turn_1.json")
+  });
+  const host = await openBridgePage(browser, server.origin);
+  const guest = await openBridgePage(browser, server.origin);
+
+  try {
+    await armForwardRailgun(host.page, "bravo_ship", "3");
+    await armForwardRailgun(guest.page, "alpha_ship", "3");
+
+    await submitPlot(host.page);
+    await submitPlot(guest.page);
+
+    await expect(host.page.locator("[data-turn-number]")).toHaveText("Turn 2");
+    await expect(guest.page.locator("[data-turn-number]")).toHaveText("Turn 2");
+    await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
+      timeout: 18_000
+    });
+    await expect(guest.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
+      timeout: 18_000
+    });
+    await expect(host.page.locator("[data-combat-feed-summary]").filter({ hasText: "Your bow railgun degraded" })).toHaveCount(
+      1
+    );
+    await expect(
+      host.page.locator("[data-combat-feed-summary]").filter({ hasText: "Contact bow railgun degraded" })
+    ).toHaveCount(1);
+    await expect(host.page.locator('[data-select-system="forward_mount"]')).toHaveClass(/ssd-system--degraded/);
+    await expect(guest.page.locator('[data-select-system="forward_mount"]')).toHaveClass(/ssd-system--degraded/);
   } finally {
     await closeBridgePages(host, guest);
     await server.close();

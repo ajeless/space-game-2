@@ -1,0 +1,35 @@
+{
+  "schema_version": "sg2/v0.1",
+  "match_id": "close_action_duel_fixture_v0_1",
+  "turn_number": 1,
+  "ship_instance_id": "bravo_ship",
+  "power": {
+    "drive_pips": 5,
+    "railgun_pips": 3
+  },
+  "maneuver": {
+    "desired_end_heading_degrees": 180,
+    "translation_plan": {
+      "kind": "piecewise_linear",
+      "frame": "world",
+      "knots": [
+        {
+          "t": 0,
+          "thrust_fraction": { "x": 0, "y": 0 }
+        },
+        {
+          "t": 1,
+          "thrust_fraction": { "x": 0, "y": 0 }
+        }
+      ]
+    }
+  },
+  "weapons": [
+    {
+      "mount_id": "forward_mount",
+      "target_ship_instance_id": "alpha_ship",
+      "fire_mode": "best_shot_this_turn",
+      "charge_pips": 3
+    }
+  ]
+}

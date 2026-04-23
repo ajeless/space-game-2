@@ -31,6 +31,20 @@ describe("v0.1 foundation contracts", () => {
     expect(bravoPlot.weapons[0]?.charge_pips).toBe(3);
   });
 
+  it("loads and validates the close-action playtest fixture and opening plots", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/close_action_duel_turn_1.json"));
+    const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/close_action_alpha_turn_1.json"), battleState);
+    const bravoPlot = validatePlotSubmission(await readJson("fixtures/plots/close_action_bravo_turn_1.json"), battleState);
+
+    expect(battleState.match_setup.match_id).toBe("close_action_duel_fixture_v0_1");
+    expect(battleState.match_setup.seed_root).toBe("close-action-duel-seed-2");
+    expect(alphaPlot.power).toEqual({
+      drive_pips: 5,
+      railgun_pips: 3
+    });
+    expect(bravoPlot.maneuver.translation_plan.knots).toHaveLength(2);
+  });
+
   it("derives available reactor pips from the canonical fixture state", async () => {
     const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
     const alphaShip = battleState.ships.alpha_ship;

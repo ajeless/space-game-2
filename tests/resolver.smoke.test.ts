@@ -11,8 +11,8 @@ async function readJson(relativePath: string): Promise<unknown> {
   return JSON.parse(raw) as unknown;
 }
 
-async function readBattleStateFixture() {
-  return validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+async function readBattleStateFixture(relativePath = "fixtures/battle_states/default_duel_turn_1.json") {
+  return validateBattleState(await readJson(relativePath));
 }
 
 function makeIdlePlan() {
@@ -131,6 +131,86 @@ describe("resolver", () => {
         seed: "turn-1-seed"
       })
     ).toThrow("missing plot");
+  });
+
+  it("resolves the close-action opening into mutual bow-gun degradation", async () => {
+    const state = await readBattleStateFixture("fixtures/battle_states/close_action_duel_turn_1.json");
+    const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/close_action_alpha_turn_1.json"), state);
+    const bravoPlot = validatePlotSubmission(await readJson("fixtures/plots/close_action_bravo_turn_1.json"), state);
+    const result = resolve({
+      state: structuredClone(state),
+      plots_by_ship: {
+        alpha_ship: alphaPlot,
+        bravo_ship: bravoPlot
+      },
+      seed: `${state.match_setup.seed_root}:turn:${state.turn_number}`
+    });
+    const weaponEvents = result.events.filter((event) => event.type === "weapon_fired");
+    const hitEvents = result.events.filter((event) => event.type === "hit_registered");
+    const subsystemDamageEvents = result.events.filter((event) => event.type === "subsystem_damaged");
+
+    expect(weaponEvents).toHaveLength(2);
+    expect(weaponEvents[0]).toMatchObject({
+      sub_tick: 0,
+      type: "weapon_fired",
+      actor: "alpha_ship",
+      target: "bravo_ship"
+    });
+    expect(weaponEvents[0]?.details.hitProbability).toBeCloseTo(0.5632207099534728, 10);
+    expect(hitEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sub_tick: 0,
+          type: "hit_registered",
+          target: "alpha_ship",
+          details: expect.objectContaining({
+            fromActor: "bravo_ship",
+            impactSystemId: "forward_mount",
+            hullDamageApplied: 15,
+            subsystemDamageApplied: 9
+          })
+        }),
+        expect.objectContaining({
+          sub_tick: 0,
+          type: "hit_registered",
+          target: "bravo_ship",
+          details: expect.objectContaining({
+            fromActor: "alpha_ship",
+            impactSystemId: "forward_mount",
+            hullDamageApplied: 15,
+            subsystemDamageApplied: 9
+          })
+        })
+      ])
+    );
+    expect(subsystemDamageEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actor: "alpha_ship",
+          details: expect.objectContaining({
+            systemId: "forward_mount",
+            previousState: "operational",
+            newState: "degraded",
+            previousIntegrity: 24,
+            newIntegrity: 15
+          })
+        }),
+        expect.objectContaining({
+          actor: "bravo_ship",
+          details: expect.objectContaining({
+            systemId: "forward_mount",
+            previousState: "operational",
+            newState: "degraded",
+            previousIntegrity: 24,
+            newIntegrity: 15
+          })
+        })
+      ])
+    );
+    expect(result.next_state.ships.alpha_ship?.hull.current_integrity).toBe(85);
+    expect(result.next_state.ships.bravo_ship?.hull.current_integrity).toBe(85);
+    expect(result.next_state.ships.alpha_ship?.systems.forward_mount?.current_integrity).toBe(15);
+    expect(result.next_state.ships.bravo_ship?.systems.forward_mount?.current_integrity).toBe(15);
   });
 
   it("applies deterministic local subsystem damage when a planned shot hits", async () => {

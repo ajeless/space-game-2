@@ -1,7 +1,13 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildPlotPreview, createPlotDraft, validateBattleState } from "../src/shared/index.js";
+import {
+  buildPlotPreview,
+  createPlotDraft,
+  resolve,
+  validateBattleState,
+  validatePlotSubmission
+} from "../src/shared/index.js";
 
 async function readJson(relativePath: string): Promise<unknown> {
   const absolutePath = path.resolve(process.cwd(), relativePath);
@@ -10,8 +16,8 @@ async function readJson(relativePath: string): Promise<unknown> {
   return JSON.parse(raw) as unknown;
 }
 
-async function readBattleStateFixture() {
-  return validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+async function readBattleStateFixture(relativePath = "fixtures/battle_states/default_duel_turn_1.json") {
+  return validateBattleState(await readJson(relativePath));
 }
 
 describe("plot preview", () => {
@@ -78,5 +84,40 @@ describe("plot preview", () => {
     });
     expect(preview.weapon_cues[0]?.predicted_hit_probability).not.toBeNull();
     expect(preview.weapon_cues[0]?.best_fire_sub_tick).not.toBeNull();
+  });
+
+  it("reflects degraded-mount charge penalties after the close-action opening exchange", async () => {
+    const state = await readBattleStateFixture("fixtures/battle_states/close_action_duel_turn_1.json");
+    const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/close_action_alpha_turn_1.json"), state);
+    const bravoPlot = validatePlotSubmission(await readJson("fixtures/plots/close_action_bravo_turn_1.json"), state);
+    const resolved = resolve({
+      state: structuredClone(state),
+      plots_by_ship: {
+        alpha_ship: alphaPlot,
+        bravo_ship: bravoPlot
+      },
+      seed: `${state.match_setup.seed_root}:turn:${state.turn_number}`
+    });
+    const draft = createPlotDraft(resolved.next_state, "alpha_ship");
+
+    draft.weapons[0] = {
+      ...draft.weapons[0]!,
+      charge_pips: 3,
+      target_ship_instance_id: "bravo_ship"
+    };
+
+    const preview = buildPlotPreview(resolved.next_state, draft);
+
+    expect(preview.weapon_cues[0]).toMatchObject({
+      mount_id: "forward_mount",
+      target_ship_instance_id: "bravo_ship",
+      charge_pips: 3,
+      effective_charge_pips: 2,
+      max_range_km: 220,
+      target_in_arc: true,
+      target_in_range: true,
+      firing_enabled: true
+    });
+    expect(preview.weapon_cues[0]?.predicted_hit_probability).toBeCloseTo(0.4256421865369799, 10);
   });
 });
