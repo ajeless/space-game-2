@@ -1,6 +1,8 @@
+import { readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { validateBattleState, type BattleState } from "../src/shared/index.js";
 import { createSpaceGameServer, type SpaceGameServer } from "../src/server/app.js";
 
 export const DEFAULT_ADMIN_TOKEN = "browser-smoke-token";
@@ -8,6 +10,7 @@ const DEFAULT_FIXTURE_PATH = "fixtures/battle_states/default_duel_turn_1.json";
 
 type StartedServerOptions = {
   fixturePath?: string;
+  initialBattleState?: BattleState;
   adminToken?: string | null;
   reconnectGraceMs?: number;
 };
@@ -22,6 +25,13 @@ export type BridgePage = {
   context: BrowserContext;
   page: Page;
 };
+
+export async function loadBattleStateFixture(relativePath = DEFAULT_FIXTURE_PATH): Promise<BattleState> {
+  const absolutePath = path.resolve(process.cwd(), relativePath);
+  const raw = await readFile(absolutePath, "utf8");
+
+  return validateBattleState(JSON.parse(raw) as unknown);
+}
 
 async function getAvailablePort(): Promise<number> {
   return await new Promise<number>((resolve, reject) => {
@@ -53,6 +63,7 @@ export async function startBridgeServer(options: StartedServerOptions = {}): Pro
   const port = await getAvailablePort();
   const fixturePath = options.fixturePath ?? DEFAULT_FIXTURE_PATH;
   const app = await createSpaceGameServer({
+    initial_battle_state: options.initialBattleState,
     config: {
       host: "127.0.0.1",
       port,

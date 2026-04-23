@@ -169,7 +169,7 @@ export function renderFooterStrip(footer: FooterStripPresentation): string {
           .map(
             (item) => `<li class="${item.is_active ? "resolution-feed__item resolution-feed__item--active" : "resolution-feed__item"}">
               <span class="resolution-feed__step">${item.step_label}</span>
-              <span class="resolution-feed__summary">${item.summary}</span>
+              <span class="resolution-feed__summary" data-combat-feed-summary>${item.summary}</span>
             </li>`
           )
           .join("")}</ul>`
