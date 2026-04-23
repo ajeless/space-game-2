@@ -99,11 +99,19 @@ function interpolatePoint(start: Vector2, end: Vector2, ratio: number): Vector2 
   };
 }
 
-function renderTargetLock(center: Vector2): string {
+function renderTargetLock(
+  center: Vector2,
+  options: {
+    className?: string;
+    scale?: number;
+  } = {}
+): string {
+  const className = options.className ? ` ${options.className}` : "";
+  const scale = options.scale ?? 1;
   const chevron = `<path class="ship-glyph__target-lock-chevron" d="M-7 -26 L0 -18 L7 -26" />`;
 
   return `
-    <g class="ship-glyph__target-lock" transform="translate(${center.x.toFixed(2)} ${center.y.toFixed(2)})">
+    <g class="ship-glyph__target-lock${className}" transform="translate(${center.x.toFixed(2)} ${center.y.toFixed(2)}) scale(${scale.toFixed(2)})">
       <circle class="ship-glyph__target-lock-ring" cx="0" cy="0" r="18" />
       <g class="ship-glyph__target-lock-rotor">
         <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0" to="360" dur="6s" repeatCount="indefinite" />
@@ -298,11 +306,6 @@ function renderShipGlyph(
           ? `<text class="ship-glyph__target-tag" x="${center.x.toFixed(2)}" y="${(center.y + 32).toFixed(2)}">${targetTag}</text>`
           : ""
       }
-      ${
-        showText && isSelf && hasVelocityCue && velocityDirection
-          ? `<text class="ship-glyph__velocity-label" x="${(velocityProjection.x + velocityDirection.x * 22).toFixed(2)}" y="${(velocityProjection.y + velocityDirection.y * 22 - 4).toFixed(2)}">DRIFT</text>`
-          : ""
-      }
     </g>
   `;
 }
@@ -430,24 +433,10 @@ function renderPlotInteractionHandles(
   const headingAnchor = worldToTacticalViewport(camera, plotPreview.projected_pose.position);
   const displayHeadingDegrees = getHeadingDegreesInTacticalCamera(camera, plotPreview.desired_end_heading_degrees);
   const headingVector = getHeadingVector(displayHeadingDegrees, TACTICAL_PLOT_HANDLES.headingRadiusPx);
-  const headingDirection = {
-    x: headingVector.x / TACTICAL_PLOT_HANDLES.headingRadiusPx,
-    y: headingVector.y / TACTICAL_PLOT_HANDLES.headingRadiusPx
-  };
-  const thrustPerpendicular = {
-    x: -thrustDirection.y,
-    y: thrustDirection.x
-  };
-  const headingPerpendicular = {
-    x: -headingDirection.y,
-    y: headingDirection.x
-  };
   const headingHandle = {
     x: headingAnchor.x + headingVector.x,
     y: headingAnchor.y + headingVector.y
   };
-  const showLabels = shouldRenderTacticalText(camera);
-  const thrustLabelDistance = Math.max(24, thrustMagnitude * TACTICAL_PLOT_HANDLES.thrustRadiusPx * 0.6);
   const thrustRotationDegrees =
     Math.abs(thrustHandle.x - shipAnchor.x) < 0.01 && Math.abs(thrustHandle.y - shipAnchor.y) < 0.01
       ? 0
@@ -483,11 +472,6 @@ function renderPlotInteractionHandles(
             data-plot-drag-handle="thrust"
           />
         </g>
-        ${
-          showLabels
-            ? `<text class="plot-handles__label plot-handles__label--thrust" x="${(shipAnchor.x + thrustDirection.x * thrustLabelDistance + thrustPerpendicular.x * 12).toFixed(2)}" y="${(shipAnchor.y + thrustDirection.y * thrustLabelDistance + thrustPerpendicular.y * 12 - 4).toFixed(2)}">BURN</text>`
-            : ""
-        }
       </g>
       <g class="plot-handles__heading">
         <circle
@@ -517,13 +501,36 @@ function renderPlotInteractionHandles(
           r="9"
           data-plot-drag-handle="heading"
         />
-        ${
-          showLabels
-            ? `<text class="plot-handles__label plot-handles__label--heading" x="${(headingHandle.x + headingDirection.x * 18 - headingPerpendicular.x * 10).toFixed(2)}" y="${(headingHandle.y + headingDirection.y * 18 - headingPerpendicular.y * 10 - 4).toFixed(2)}">HEADING</text>`
-            : ""
-        }
       </g>
     </g>
+  `;
+}
+
+function renderTacticalLegend(): string {
+  return `
+    <div class="tactical-board__legend" aria-label="Tactical legend">
+      <div class="tactical-legend__item">
+        <svg class="tactical-legend__sample" viewBox="0 0 44 14" aria-hidden="true">
+          <line class="tactical-legend__line tactical-legend__line--drift" x1="2" y1="7" x2="30" y2="7" />
+          <polygon class="tactical-legend__arrow tactical-legend__arrow--drift" points="42,7 30,2 30,12" />
+        </svg>
+        <span class="tactical-legend__label">Drift</span>
+      </div>
+      <div class="tactical-legend__item">
+        <svg class="tactical-legend__sample" viewBox="0 0 44 14" aria-hidden="true">
+          <line class="tactical-legend__line tactical-legend__line--burn" x1="2" y1="7" x2="30" y2="7" />
+          <polygon class="tactical-legend__arrow tactical-legend__arrow--burn" points="42,7 30,2 30,12" />
+        </svg>
+        <span class="tactical-legend__label">Burn</span>
+      </div>
+      <div class="tactical-legend__item">
+        <svg class="tactical-legend__sample" viewBox="0 0 44 14" aria-hidden="true">
+          <line class="tactical-legend__line tactical-legend__line--heading" x1="2" y1="7" x2="32" y2="7" />
+          <circle class="tactical-legend__handle" cx="36" cy="7" r="4" />
+        </svg>
+        <span class="tactical-legend__label">Heading</span>
+      </div>
+    </div>
   `;
 }
 
@@ -636,6 +643,7 @@ function renderOffscreenMarker(
     : formatDistance(Math.hypot(ship.pose.position.x - camera.center_world.x, ship.pose.position.y - camera.center_world.y)));
   const engagementState = getWeaponCueEngagementState(targetCue);
   const isTargeted = engagementState !== "none";
+  const showTargetLock = isTargeted && Boolean(targetCue?.target_in_range);
   const classes = [
     "offscreen-marker",
     isSelf ? "offscreen-marker--self" : "",
@@ -663,6 +671,14 @@ function renderOffscreenMarker(
       <g transform="translate(${anchor.x.toFixed(2)} ${anchor.y.toFixed(2)}) rotate(${bearingDegrees.toFixed(2)})">
         <path class="offscreen-marker__arrow" d="M-12 -9 L12 0 L-12 9 Z" />
       </g>
+      ${
+        showTargetLock
+          ? renderTargetLock(anchor, {
+              className: "offscreen-marker__target-lock",
+              scale: 0.78
+            })
+          : ""
+      }
       <circle class="offscreen-marker__core" cx="${anchor.x.toFixed(2)}" cy="${anchor.y.toFixed(2)}" r="4" />
       <text
         class="offscreen-marker__label"
@@ -905,6 +921,7 @@ export function renderTacticalBoard({
         ${offscreenMarkers.join("")}
         ${renderScaleBar(camera)}
       </svg>
+      ${renderTacticalLegend()}
     </div>
   `;
 }

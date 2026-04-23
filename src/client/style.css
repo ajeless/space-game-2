@@ -733,7 +733,9 @@ body.is-plot-dragging {
 }
 
 .tactical-board {
-  display: block;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
   flex: 1;
   min-height: 0;
 }
@@ -778,15 +780,6 @@ body.is-plot-dragging {
 
 .ship-glyph__velocity-arrow {
   fill: rgba(166, 225, 255, 0.8);
-  pointer-events: none;
-}
-
-.ship-glyph__velocity-label {
-  fill: rgba(166, 212, 242, 0.8);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-anchor: middle;
   pointer-events: none;
 }
 
@@ -853,8 +846,7 @@ body.is-plot-dragging {
   stroke: rgba(242, 200, 121, 0.52);
 }
 
-.ship-glyph--pending .ship-glyph__velocity-arrow,
-.ship-glyph--pending .ship-glyph__velocity-label {
+.ship-glyph--pending .ship-glyph__velocity-arrow {
   fill: rgba(255, 214, 149, 0.84);
 }
 
@@ -886,15 +878,15 @@ body.is-plot-dragging {
 }
 
 .ship-glyph__target-lock-ring {
-  fill: rgba(118, 17, 17, 0.08);
-  stroke: rgba(232, 88, 88, 0.32);
-  stroke-width: 1.1;
+  fill: rgba(126, 19, 19, 0.12);
+  stroke: rgba(214, 80, 80, 0.44);
+  stroke-width: 1.15;
   pointer-events: none;
 }
 
 .ship-glyph__target-lock-chevron {
   fill: none;
-  stroke: rgba(240, 102, 102, 0.96);
+  stroke: rgba(214, 80, 80, 0.88);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1163,26 +1155,6 @@ body.is-plot-dragging {
   stroke: rgba(242, 200, 121, 0.58);
 }
 
-.plot-handles__label {
-  fill: rgba(224, 238, 248, 0.8);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  paint-order: stroke fill;
-  stroke: rgba(5, 13, 21, 0.9);
-  stroke-width: 2.3px;
-  text-anchor: middle;
-  text-transform: uppercase;
-}
-
-.plot-handles__label--thrust {
-  fill: rgba(125, 213, 154, 0.82);
-}
-
-.plot-handles__label--heading {
-  fill: rgba(255, 214, 149, 0.82);
-}
-
 .resolution-playback__flash {
   fill: rgba(255, 243, 197, 0.22);
   stroke: rgba(255, 220, 112, 0.98);
@@ -1247,6 +1219,68 @@ body.is-plot-dragging {
 .tactical-board--replaying .plot-preview__cue,
 .tactical-board--replaying .plot-handles {
   opacity: 0.68;
+}
+
+.tactical-board__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  padding: 0 2px;
+  color: var(--text-2);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tactical-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tactical-legend__sample {
+  width: 44px;
+  height: 14px;
+  overflow: visible;
+}
+
+.tactical-legend__line {
+  stroke-linecap: round;
+}
+
+.tactical-legend__line--drift {
+  stroke: rgba(125, 176, 218, 0.38);
+  stroke-width: 1.35;
+  stroke-dasharray: 4 6;
+}
+
+.tactical-legend__arrow--drift {
+  fill: rgba(166, 225, 255, 0.82);
+}
+
+.tactical-legend__line--burn {
+  stroke: rgba(125, 213, 154, 0.56);
+  stroke-width: 1.4;
+}
+
+.tactical-legend__arrow--burn {
+  fill: rgba(125, 213, 154, 0.82);
+}
+
+.tactical-legend__line--heading {
+  stroke: rgba(242, 200, 121, 0.62);
+  stroke-width: 1.4;
+}
+
+.tactical-legend__handle {
+  fill: rgba(242, 200, 121, 0.12);
+  stroke: rgba(242, 200, 121, 0.62);
+  stroke-width: 1.4;
+}
+
+.tactical-legend__label {
+  color: var(--text-2);
 }
 
 .tactical-scale-bar__line,

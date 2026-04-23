@@ -33,10 +33,10 @@ test("movement-only replay settles into a completed turn summary", async ({ brow
     await expect(host.page.locator("[data-turn-status]")).toContainText("replaying turn 1");
     await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/replay turn 1/i);
     await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
-      timeout: 8_000
+      timeout: 18_000
     });
     await expect(guest.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
-      timeout: 8_000
+      timeout: 18_000
     });
   } finally {
     await closeBridgePages(host, guest);
@@ -83,10 +83,10 @@ test("drift-only replay keeps the ship centered before and after the playback se
         const currentShipCenter = await getLocatorCenter(host.page, '[data-ship-core="alpha_ship"]');
 
         return Math.hypot(currentShipCenter.x - initialShipCenter.x, currentShipCenter.y - initialShipCenter.y);
-      }, { timeout: 3_000 })
+      }, { timeout: 5_000 })
       .toBeGreaterThan(30);
     await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
-      timeout: 8_000
+      timeout: 18_000
     });
 
     const settledShipCenter = await getLocatorCenter(host.page, '[data-ship-core="alpha_ship"]');
@@ -135,7 +135,7 @@ test("combat replay keeps fire and hit events visible in the feed", async ({ bro
       "You fired bow railgun at contact · 3P"
     ]);
     await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
-      timeout: 8_000
+      timeout: 18_000
     });
   } finally {
     await closeBridgePages(host, guest);

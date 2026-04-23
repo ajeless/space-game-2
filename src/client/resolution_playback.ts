@@ -6,11 +6,11 @@ import type {
   ThrustAppliedEvent
 } from "../shared/index.js";
 
-const MOTION_STEP_DURATION_MS = 42;
-const EVENT_STEP_DURATION_MS = 420;
-const CAMERA_SETTLE_STEP_DURATION_MS = 80;
+const MOTION_STEP_DURATION_MS = 84;
+const EVENT_STEP_DURATION_MS = 840;
+const CAMERA_SETTLE_STEP_DURATION_MS = 160;
 const CAMERA_SETTLE_STEP_COUNT = 6;
-const FINAL_STEP_DURATION_MS = 1100;
+const FINAL_STEP_DURATION_MS = 2200;
 
 type ShipPoseMap = Record<
   ShipInstanceId,
