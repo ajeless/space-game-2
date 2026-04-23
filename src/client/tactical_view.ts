@@ -99,6 +99,23 @@ function interpolatePoint(start: Vector2, end: Vector2, ratio: number): Vector2 
   };
 }
 
+function renderTargetLock(center: Vector2): string {
+  const chevron = `<path class="ship-glyph__target-lock-chevron" d="M-7 -26 L0 -18 L7 -26" />`;
+
+  return `
+    <g class="ship-glyph__target-lock" transform="translate(${center.x.toFixed(2)} ${center.y.toFixed(2)})">
+      <circle class="ship-glyph__target-lock-ring" cx="0" cy="0" r="18" />
+      <g class="ship-glyph__target-lock-rotor">
+        <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0" to="360" dur="6s" repeatCount="indefinite" />
+        ${chevron}
+        <g transform="rotate(90)">${chevron}</g>
+        <g transform="rotate(180)">${chevron}</g>
+        <g transform="rotate(270)">${chevron}</g>
+      </g>
+    </g>
+  `;
+}
+
 function getTacticalShipLabel(
   identityValue: SessionIdentity | null,
   ship: ShipRuntimeState,
@@ -184,6 +201,20 @@ function renderShipGlyph(
         y: velocityScreenDelta.y / velocityScreenDistance
       }
     : null;
+  const velocityArrowBase =
+    hasVelocityCue && velocityDirection
+      ? {
+          x: velocityProjection.x - velocityDirection.x * 10,
+          y: velocityProjection.y - velocityDirection.y * 10
+        }
+      : null;
+  const velocityArrowPerpendicular =
+    hasVelocityCue && velocityDirection
+      ? {
+          x: -velocityDirection.y,
+          y: velocityDirection.x
+        }
+      : null;
   const engagementState = getWeaponCueEngagementState(targetCue);
   const isTargeted = engagementState !== "none";
   const classes = [
@@ -213,18 +244,24 @@ function renderShipGlyph(
         r="30"
         ${targetAttribute}
       />
+      ${
+        hasVelocityCue && velocityArrowBase && velocityArrowPerpendicular
+          ? `
       <line
         class="ship-glyph__velocity"
         x1="${center.x.toFixed(2)}"
         y1="${center.y.toFixed(2)}"
-        x2="${velocityProjection.x.toFixed(2)}"
-        y2="${velocityProjection.y.toFixed(2)}"
+        x2="${velocityArrowBase.x.toFixed(2)}"
+        y2="${velocityArrowBase.y.toFixed(2)}"
       />
-      ${
-        hasVelocityCue
-          ? `
-      <circle class="ship-glyph__velocity-ring" cx="${velocityProjection.x.toFixed(2)}" cy="${velocityProjection.y.toFixed(2)}" r="8" />
-      <circle class="ship-glyph__velocity-core" cx="${velocityProjection.x.toFixed(2)}" cy="${velocityProjection.y.toFixed(2)}" r="3" />
+      <polygon
+        class="ship-glyph__velocity-arrow"
+        points="${velocityProjection.x.toFixed(2)},${velocityProjection.y.toFixed(2)} ${(
+            velocityArrowBase.x + velocityArrowPerpendicular.x * 4.5
+          ).toFixed(2)},${(velocityArrowBase.y + velocityArrowPerpendicular.y * 4.5).toFixed(2)} ${(
+            velocityArrowBase.x - velocityArrowPerpendicular.x * 4.5
+          ).toFixed(2)},${(velocityArrowBase.y - velocityArrowPerpendicular.y * 4.5).toFixed(2)}"
+      />
       `
           : ""
       }
@@ -247,7 +284,7 @@ function renderShipGlyph(
       />
       ${
         isTargeted
-          ? `<circle class="ship-glyph__target-ring" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="22" />`
+          ? renderTargetLock(center)
           : ""
       }
       ${showText && label ? `<text class="ship-glyph__label" x="${center.x.toFixed(2)}" y="${labelY.toFixed(2)}">${label}</text>` : ""}
@@ -323,14 +360,6 @@ function renderPreviewGhost(sessionValue: MatchSessionView, camera: TacticalCame
 
   return `
     <g class="plot-preview__ghost">
-      ${
-        hasProjectedChange
-          ? `
-      <circle class="plot-preview__ghost-ring" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="24" />
-      <circle class="plot-preview__ghost-anchor" cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="10" />
-      `
-          : ""
-      }
       <polygon
         class="plot-preview__ghost-hull"
         points="${hullPoints}"
@@ -535,7 +564,6 @@ function renderWeaponCue(
             x2="${targetPoint.x.toFixed(2)}"
             y2="${targetPoint.y.toFixed(2)}"
           />
-          <circle class="plot-preview__target-reticle" cx="${targetPoint.x.toFixed(2)}" cy="${targetPoint.y.toFixed(2)}" r="18" />
           `
               : ""
           }

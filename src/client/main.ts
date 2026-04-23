@@ -143,12 +143,6 @@ function normalizeDegrees(angle: number): number {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
-function getShortestSignedAngleDelta(fromDegrees: number, toDegrees: number): number {
-  const delta = (toDegrees - fromDegrees + 540) % 360 - 180;
-
-  return delta === -180 ? 180 : delta;
-}
-
 function capitalizeLabel(label: string): string {
   if (label.length === 0) {
     return label;
@@ -1067,7 +1061,7 @@ function getResolutionPlaybackCamera(
   }
 
   const transitionRatio = smoothstep(playbackStep.camera_transition_ratio);
-  const headingDelta = getShortestSignedAngleDelta(initialPose.heading_degrees, finalPose.heading_degrees);
+  const currentPose = playbackStep.ship_poses[viewpointShipId] ?? finalPose;
 
   return withTacticalCameraView(
     camera,
@@ -1075,7 +1069,7 @@ function getResolutionPlaybackCamera(
       x: initialPose.position.x + (finalPose.position.x - initialPose.position.x) * transitionRatio,
       y: initialPose.position.y + (finalPose.position.y - initialPose.position.y) * transitionRatio
     },
-    initialPose.heading_degrees + headingDelta * transitionRatio
+    currentPose.heading_degrees
   );
 }
 

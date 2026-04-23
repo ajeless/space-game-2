@@ -769,28 +769,21 @@ body.is-plot-dragging {
 }
 
 .ship-glyph__velocity {
-  stroke: rgba(125, 176, 218, 0.34);
-  stroke-width: 1.6;
-  stroke-dasharray: 5 5;
+  stroke: rgba(125, 176, 218, 0.28);
+  stroke-width: 1.35;
+  stroke-dasharray: 4 6;
   stroke-linecap: round;
   pointer-events: none;
 }
 
-.ship-glyph__velocity-ring {
-  fill: rgba(10, 24, 37, 0.92);
-  stroke: rgba(125, 176, 218, 0.72);
-  stroke-width: 1.5;
-  pointer-events: none;
-}
-
-.ship-glyph__velocity-core {
-  fill: rgba(166, 225, 255, 0.94);
+.ship-glyph__velocity-arrow {
+  fill: rgba(166, 225, 255, 0.8);
   pointer-events: none;
 }
 
 .ship-glyph__velocity-label {
-  fill: rgba(166, 212, 242, 0.94);
-  font-size: 10px;
+  fill: rgba(166, 212, 242, 0.8);
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-anchor: middle;
@@ -857,16 +850,12 @@ body.is-plot-dragging {
 }
 
 .ship-glyph--pending .ship-glyph__velocity {
-  stroke: rgba(242, 200, 121, 0.68);
+  stroke: rgba(242, 200, 121, 0.52);
 }
 
-.ship-glyph--pending .ship-glyph__velocity-ring {
-  stroke: rgba(242, 200, 121, 0.82);
-}
-
-.ship-glyph--pending .ship-glyph__velocity-core,
+.ship-glyph--pending .ship-glyph__velocity-arrow,
 .ship-glyph--pending .ship-glyph__velocity-label {
-  fill: rgba(255, 214, 149, 0.96);
+  fill: rgba(255, 214, 149, 0.84);
 }
 
 .ship-glyph--tracked .ship-glyph__core {
@@ -896,10 +885,19 @@ body.is-plot-dragging {
   stroke-dasharray: 5 4;
 }
 
-.ship-glyph__target-ring {
+.ship-glyph__target-lock-ring {
+  fill: rgba(118, 17, 17, 0.08);
+  stroke: rgba(232, 88, 88, 0.32);
+  stroke-width: 1.1;
+  pointer-events: none;
+}
+
+.ship-glyph__target-lock-chevron {
   fill: none;
+  stroke: rgba(240, 102, 102, 0.96);
   stroke-width: 2;
-  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   pointer-events: none;
 }
 
@@ -911,24 +909,12 @@ body.is-plot-dragging {
   pointer-events: none;
 }
 
-.ship-glyph--tracked .ship-glyph__target-ring {
-  stroke: rgba(125, 176, 218, 0.94);
-}
-
 .ship-glyph--tracked .ship-glyph__target-tag {
   fill: rgba(166, 212, 242, 0.96);
 }
 
-.ship-glyph--armed .ship-glyph__target-ring {
-  stroke: rgba(125, 213, 154, 0.94);
-}
-
 .ship-glyph--armed .ship-glyph__target-tag {
   fill: rgba(125, 213, 154, 0.98);
-}
-
-.ship-glyph--blocked .ship-glyph__target-ring {
-  stroke: rgba(236, 126, 116, 0.9);
 }
 
 .ship-glyph--blocked .ship-glyph__target-tag {
@@ -1052,38 +1038,23 @@ body.is-plot-dragging {
   pointer-events: none;
 }
 
-.plot-preview__ghost-ring {
-  fill: none;
-  stroke: rgba(173, 236, 245, 0.34);
-  stroke-width: 1.4;
-  stroke-dasharray: 6 5;
-  pointer-events: none;
-}
-
-.plot-preview__ghost-anchor {
-  fill: rgba(10, 24, 37, 0.9);
-  stroke: rgba(173, 236, 245, 0.66);
-  stroke-width: 1.4;
-  pointer-events: none;
-}
-
 .plot-preview__ghost-hull {
-  fill: rgba(173, 236, 245, 0.04);
-  stroke: rgba(173, 236, 245, 0.5);
-  stroke-width: 1.6;
+  fill: rgba(173, 236, 245, 0.03);
+  stroke: rgba(173, 236, 245, 0.34);
+  stroke-width: 1.3;
   stroke-dasharray: 6 5;
   pointer-events: none;
 }
 
 .plot-preview__ghost-heading {
-  stroke: rgba(173, 236, 245, 0.62);
-  stroke-width: 1.8;
+  stroke: rgba(173, 236, 245, 0.42);
+  stroke-width: 1.35;
   stroke-dasharray: 5 4;
   pointer-events: none;
 }
 
 .plot-preview__ghost-core {
-  fill: rgba(173, 236, 245, 0.72);
+  fill: rgba(173, 236, 245, 0.48);
   pointer-events: none;
 }
 
@@ -1132,66 +1103,47 @@ body.is-plot-dragging {
 }
 
 .plot-preview__target-line {
-  stroke-width: 1.6;
-  stroke-dasharray: 6 5;
+  stroke-width: 1.1;
+  stroke-dasharray: 3 7;
   pointer-events: none;
 }
 
 .plot-preview__cue--idle .plot-preview__target-line {
-  stroke: rgba(125, 176, 218, 0.5);
+  stroke: rgba(125, 176, 218, 0.34);
 }
 
 .plot-preview__cue--valid .plot-preview__target-line {
-  stroke: rgba(125, 213, 154, 0.82);
+  stroke: rgba(125, 213, 154, 0.52);
 }
 
 .plot-preview__cue--warn .plot-preview__target-line {
-  stroke: rgba(236, 126, 116, 0.8);
-}
-
-.plot-preview__target-reticle {
-  fill: none;
-  stroke-width: 1.5;
-  stroke-dasharray: 4 4;
-  pointer-events: none;
-}
-
-.plot-preview__cue--valid .plot-preview__target-reticle {
-  stroke: rgba(125, 213, 154, 0.88);
-}
-
-.plot-preview__cue--idle .plot-preview__target-reticle {
-  stroke: rgba(125, 176, 218, 0.64);
-}
-
-.plot-preview__cue--warn .plot-preview__target-reticle {
-  stroke: rgba(236, 126, 116, 0.88);
+  stroke: rgba(236, 126, 116, 0.48);
 }
 
 .plot-handles__guide-ring {
   fill: none;
-  stroke: rgba(125, 176, 218, 0.16);
-  stroke-width: 1.2;
+  stroke: rgba(125, 176, 218, 0.1);
+  stroke-width: 0.95;
   stroke-dasharray: 5 5;
 }
 
 .plot-handles__guide-ring--heading {
-  stroke: rgba(242, 200, 121, 0.2);
+  stroke: rgba(242, 200, 121, 0.12);
 }
 
 .plot-handles__vector {
-  stroke: rgba(125, 213, 154, 0.62);
-  stroke-width: 2;
+  stroke: rgba(125, 213, 154, 0.48);
+  stroke-width: 1.4;
   stroke-linecap: round;
 }
 
 .plot-handles__vector--heading {
-  stroke: rgba(242, 200, 121, 0.72);
+  stroke: rgba(242, 200, 121, 0.56);
 }
 
 .plot-handles__grip {
   cursor: grab;
-  stroke-width: 2;
+  stroke-width: 1.5;
   pointer-events: auto;
 }
 
@@ -1201,34 +1153,34 @@ body.is-plot-dragging {
 }
 
 .plot-handles__grip--thrust {
-  fill: rgba(125, 213, 154, 0.12);
-  stroke: rgba(125, 213, 154, 0.78);
+  fill: rgba(125, 213, 154, 0.08);
+  stroke: rgba(125, 213, 154, 0.56);
   stroke-linejoin: round;
 }
 
 .plot-handles__grip--heading {
-  fill: rgba(242, 200, 121, 0.1);
-  stroke: rgba(242, 200, 121, 0.8);
+  fill: rgba(242, 200, 121, 0.08);
+  stroke: rgba(242, 200, 121, 0.58);
 }
 
 .plot-handles__label {
-  fill: var(--text-1);
-  font-size: 11px;
+  fill: rgba(224, 238, 248, 0.8);
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.05em;
   paint-order: stroke fill;
-  stroke: rgba(5, 13, 21, 0.98);
-  stroke-width: 3px;
+  stroke: rgba(5, 13, 21, 0.9);
+  stroke-width: 2.3px;
   text-anchor: middle;
   text-transform: uppercase;
 }
 
 .plot-handles__label--thrust {
-  fill: rgba(125, 213, 154, 0.98);
+  fill: rgba(125, 213, 154, 0.82);
 }
 
 .plot-handles__label--heading {
-  fill: rgba(255, 214, 149, 0.98);
+  fill: rgba(255, 214, 149, 0.82);
 }
 
 .resolution-playback__flash {
@@ -1288,6 +1240,13 @@ body.is-plot-dragging {
   text-anchor: middle;
   text-transform: uppercase;
   pointer-events: none;
+}
+
+.tactical-board--replaying .plot-preview__path-layer,
+.tactical-board--replaying .plot-preview__ghost,
+.tactical-board--replaying .plot-preview__cue,
+.tactical-board--replaying .plot-handles {
+  opacity: 0.68;
 }
 
 .tactical-scale-bar__line,
