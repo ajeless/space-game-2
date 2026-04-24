@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Burn Vector mark" color="#6AA8D6">
+  <g fill="currentColor">
+    <!-- Thrust stem -->
+    <path d="M2 13 L16 13 L16 19 L2 19 Z"/>
+    <!-- Arrow head -->
+    <path d="M18 6 L30 16 L18 26 Z"/>
+  </g>
+</svg>

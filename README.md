@@ -1,93 +1,107 @@
-# Burn Vector
+<p align="center">
+  <img src="docs/assets/logo/burn-vector-logo.svg" width="480" alt="Burn Vector">
+</p>
 
-> Imported from `ajeless/docs/sg/space_game_2/README.md` on 2026-04-21.
-> This copy is now maintained in this repository. The old docs repo remains the archive/reference source for earlier ideation.
+<p align="center"><em>A turn-based tactical starship-combat duel. Plot. Commit. Execute. Debrief.</em></p>
 
-A tactical starship combat videogame. Turn-based planning, animated execution, SSD-centric interface. Original IP. Built in deployable vertical slices — each release is a fully playable, internet-reachable build.
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
+  <a href="package.json"><img alt="Node 24+" src="https://img.shields.io/badge/Node-24%2B-5FA04E?logo=nodedotjs&logoColor=white"></a>
+  <a href="docs/developer/testing.md"><img alt="Tested with Vitest and Playwright" src="https://img.shields.io/badge/tests-Vitest%20%7C%20Playwright-6E9F18"></a>
+</p>
 
-## What this project is
+<p align="center">
+  <img src="docs/assets/screenshots/01-bridge-start.png" width="90%" alt="Bridge at the start of a match.">
+</p>
 
-A homage to tabletop tactical starship combat games — Star Fleet Battles, Federation Commander, Attack Vector: Tactical, Full Thrust, Triplanetary, Mayday/Brilliant Lances, and the rest of that lineage — that takes full advantage of the digital and networked medium.
+## What is Burn Vector?
 
-Core loop: **Plot -> Commit -> Execute-animated -> Debrief.**
+A tactical, turn-based starship-combat duel with a pure shared resolver and a ship-schematic-centric interface. Two identical ships start symmetric; one goes home. Built as a deployable vertical slice — everything you see is wired through a real peer-hosted multiplayer stack.
 
-Primary interface: the Ship System Display (SSD). Energy allocation, damage, subsystems, damage control, crew — all live on a ship schematic the player plays *with*, not a pop-out screen.
+It's an homage to tabletop starship combat (Star Fleet Battles, Federation Commander, Attack Vector: Tactical, Full Thrust, Triplanetary, Mayday/Brilliant Lances) that takes full advantage of the digital medium: continuous Newtonian movement, plot-commit-execute-debrief loops, and an SSD that the player plays *with* rather than through.
 
-Movement model: continuous Newtonian physics with rich digital planning UI (velocity arrows, ghost projections, reachable-region envelopes, quantized effect thresholds for ranges and arcs).
+## Quickstart
 
-## Current status
+Node.js 24+ required.
 
-The current repository state is the shipped `v0.2` duel build.
+```bash
+git clone https://github.com/ajeless/space-game-2.git
+cd space-game-2
+npm install
+# In one terminal:
+npm run dev:server
+# In another:
+npm run dev:client
+```
 
-- `v0.1` rules, contracts, ship data, and resolver invariants remain the gameplay baseline.
-- `v0.2` shipped the remote-play hardening pass, combat-presentation pass, and final maintenance/docs cleanup.
-- The playable browser build supports two-player peer-hosted duels, spectator/reclaim flow, replay-locked plotting, and host-authenticated match reset.
+Open http://localhost:5173 in two browser tabs to play both sides of a duel.
 
-## What this project is not
+## Gameplay
 
-- Not a 4X or empire game.
-- Not a real-time game.
-- Not setting-first.
-- Not a top-down design exercise. Scope is earned slice by slice, not planned in advance.
+<p align="center">
+  <img src="docs/assets/screenshots/02-plotting.png" width="90%" alt="Plotting a burn and aiming a weapon.">
+  <br><em>Plot your burn and aim a weapon from the ship schematic.</em>
+</p>
 
-## Working discipline
+<p align="center">
+  <img src="docs/assets/screenshots/03-combat.png" width="90%" alt="Combat in flight.">
+  <br><em>Both plots resolve animated — you watch your decisions play out.</em>
+</p>
 
-This project is built in **deployable vertical slices**. Each slice is a working, multiplayer-capable, internet-reachable version of the game that players can actually play.
+<p align="center">
+  <img src="docs/assets/screenshots/04-debrief.png" width="90%" alt="Debrief after turn resolution.">
+  <br><em>Debrief sets up the next turn with everything that just happened visible.</em>
+</p>
 
-- New features earn their place in the next slice by serving the players who are currently playing the previous slice.
-- Scope is added only when the current slice demands it. Ideas that aren't required for the next playable build are not in scope, regardless of how good they are.
-- Mechanical design is prioritized. Setting decisions are made only as needed to support mechanics, and only to the minimum extent required.
-- Infrastructure is earned. No server until the game is good enough that peer-hosting becomes the bottleneck.
+## How it works
 
-## v0.1 slice target
+Three layers:
 
-The first deployable release. Everything below is required; anything not listed is out of scope.
+- **Client** — vanilla TypeScript + DOM. No framework. Plot authoring, tactical camera, SSD renderer.
+- **Shared** — pure logic: contracts, validation, the turn resolver. No DOM, no filesystem, no wall clock.
+- **Server** — Node + `ws`. Peer-authoritative host. Resolves turns and broadcasts results.
 
-- **Two identical ships in space.** Symmetric. Fairness is free when both sides are the same.
-- **Continuous Newtonian movement** with planning UI: velocity arrows, ghost projections, draggable thrust handles, reachable-region envelopes, collision/constraint feedback.
-- **Minimal SSD** with four core systems (drive, reactor, bridge, one weapon mount) plus hull tracking. Energy allocation exists but is simple. Damage exists but is simple.
-- **One weapon type** — direct-fire. No seekers, no EW, no point defense.
-- **Full plot-commit-execute-debrief loop.** Even if each phase is thin, all four phases exist.
-- **Win condition.** One ship destroyed, or one ship disengages past a map boundary.
-- **Peer-hosted networked multiplayer via tunnel** (Cloudflare Tunnel or equivalent). No dedicated server. One player hosts; the other connects via shared link.
-- **Replays as deterministic artifacts.** Seed plus plot log reproduces the battle. Shareable as files.
+See [docs/design/architecture.md](docs/design/architecture.md) for layer diagrams and the turn-loop sequence.
 
-## Architectural ordering
+## Built with
 
-The sequence in which capabilities are added matters. These are the ordering commitments:
+<p align="center">
+  <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white"></a>
+  <a href="https://nodejs.org/"><img alt="Node.js" src="https://img.shields.io/badge/Node.js-5FA04E?logo=nodedotjs&logoColor=white"></a>
+  <a href="https://vitejs.dev/"><img alt="Vite" src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white"></a>
+  <a href="https://vitest.dev/"><img alt="Vitest" src="https://img.shields.io/badge/Vitest-6E9F18?logo=vitest&logoColor=white"></a>
+  <a href="https://playwright.dev/"><img alt="Playwright" src="https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white"></a>
+  <a href="https://github.com/websockets/ws"><img alt="ws" src="https://img.shields.io/badge/ws-8-000000?logo=websocket"></a>
+  <a href="https://github.com/dubzzz/fast-check"><img alt="fast-check" src="https://img.shields.io/badge/fast--check-property%20tests-FF6B6B"></a>
+</p>
 
-- **Networked peer-hosted multiplayer is first.** This is the v0.1 release. All later modes ride on this foundation.
-- **AI opponent in networked-style comes after human-vs-human works.** The AI is another participant from the protocol's perspective; the networking layer is already proven.
-- **Hot-seat comes after networked play.** Hot-seat is structurally harder than networked play in WEGO (secret-state management on a shared screen, physical handoff, social awkwardness). Building networked-first produces a cleaner foundation; hot-seat rides on top of it. Hot-seat is *not* part of the initial slices.
-- **Dedicated server comes when peer-hosting is the actual bottleneck.** Not before. The game must be good enough that the friction of peer-hosting is a real problem players complain about.
-- **Campaign, persistence, and other single-player modes come later still.** Each is earned by a later release.
+- [**TypeScript**](https://www.typescriptlang.org/) — strict static types across client, server, and shared code.
+- [**Node.js**](https://nodejs.org/) — host server runtime; version 24+ required.
+- [**Vite**](https://vitejs.dev/) — client development server and production bundler.
+- [**Vitest**](https://vitest.dev/) — unit tests, contract tests, property tests. 87 tests across the suite.
+- [**Playwright**](https://playwright.dev/) — browser regression suite covering real duel flows.
+- [**ws**](https://github.com/websockets/ws) — peer-to-peer WebSocket transport.
+- [**fast-check**](https://github.com/dubzzz/fast-check) — property-based testing for resolver determinism.
 
-## Current docs
+## Inspiration
 
-- [Stack decision](docs/design/stack_decision.md)
-- [Resolver design](docs/design/resolver_design.md)
-- [Ship definition format](docs/design/ship_definition_format.md)
-- [SSD layout](docs/design/ssd_layout.md)
-- [Planner UI and tactical camera](docs/design/planner_ui_and_tactical_camera.md)
-- [v0.1 data contracts](docs/design/v0_1_data_contracts.md)
-- [v0.1 tuning baseline](docs/design/v0_1_tuning_baseline.md)
-- [Plan and deferred work](PLAN.md)
+Burn Vector is an homage to the tabletop tactical starship-combat lineage:
 
-## Guides
+- Star Fleet Battles (Amarillo Design Bureau)
+- Federation Commander (ADB)
+- Attack Vector: Tactical (Ad Astra Games)
+- Full Thrust (Ground Zero Games)
+- Triplanetary (GDW / Steve Jackson Games)
+- Mayday / Brilliant Lances (GDW)
 
-- [Developer: layout and hit model](docs/developer/layout_and_hit_model.md)
-- [Developer: remote play runbook](docs/developer/remote_play_runbook.md)
-- [Player: ship layout and damage](docs/player/ship_layout_and_damage.md)
-- [Player: user manual](docs/player/user_manual.md)
+If you came up on any of those, you'll recognize the DNA.
 
-## Deferred work
+## Status
 
-Backlog, deferred design questions, and post-`v0.2` work now live in [PLAN.md](PLAN.md). Keeping that material in one place is intentional; the rest of the docs describe shipped behavior and current contracts.
+**v0.3 — maintenance mode.** Feature development is retired; the project stands as a portfolio artifact showcasing a full-stack TypeScript game prototype with deterministic-resolver architecture, peer-hosted multiplayer, and a comprehensive test suite.
 
-## Preserved prior ideation
+See [CHANGELOG.md](CHANGELOG.md) for version history and [PLAN.md](PLAN.md) for the parked-work record.
 
-Earlier ideation explored setting, IP direction, faction architecture, cosmology, and many other creative directions. The preserved creative artifact still lives in the archive docs repo:
+## License
 
-- <https://github.com/ajeless/docs/blob/main/sg/space_game_1/idea_capture.md>
-
-**It is not binding on this project.** Design decisions here start fresh. Ideas from the preserved doc may be drawn on when useful, but they are not commitments, and scope here is not pre-allocated to honor them.
+[MIT](LICENSE) © 2026 ajeless
