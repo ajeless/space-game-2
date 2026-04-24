@@ -183,6 +183,38 @@ describe("MatchSession", () => {
     expect(resolved.session.battle_state.turn_number).toBe(2);
   });
 
+  it("ignores a stale reconnect token once the grace period has expired and assigns a fresh slot", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+    let now = 1_000;
+    const session = new MatchSession(battleState, {
+      reconnect_grace_ms: 50,
+      now: () => now
+    });
+
+    const alphaIdentity = session.connectClient("client_1").identity;
+    session.disconnectClient("client_1");
+    now += 100;
+
+    const resumeAttempt = session.connectClient("client_2", alphaIdentity.reconnect_token);
+
+    expect(resumeAttempt.identity.ship_instance_id).toBe("alpha_ship");
+    expect(resumeAttempt.identity.reconnect_token).not.toBe(alphaIdentity.reconnect_token);
+    expect(resumeAttempt.displaced_client_id).toBeNull();
+  });
+
+  it("rejects slot claims for unknown slots and slots that are already occupied", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+    const session = new MatchSession(battleState);
+
+    session.connectClient("client_1");
+    session.connectClient("client_2");
+    const spectatorIdentity = session.connectClient("client_3").identity;
+
+    expect(spectatorIdentity.role).toBe("spectator");
+    expect(() => session.claimSlot("client_3", "charlie" as never)).toThrow("unknown slot");
+    expect(() => session.claimSlot("client_3", "alpha")).toThrow("already occupied");
+  });
+
   it("rejects server-side plot submission after the match has already ended", async () => {
     const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
     const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/alpha_turn_1.json"), battleState);
