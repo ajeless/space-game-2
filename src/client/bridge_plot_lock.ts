@@ -1,3 +1,7 @@
+// Computes whether the local bridge should lock plot interaction (link down, plot submitted, or replay in flight).
+// Depends on: shared session types and resolution_playback steps. Consumed by: src/client/main.ts and bridge_presenters.
+// Invariant: lock state is derived; never persist it — recompute from session + link + playback on every render.
+
 import type { MatchSessionView, SessionIdentity, ShipInstanceId } from "../shared/index.js";
 import type { ResolutionPlaybackStep } from "./resolution_playback.js";
 

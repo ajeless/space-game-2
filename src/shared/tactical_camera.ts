@@ -1,3 +1,7 @@
+// Builds the tactical camera (center, world/pixel scale, scale-bar label) from the battlefield boundary, ships, and current plot preview.
+// Depends on: shared contracts and plot_preview. Consumed by: src/client/main.ts, tactical_view, and tactical_math.
+// Invariant: worldToTacticalViewport and tacticalViewportToWorld must remain exact inverses — drag UX depends on it.
+
 import type { BattleBoundary, BattleState, ShipInstanceId, Vector2 } from "./contracts.js";
 import type { PlotPreview } from "./plot_preview.js";
 

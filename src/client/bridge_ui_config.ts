@@ -1,3 +1,6 @@
+// UI layout constants for the schematic viewport, tactical viewport, plot handles, and optional zoom controls toggle.
+// Depends on: nothing. Consumed by: tactical_view, tactical_math, schematic_view, and src/client/main.ts.
+
 export const SCHEMATIC_VIEWPORT = {
   width: 420,
   height: 620,

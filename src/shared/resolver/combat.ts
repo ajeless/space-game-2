@@ -1,3 +1,7 @@
+// Weapon targeting, arc evaluation, hit probability, and impact resolution for the sub-tick resolver.
+// Depends on: shared contracts, derived accessors, determinism, and resolver math. Consumed by: the events and planning phases.
+// Invariant: every non-deterministic roll routes through sampleUnitInterval for replayability.
+
 import type {
   BattleState,
   ShipConfig,

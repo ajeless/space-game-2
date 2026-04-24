@@ -1,3 +1,6 @@
+// Reads and validates the server's environment-driven configuration (host, port, fixture path, admin token, reconnect grace).
+// Depends on: nothing. Consumed by: src/server/app.ts.
+
 const DEFAULT_BATTLE_STATE_FIXTURE = "fixtures/battle_states/default_duel_turn_1.json";
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 8000;

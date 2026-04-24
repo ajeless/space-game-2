@@ -1,3 +1,7 @@
+// Browser entry point: owns client state, renders the bridge shell, and wires network and input.
+// Depends on: every other file in src/client/ plus shared contracts. Consumed by: Vite bundler via index.html.
+// Invariant: every state change that should be visible must be followed by render() before the handler returns.
+
 import "./style.css";
 import {
   renderActionStripControls,
@@ -7,6 +11,8 @@ import {
   renderReadoutStrip,
   renderTacticalCameraControls
 } from "./bridge_shell_view.js";
+import { connectBridgeWebSocket, type BridgeConnection } from "./bridge_connection.js";
+import { createGlobalHotkeyHandler } from "./bridge_hotkeys.js";
 import {
   applyResolutionPlaybackStepToBattleState,
   buildResolutionPlaybackState,
@@ -114,8 +120,7 @@ let health: HealthResponse | null = null;
 let wsState: BridgeLinkState = "connecting";
 let identity: SessionIdentity | null = null;
 let session: MatchSessionView | null = null;
-let socket: WebSocket | null = null;
-let reconnectTimer: number | null = null;
+let connection: BridgeConnection | null = null;
 let plotDraft: PlotDraft | null = null;
 let selectedSystemId: SystemId | null = null;
 let tacticalCameraSelection: TacticalCameraSelection = createDefaultTacticalCameraSelection();
@@ -479,7 +484,21 @@ function handleGlobalTacticalPointerEnd(event: PointerEvent): void {
 window.addEventListener("pointermove", handleGlobalTacticalPointerMove);
 window.addEventListener("pointerup", handleGlobalTacticalPointerEnd);
 window.addEventListener("pointercancel", handleGlobalTacticalPointerEnd);
-window.addEventListener("keydown", handleGlobalKeydown);
+window.addEventListener(
+  "keydown",
+  createGlobalHotkeyHandler({
+    hasActiveTacticalDrag: () => activeTacticalDrag !== null,
+    hasSelectedSystem: () => selectedSystemId !== null,
+    canSubmitPlot: () =>
+      identity !== null &&
+      identity.role === "player" &&
+      !isMatchEnded(session) &&
+      !getCurrentPlotInteractionLocked(session, identity),
+    onClearSelectedSystem: clearSelectedSystem,
+    onResetPlotDraft: resetCurrentPlotDraft,
+    onSubmitPlot: submitCurrentPlot
+  })
+);
 
 function getRectangleBoundary(sessionValue: MatchSessionView): RectangleBoundary | null {
   const boundary = sessionValue.battle_state.match_setup.battlefield.boundary;
@@ -536,7 +555,7 @@ function resetCurrentPlotDraft(): void {
 }
 
 function submitCurrentPlot(): void {
-  if (!socket || socket.readyState !== WebSocket.OPEN || !session) {
+  if (!connection || !connection.isOpen() || !session) {
     return;
   }
 
@@ -553,12 +572,10 @@ function submitCurrentPlot(): void {
 
     const plot = buildPlotSubmissionFromDraft(session.battle_state, summary.draft);
 
-    socket.send(
-      JSON.stringify({
-        type: "submit_plot",
-        plot
-      })
-    );
+    connection.send({
+      type: "submit_plot",
+      plot
+    });
     optimisticSubmittedPlot = {
       ship_instance_id: plot.ship_instance_id,
       turn_number: plot.turn_number
@@ -568,51 +585,6 @@ function submitCurrentPlot(): void {
   } catch (error) {
     logMessage(error instanceof Error ? error.message : "failed to build plot");
     render();
-  }
-}
-
-function shouldIgnoreGlobalHotkeys(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  return Boolean(target.closest("input, select, textarea, button, [contenteditable='true']"));
-}
-
-function handleGlobalKeydown(event: KeyboardEvent): void {
-  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.repeat || activeTacticalDrag) {
-    return;
-  }
-
-  if (shouldIgnoreGlobalHotkeys(event.target)) {
-    return;
-  }
-
-  if (event.key === "Escape") {
-    if (selectedSystemId !== null) {
-      event.preventDefault();
-      clearSelectedSystem();
-    }
-    return;
-  }
-
-  if (!identity || identity.role !== "player" || isMatchEnded(session)) {
-    return;
-  }
-
-  if (getCurrentPlotInteractionLocked(session, identity)) {
-    return;
-  }
-
-  if (event.code === "KeyR") {
-    event.preventDefault();
-    resetCurrentPlotDraft();
-    return;
-  }
-
-  if (event.code === "Space") {
-    event.preventDefault();
-    submitCurrentPlot();
   }
 }
 
@@ -797,16 +769,14 @@ function render(): void {
       hostToolsOpen = isOpen;
     },
     onClaimSlot: (slotId) => {
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
+      if (!connection || !connection.isOpen()) {
         return;
       }
 
-      socket.send(
-        JSON.stringify({
-          type: "claim_slot",
-          slot_id: slotId
-        })
-      );
+      connection.send({
+        type: "claim_slot",
+        slot_id: slotId
+      });
       logMessage(`claim requested · ${slotId}`);
       render();
     },
@@ -861,10 +831,7 @@ function handleServerMessage(message: ServerToClientMessage): void {
     identity = message.identity;
     session = message.session;
     writeStoredValue(RECONNECT_TOKEN_STORAGE_KEY, message.identity.reconnect_token);
-    if (reconnectTimer !== null) {
-      window.clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
+    connection?.cancelPendingReconnect();
     syncResolutionPlayback(session, previousBattleState);
     logMessage(
       `hello received · ${message.identity.role}${message.identity.slot_id ? ` · ${message.identity.slot_id}` : ""}`
@@ -911,50 +878,14 @@ function handleServerMessage(message: ServerToClientMessage): void {
   }
 }
 
-function connectWebSocket(): void {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const reconnectToken = readStoredValue(RECONNECT_TOKEN_STORAGE_KEY);
-  const url = new URL(`${protocol}//${window.location.host}/ws`);
-
-  if (reconnectToken) {
-    url.searchParams.set("reconnectToken", reconnectToken);
-  }
-
-  socket = new WebSocket(url.toString());
-
-  socket.addEventListener("open", () => {
-    wsState = "connected";
-    render();
-  });
-
-  socket.addEventListener("message", (event) => {
-    const message = JSON.parse(event.data) as ServerToClientMessage;
-    handleServerMessage(message);
-  });
-
-  socket.addEventListener("close", (event) => {
-    wsState = "closed";
-    if (event.code !== 4001) {
-      logMessage("link closed");
-    }
-    if (event.code !== 4001 && reconnectTimer === null) {
-      reconnectTimer = window.setTimeout(() => {
-        reconnectTimer = null;
-        wsState = "connecting";
-        render();
-        connectWebSocket();
-      }, 1000);
-    }
-    render();
-  });
-
-  socket.addEventListener("error", () => {
-    wsState = "error";
-    logMessage("link error");
-    render();
-  });
-}
-
 render();
 void loadHealth();
-connectWebSocket();
+connection = connectBridgeWebSocket({
+  getReconnectToken: () => readStoredValue(RECONNECT_TOKEN_STORAGE_KEY),
+  onLinkStateChange: (state) => {
+    wsState = state;
+    render();
+  },
+  onServerMessage: handleServerMessage,
+  onLogMessage: logMessage
+});

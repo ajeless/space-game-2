@@ -1,3 +1,7 @@
+// Simulates a PlotDraft against the resolver's motion model to produce a path, projected pose, and weapon fire-cues.
+// Depends on: resolver math/motion, planned_shots, and plot_authoring. Consumed by: src/client/main.ts and tactical_view.
+// Invariant: the preview reuses the resolver phases so the displayed path matches the authoritative resolution.
+
 import type {
   BattleState,
   PlotSubmission,

@@ -1,3 +1,7 @@
+// Client-only math for translating pointer events into world-space plot updates and for centring the replay camera.
+// Depends on: shared TacticalCamera/Vector2 types, bridge_ui_config viewport constants, resolution_playback state. Consumed by: src/client/main.ts and tactical_view.
+// Invariant: functions are pure and must not read the DOM directly; pass in bounds/positions explicitly.
+
 import type { ShipInstanceId, TacticalCamera, Vector2 } from "../shared/index.js";
 import { TACTICAL_PLOT_HANDLES, TACTICAL_VIEWPORT } from "./bridge_ui_config.js";
 import type { ResolutionPlaybackState, ResolutionPlaybackStep } from "./resolution_playback.js";

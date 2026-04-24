@@ -1,3 +1,7 @@
+// Authoritative match session: seat claims, reconnect reservations, plot intake, and turn resolution on the server.
+// Depends on: shared contracts, resolver, and validation. Consumed by: src/server/app.ts.
+// Invariant: every external mutation returns a fresh MatchSessionView — callers must not mutate the view they receive.
+
 import { randomUUID } from "node:crypto";
 import type { BattleState, PlotSubmission, ShipInstanceId, SlotId } from "../shared/contracts.js";
 import { resolve, validateBattleState, validatePlotSubmission } from "../shared/index.js";

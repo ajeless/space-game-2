@@ -1,3 +1,7 @@
+// Geometry primitives used by the resolver and plot preview: vector ops, angle math, and hull-local transforms.
+// Depends on: shared contracts (Vector2 and ship pose). Consumed by: resolver phases, combat, motion, planned_shots, and plot_preview.
+// Invariant: functions are pure — they never read battle state or mutate the inputs they are passed.
+
 import type { ShipRuntimeState, Vector2 } from "../contracts.js";
 
 export function clamp(value: number, min: number, max: number): number {

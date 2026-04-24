@@ -1,0 +1,49 @@
+/* Design tokens, resets, and page-level surface for the Burn Vector bridge.
+   Depends on: nothing. Consumed by: style.css (loaded first so every later layer inherits the variables).
+*/
+
+:root {
+  color-scheme: dark;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --bg-0: #04111a;
+  --bg-1: #081a28;
+  --bg-2: #0d2232;
+  --bg-3: #122b3f;
+  --line-0: rgba(136, 172, 201, 0.16);
+  --line-1: rgba(136, 172, 201, 0.28);
+  --line-2: rgba(136, 172, 201, 0.42);
+  --text-0: #d8e3eb;
+  --text-1: #a4bacb;
+  --text-2: #7ea5c4;
+  --ok: #7ad39b;
+  --warn: #f2c879;
+  --weapon: #c48a2b;
+  --reactor: #3880cc;
+  --bridge: #238469;
+  --drive: #8f8a82;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(36, 86, 124, 0.34), transparent 24%),
+    radial-gradient(circle at right center, rgba(19, 62, 86, 0.22), transparent 28%),
+    linear-gradient(180deg, var(--bg-0) 0%, #051521 100%);
+  color: var(--text-0);
+}
+
+body.is-plot-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+#app {
+  height: 100vh;
+  padding: 10px;
+}

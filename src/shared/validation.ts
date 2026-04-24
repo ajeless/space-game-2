@@ -1,3 +1,7 @@
+// Runtime validators for BattleState and PlotSubmission payloads crossing the wire or loaded from JSON fixtures.
+// Depends on: shared contracts and derived accessors. Consumed by: src/server/**, src/client/bridge_storage.ts, and every resolver entry.
+// Invariant: every validator throws ValidationError on any contract violation — callers may assume validated inputs are sound.
+
 import {
   SCHEMA_VERSION,
   type BaseSystemConfig,

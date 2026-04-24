@@ -1,3 +1,7 @@
+// Node host: serves the built client, exposes /api/health and /api/session/reset, and hosts the /ws WebSocket bridge.
+// Depends on: ws package, server/config, server/session, and shared contracts/network types. Consumed by: src/server/index.ts.
+// Invariant: all authoritative mutation flows through MatchSession; request handlers must not touch battle state directly.
+
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse, Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";

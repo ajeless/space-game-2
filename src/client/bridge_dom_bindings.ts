@@ -1,3 +1,7 @@
+// Wires event handlers onto the rendered bridge DOM after each render().
+// Depends on: shared plot-authoring mutators and contracts. Consumed by: src/client/main.ts.
+// Invariant: all callbacks must tolerate being fired after a subsequent render() replaces the DOM.
+
 import {
   clearPlotDraftWeaponIntent,
   setPlotDraftStationKeeping,

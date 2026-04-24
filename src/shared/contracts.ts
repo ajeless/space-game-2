@@ -1,3 +1,7 @@
+// Canonical type contracts for the battle state, ship configs, plot submissions, and resolver events.
+// Depends on: nothing. Consumed by: every other file in src/shared/ plus both client and server.
+// Invariant: any change to these shapes must also update validation.ts and the schema version.
+
 export const SCHEMA_VERSION = "sg2/v0.1" as const;
 
 export type SchemaVersion = typeof SCHEMA_VERSION;

@@ -1,3 +1,6 @@
+// State-updates phase: folds the sub-tick's events into the battle state (hits, subsystem state changes, terminal outcomes).
+// Depends on: resolver combat label helper and resolver event types. Consumed by: resolver/sub_tick.ts.
+
 import type { BattleState, PlotSubmission, ShipInstanceId } from "../../contracts.js";
 import { getSubsystemStateLabel } from "../combat.js";
 import type { ResolverEvent } from "../types.js";

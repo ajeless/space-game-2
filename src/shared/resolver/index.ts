@@ -1,3 +1,7 @@
+// Resolver entry point: validates inputs, runs every sub-tick, appends the turn_ended event, and returns the next state.
+// Depends on: shared validation, planned_shots, sub_tick runner, and resolver types. Consumed by: src/server/session.ts and tests.
+// Invariant: resolve() never mutates its input; the returned next_state is a fresh structured clone.
+
 import type { BattleState, PlotSubmission, ShipInstanceId } from "../contracts.js";
 import { validateBattleState, validatePlotSubmission } from "../validation.js";
 import { buildPlannedShots } from "./planned_shots.js";

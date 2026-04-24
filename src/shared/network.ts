@@ -1,3 +1,7 @@
+// Wire types for the bridge WebSocket: the client/server message union, session identity, and match session view payloads.
+// Depends on: shared contracts and resolver event types. Consumed by: src/server/app.ts and src/client/main.ts.
+// Invariant: changing a message shape requires a server and client update in lockstep.
+
 import type { BattleState, PlotSubmission, ShipInstanceId, SlotId } from "./contracts.js";
 import type { ResolverEvent } from "./resolver/types.js";
 

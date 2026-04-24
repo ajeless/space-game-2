@@ -1,0 +1,89 @@
+/* Responsive overrides for narrow viewports. Imported last so media queries win where they should.
+   Depends on: every preceding layer. Consumed by: style.css.
+*/
+
+@media (max-width: 1180px) {
+  .bridge-main {
+    grid-template-columns: 1fr;
+  }
+
+  .bridge-shell {
+    height: auto;
+  }
+
+  body,
+  #app {
+    height: auto;
+    overflow: auto;
+  }
+
+  .action-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .action-strip__controls {
+    justify-content: flex-start;
+  }
+
+  .ssd-control-grid,
+  .ssd-mount-card__controls,
+  .ssd-selected-panel__grid,
+  .ssd-selected-panel__summary,
+  .ssd-selected-panel__controls {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .match-outcome-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 820px) {
+  #app {
+    padding: 16px;
+  }
+
+  .mission-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .mission-bar__status {
+    justify-content: flex-start;
+  }
+
+  .schematic-shell__header,
+  .tactical-panel__header {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .schematic-shell__body {
+    grid-template-rows: minmax(320px, 1fr) auto;
+  }
+
+  .tactical-panel__header-right {
+    justify-items: stretch;
+  }
+
+  .tactical-panel__meta {
+    justify-content: flex-start;
+  }
+
+  .camera-controls,
+  .camera-controls__group {
+    justify-items: start;
+  }
+
+  .camera-toggle-row {
+    justify-content: flex-start;
+  }
+
+  .ssd-control-deck {
+    margin: 0;
+  }
+}

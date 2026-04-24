@@ -1,0 +1,504 @@
+/* Ship schematic (SSD) viewport, system glyphs, control deck, and selected-system panels.
+   Depends on: base.css tokens and layout.css panel shells. Consumed by: style.css.
+*/
+
+.schematic-shell,
+.tactical-panel__header {
+  display: grid;
+  gap: 12px;
+}
+
+.schematic-shell {
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.schematic-shell__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.schematic-shell__header-main {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.schematic-shell__body {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(8px, 1fr) auto;
+  gap: 10px;
+}
+
+.schematic-shell__header h2,
+.tactical-panel__header h2,
+.console-panel h2 {
+  margin: 4px 0 0;
+  font-size: 1.08rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.schematic-shell__header p,
+.console-panel p {
+  margin: 0;
+  color: var(--text-1);
+}
+
+.ssd-viewport {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line-0);
+  background:
+    radial-gradient(circle at 50% 28%, rgba(39, 86, 118, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(7, 18, 29, 0.98), rgba(5, 14, 23, 0.98));
+  min-height: 0;
+  height: 100%;
+}
+
+.ssd-viewport svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ssd-viewport__frame {
+  fill: rgba(8, 21, 33, 0.82);
+  stroke: rgba(125, 176, 218, 0.22);
+  stroke-width: 2;
+}
+
+.ssd-status-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-tile {
+  min-width: 96px;
+  padding: 8px 10px;
+  border: 1px solid rgba(125, 176, 218, 0.22);
+  background: rgba(9, 24, 37, 0.88);
+}
+
+.status-tile span,
+.readout-chip span {
+  display: block;
+  color: var(--text-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.status-tile strong,
+.readout-chip strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 1rem;
+}
+
+.heading-compass {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 104px;
+  align-self: start;
+}
+
+.heading-compass svg {
+  width: 84px;
+  height: 84px;
+}
+
+.heading-compass__ring {
+  fill: rgba(9, 21, 32, 0.92);
+  stroke: rgba(125, 176, 218, 0.32);
+  stroke-width: 2;
+}
+
+.heading-compass__reference {
+  stroke: rgba(125, 176, 218, 0.34);
+  stroke-width: 2;
+}
+
+.heading-compass__needle {
+  fill: rgba(125, 213, 154, 0.94);
+}
+
+.heading-compass__value {
+  color: var(--text-1);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ssd-control-deck {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(125, 176, 218, 0.18);
+  background: linear-gradient(180deg, rgba(8, 20, 31, 0.92), rgba(6, 15, 24, 0.96));
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.32);
+}
+
+.ssd-control-deck--locked {
+  border-color: rgba(242, 200, 121, 0.24);
+  background: linear-gradient(180deg, rgba(28, 24, 15, 0.92), rgba(17, 16, 12, 0.96));
+}
+
+.ssd-control-deck__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ssd-control-deck__header strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.96rem;
+}
+
+.ssd-control-deck__status {
+  padding: 6px 8px;
+  border: 1px solid rgba(125, 176, 218, 0.24);
+  background: rgba(10, 24, 37, 0.82);
+  color: var(--text-1);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ssd-control-deck__status--pending {
+  border-color: rgba(242, 200, 121, 0.56);
+  color: rgba(242, 200, 121, 0.96);
+}
+
+.ssd-control-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  opacity: 0.82;
+}
+
+.ssd-slider-card {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px dashed rgba(125, 176, 218, 0.16);
+  background: rgba(9, 20, 31, 0.56);
+}
+
+.ssd-slider-card span,
+.ssd-inline-field span {
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.67rem;
+}
+
+.ssd-slider-card strong {
+  font-size: 0.95rem;
+}
+
+.ssd-slider-card small {
+  color: var(--text-1);
+  font-size: 0.74rem;
+}
+
+.ssd-slider-card input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: rgba(125, 213, 154, 0.95);
+}
+
+.ssd-control-summary {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.ssd-control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.ssd-control-actions .action-button {
+  width: 100%;
+}
+
+.ssd-mount-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.ssd-mount-card {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(196, 138, 43, 0.18);
+  background: rgba(18, 25, 32, 0.86);
+}
+
+.ssd-mount-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.ssd-mount-card__header strong {
+  font-size: 0.86rem;
+}
+
+.ssd-mount-card__controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ssd-inline-field {
+  display: grid;
+  gap: 4px;
+}
+
+.ssd-inline-field select {
+  width: 100%;
+  padding: 8px 9px;
+  border: 1px solid rgba(125, 176, 218, 0.2);
+  background: rgba(8, 19, 30, 0.9);
+  color: inherit;
+  font-size: 0.86rem;
+}
+
+.ssd-control-deck__note {
+  margin: 0;
+  color: var(--text-1);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.ssd-selected-panel .ssd-control-deck__note {
+  font-size: 0.79rem;
+  line-height: 1.24;
+}
+
+.ssd-selected-panel {
+  display: grid;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid rgba(125, 176, 218, 0.16);
+  background: rgba(10, 22, 34, 0.84);
+}
+
+.ssd-selected-panel--aim {
+  border-color: rgba(196, 138, 43, 0.28);
+  background: rgba(23, 19, 14, 0.84);
+}
+
+.ssd-selected-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ssd-selected-panel__header strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.95rem;
+}
+
+.ssd-selected-panel__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.ssd-selected-panel__controls .action-button {
+  min-width: 126px;
+}
+
+.ssd-selected-panel__summary,
+.ssd-selected-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.ssd-selected-summary,
+.ssd-selected-readout {
+  display: grid;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid rgba(125, 176, 218, 0.12);
+  background: rgba(7, 18, 29, 0.72);
+}
+
+.ssd-selected-summary span,
+.ssd-selected-readout span {
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.67rem;
+}
+
+.ssd-selected-summary strong,
+.ssd-selected-readout strong {
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.ssd-selected-summary--idle,
+.ssd-selected-readout {
+  border-color: rgba(125, 176, 218, 0.18);
+}
+
+.ssd-selected-summary--idle strong {
+  color: rgba(214, 228, 240, 0.98);
+}
+
+.ssd-selected-summary--armed {
+  border-color: rgba(125, 213, 154, 0.28);
+  background: rgba(13, 31, 24, 0.76);
+}
+
+.ssd-selected-summary--armed strong {
+  color: rgba(125, 213, 154, 0.98);
+}
+
+.ssd-selected-summary--warn {
+  border-color: rgba(242, 200, 121, 0.28);
+  background: rgba(38, 26, 15, 0.76);
+}
+
+.ssd-selected-summary--warn strong {
+  color: rgba(255, 206, 149, 0.98);
+}
+
+.ssd-selected-summary--disabled {
+  border-color: rgba(236, 126, 116, 0.24);
+  background: rgba(35, 20, 18, 0.76);
+}
+
+.ssd-selected-summary--disabled strong {
+  color: rgba(255, 181, 133, 0.98);
+}
+
+.ssd-hull__shape {
+  fill: rgba(103, 133, 157, 0.14);
+  stroke: rgba(186, 208, 222, 0.5);
+  stroke-width: 2;
+}
+
+.ssd-hull__spine {
+  stroke: rgba(186, 208, 222, 0.22);
+  stroke-width: 2;
+}
+
+.ssd-system__body {
+  stroke-width: 1.8;
+  pointer-events: none;
+}
+
+.ssd-system {
+  cursor: pointer;
+}
+
+.ssd-system__hit {
+  fill: transparent;
+}
+
+.ssd-system__label,
+.ssd-system__meta {
+  fill: var(--text-0);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.ssd-system__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.ssd-system__meta {
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+
+.ssd-system--weapon_mount .ssd-system__body {
+  fill: rgba(105, 68, 17, 0.48);
+  stroke: rgba(196, 138, 43, 0.82);
+}
+
+.ssd-system--reactor .ssd-system__body {
+  fill: rgba(22, 58, 96, 0.5);
+  stroke: rgba(56, 128, 204, 0.84);
+}
+
+.ssd-system--bridge .ssd-system__body {
+  fill: rgba(17, 69, 56, 0.5);
+  stroke: rgba(35, 132, 105, 0.84);
+}
+
+.ssd-system--drive .ssd-system__body {
+  fill: rgba(58, 57, 53, 0.5);
+  stroke: rgba(143, 138, 130, 0.84);
+}
+
+.ssd-system--degraded .ssd-system__body {
+  fill-opacity: 0.72;
+  stroke-dasharray: 5 4;
+}
+
+.ssd-system--offline .ssd-system__body {
+  fill-opacity: 0.38;
+  stroke-opacity: 0.48;
+}
+
+.ssd-system--selected .ssd-system__body {
+  stroke: rgba(242, 200, 121, 0.98);
+  filter: drop-shadow(0 0 8px rgba(242, 200, 121, 0.18));
+}
+
+.ssd-system--selected .ssd-system__meta {
+  fill: rgba(242, 200, 121, 0.96);
+}
+
+.ssd-system--armed .ssd-system__body {
+  stroke: rgba(125, 213, 154, 0.96);
+  filter: drop-shadow(0 0 6px rgba(125, 213, 154, 0.14));
+}
+
+.ssd-system--armed .ssd-system__meta {
+  fill: rgba(125, 213, 154, 0.96);
+}
+
+.ssd-system--recent-hit .ssd-system__body {
+  stroke: rgba(236, 126, 116, 0.98);
+  fill: rgba(80, 28, 24, 0.82);
+}
+
+.ssd-system--recent-hit .ssd-system__meta {
+  fill: rgba(236, 126, 116, 0.98);
+}
+
+.ssd-system--critical-hit .ssd-system__body {
+  stroke: rgba(255, 178, 120, 1);
+  fill: rgba(97, 39, 17, 0.86);
+  filter: drop-shadow(0 0 10px rgba(255, 178, 120, 0.24));
+}
+
+.ssd-system--critical-hit .ssd-system__meta {
+  fill: rgba(255, 206, 149, 1);
+}

@@ -1,3 +1,7 @@
+// Turn-scoped shot planning: picks the best sub-tick for each weapon mount given the projected motion of both ships.
+// Depends on: resolver combat, motion, math, and shared derivations. Consumed by: resolver/index.ts and plot_preview.
+// Invariant: the returned map is keyed by getPlannedShotKey(shipId, mountId) and is stable for a given input pair.
+
 import type { BattleState, PlotSubmission, ShipInstanceId, ShipRuntimeState } from "../contracts.js";
 import { getShipConfig, getSystemConfig } from "../derived.js";
 import { evaluateWeaponOpportunity } from "./combat.js";

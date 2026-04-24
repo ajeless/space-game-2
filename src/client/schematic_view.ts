@@ -1,3 +1,7 @@
+// Renders the ship-schematic panel: the SSD viewport, status tiles, control deck, and selected-system detail.
+// Depends on: shared derivations, bridge_ui_config, combat_readability labels, and tactical_math angle helpers. Consumed by: src/client/main.ts.
+// Invariant: the function only produces HTML and must not read or mutate module state.
+
 import { getAvailableReactorPips, getSystemStateAndEffects } from "../shared/index.js";
 import { SCHEMATIC_VIEWPORT } from "./bridge_ui_config.js";
 import type {

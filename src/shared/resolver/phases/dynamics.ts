@@ -1,3 +1,6 @@
+// Dynamics phase: applies each ship's thrust/heading plan for the current sub-tick and emits thrust_applied events.
+// Depends on: resolver motion model and resolver types. Consumed by: resolver/sub_tick.ts.
+
 import type { BattleState, PlotSubmission, ShipInstanceId, ShipRuntimeState, Vector2 } from "../../contracts.js";
 import type { ResolverEvent, ThrustAppliedEvent } from "../types.js";
 import { advanceShipCoasting, advanceShipDynamics } from "../motion.js";

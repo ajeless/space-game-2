@@ -1,0 +1,177 @@
+/* Footer strip, resolution progress bar, host-tools disclosure, and resolution feed list.
+   Depends on: base.css tokens. Consumed by: style.css.
+*/
+
+.footer-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 8px;
+  padding: 0 12px 10px;
+  align-items: stretch;
+}
+
+.footer-strip__cell {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 3px;
+  min-height: 118px;
+  padding: 7px 9px;
+  border: 1px solid var(--line-0);
+  background: rgba(11, 24, 36, 0.68);
+  align-content: start;
+}
+
+.footer-strip__cell strong {
+  min-width: 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.3;
+}
+
+.footer-strip__meta {
+  color: var(--text-2);
+  font-size: 0.76rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resolution-progress {
+  margin-top: 4px;
+}
+
+.resolution-progress__bar {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border: 1px solid rgba(125, 176, 218, 0.14);
+  background: rgba(7, 18, 29, 0.9);
+  overflow: hidden;
+}
+
+.resolution-progress__fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(125, 176, 218, 0.38), rgba(173, 236, 245, 0.82));
+}
+
+.host-tools {
+  margin-top: 6px;
+  align-self: start;
+}
+
+.host-tools__toggle {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 1px solid rgba(125, 176, 218, 0.22);
+  background: rgba(15, 33, 49, 0.72);
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.host-tools__toggle::-webkit-details-marker {
+  display: none;
+}
+
+.host-tools__toggle:hover {
+  border-color: rgba(125, 176, 218, 0.46);
+}
+
+.host-tools__copy {
+  display: grid;
+  gap: 2px;
+}
+
+.host-tools__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.host-tools__hint {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.host-tools__chevron {
+  color: var(--text-2);
+  font-size: 0.78rem;
+  transition: transform 120ms ease;
+}
+
+.host-tools[open] .host-tools__chevron {
+  transform: rotate(180deg);
+}
+
+.host-tools__menu {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(125, 176, 218, 0.12);
+}
+
+.resolution-feed {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-height: calc(1.3em * 4 + 9px);
+  color: var(--text-1);
+  font-size: 0.78rem;
+}
+
+.resolution-feed li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  line-height: 1.3;
+  align-items: start;
+}
+
+.resolution-feed__item {
+  padding: 3px 0;
+  color: var(--text-1);
+}
+
+.resolution-feed__item--active {
+  color: var(--text-0);
+}
+
+.resolution-feed__item--active .resolution-feed__summary {
+  color: var(--text-0);
+  font-weight: 600;
+}
+
+.resolution-feed__step {
+  color: var(--text-2);
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.resolution-feed__summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resolution-feed--empty {
+  color: var(--text-2);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}

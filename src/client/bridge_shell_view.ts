@@ -1,3 +1,7 @@
+// HTML template builders for the overall bridge shell: mission bar, action strip, footer strip, and match-outcome banner.
+// Depends on: only the view-model shapes declared locally. Consumed by: src/client/main.ts.
+// Invariant: every function returns a string of sanitised HTML; do not inline raw, untrusted text.
+
 type MatchOutcomePresentation = {
   tone: "victory" | "defeat" | "neutral";
   headline: string;

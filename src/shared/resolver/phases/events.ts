@@ -1,3 +1,6 @@
+// Events phase: consumes the sub-tick sensing snapshot, rolls hits via the determinism helper, and emits weapon/impact events.
+// Depends on: resolver combat, determinism, and sensing snapshot types. Consumed by: resolver/sub_tick.ts.
+
 import type { BattleState, PlotSubmission, ShipInstanceId } from "../../contracts.js";
 import { resolveImpact } from "../combat.js";
 import { sampleUnitInterval } from "../determinism.js";

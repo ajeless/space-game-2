@@ -1,0 +1,191 @@
+/* Action strip, match outcome banner, readout strip, commit strip, and the action-button family.
+   Depends on: base.css tokens. Consumed by: style.css.
+*/
+
+.action-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--line-0);
+  align-items: center;
+}
+
+.match-outcome-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin: 10px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(125, 176, 218, 0.2);
+  background: rgba(12, 28, 42, 0.74);
+}
+
+.match-outcome-banner--victory {
+  border-color: rgba(125, 213, 154, 0.44);
+  background: rgba(18, 42, 33, 0.82);
+}
+
+.match-outcome-banner--defeat {
+  border-color: rgba(236, 126, 116, 0.42);
+  background: rgba(46, 22, 20, 0.84);
+}
+
+.match-outcome-banner__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.match-outcome-banner__copy strong {
+  font-size: 1rem;
+}
+
+.match-outcome-banner__copy p,
+.match-outcome-banner__hint {
+  margin: 0;
+  color: var(--text-1);
+  font-size: 0.84rem;
+}
+
+.readout-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.readout-chip {
+  min-width: 104px;
+  padding: 6px 9px;
+  border: 1px solid rgba(125, 176, 218, 0.18);
+  background: rgba(10, 24, 37, 0.78);
+}
+
+.action-strip__controls {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.commit-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.commit-strip--spectator {
+  justify-content: space-between;
+  width: 100%;
+}
+
+.commit-strip--ended {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.commit-strip__status {
+  display: grid;
+  gap: 3px;
+  margin-right: 6px;
+}
+
+.commit-strip__status strong {
+  font-size: 0.92rem;
+}
+
+.commit-strip__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-button {
+  min-width: 0;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid rgba(125, 176, 218, 0.34);
+  background: linear-gradient(180deg, rgba(21, 49, 72, 0.95), rgba(12, 31, 47, 0.95));
+  color: inherit;
+  text-align: left;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.action-button--primary {
+  border-color: rgba(125, 213, 154, 0.42);
+  background: linear-gradient(180deg, rgba(27, 66, 54, 0.96), rgba(15, 41, 33, 0.96));
+}
+
+.action-button--secondary {
+  background: linear-gradient(180deg, rgba(18, 41, 60, 0.95), rgba(10, 24, 37, 0.95));
+}
+
+.action-button--danger {
+  border-color: rgba(236, 126, 116, 0.42);
+  background: linear-gradient(180deg, rgba(59, 28, 25, 0.96), rgba(34, 17, 16, 0.96));
+}
+
+.action-button--compact {
+  padding: 7px 9px;
+  font-size: 0.8rem;
+}
+
+.action-button:hover {
+  border-color: rgba(125, 176, 218, 0.72);
+}
+
+.action-button:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+.action-button:disabled:hover {
+  border-color: rgba(125, 176, 218, 0.34);
+}
+
+.action-button > span,
+.action-button > small {
+  display: block;
+}
+
+.action-button .action-button__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.action-button__label {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.action-button__hotkey {
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.action-button__hint {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.action-button small,
+.action-strip__note {
+  margin: 0;
+  margin-top: 4px;
+  color: var(--text-1);
+}
+
+.action-button .action-button__hotkey,
+.action-button .action-button__hint {
+  margin-top: 0;
+  color: var(--text-2);
+}

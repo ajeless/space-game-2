@@ -1,3 +1,7 @@
+// localStorage helpers for the bridge: reconnect token, admin token, last-resolution key, and cached replay source state.
+// Depends on: shared BattleState validator. Consumed by: src/client/main.ts, bridge_connection.
+// Invariant: every read must tolerate storage being unavailable and return null; every write must swallow failures.
+
 import { validateBattleState, type BattleState } from "../shared/index.js";
 
 export const RECONNECT_TOKEN_STORAGE_KEY = "sg2_reconnect_token";

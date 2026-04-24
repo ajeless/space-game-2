@@ -1,3 +1,7 @@
+// PlotDraft authoring helpers: create, mutate, summarize, and build a server-ready PlotSubmission from a draft.
+// Depends on: shared contracts and derived accessors. Consumed by: src/client/** plot UI and tests.
+// Invariant: mutators return fresh drafts; callers must not mutate the returned object in place.
+
 import type {
   BattleState,
   PlotSubmission,

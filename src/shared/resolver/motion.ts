@@ -1,3 +1,7 @@
+// Sub-tick motion model: clamps thrust vectors, advances ship pose under drift plus burn, and samples the plan mid-tick.
+// Depends on: shared contracts, derived accessors, and resolver math. Consumed by: the dynamics phase, planned_shots, and plot_preview.
+// Invariant: advanceShipDynamics and advanceShipCoasting never mutate their ship input — they return a fresh pose.
+
 import type { BattleState, PlotSubmission, ShipRuntimeState, Vector2 } from "../contracts.js";
 import { getAvailableReactorPips, getShipConfig, getSystemStateAndEffects } from "../derived.js";
 import { clamp, normalizeDegrees, shortestSignedAngleDelta } from "./math.js";

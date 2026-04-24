@@ -1,3 +1,6 @@
+// Intent phase: emits one plot_committed event per active ship at sub-tick 0 and nothing on later sub-ticks.
+// Depends on: resolver context and event types. Consumed by: resolver/sub_tick.ts.
+
 import type { PlotCommittedEvent, ResolverContext } from "../types.js";
 
 export function runIntentPhase(context: ResolverContext, subTick: number): PlotCommittedEvent[] {

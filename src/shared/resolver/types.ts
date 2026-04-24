@@ -1,3 +1,7 @@
+// Resolver-facing type declarations: ResolverEvent union, sub-tick snapshots, planned-shot descriptors, and phase I/O shapes.
+// Depends on: shared contracts. Consumed by: resolver/index.ts, resolver/sub_tick.ts, every phase module, and network.ts.
+// Invariant: adding or renaming a ResolverEvent variant is a wire-breaking change — network.ts re-exports it.
+
 import type { BattleState, PlotSubmission, ShipInstanceId, SystemId, Vector2 } from "../contracts.js";
 
 export interface ResolverEventBase<TType extends string, TDetails> {

@@ -1,3 +1,6 @@
+// Sensing phase: for each planned weapon shot, evaluates the sub-tick opportunity and builds the events-phase snapshot.
+// Depends on: resolver combat and shared planned-shot types. Consumed by: resolver/sub_tick.ts.
+
 import type { BattleState, PlotSubmission, ShipInstanceId } from "../../contracts.js";
 import { evaluateWeaponOpportunity } from "../combat.js";
 import type { PlannedWeaponShot, SensingSnapshot } from "../types.js";

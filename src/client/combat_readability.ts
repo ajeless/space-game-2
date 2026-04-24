@@ -1,3 +1,7 @@
+// Human-readable labels for weapon cues, mount states, and contact telemetry used on the tactical board and schematic.
+// Depends on: shared weapon-cue and ship runtime types. Consumed by: tactical_view and schematic_view.
+// Invariant: labels are pure formatters over the input — they must not look at global state.
+
 import type { PlotPreviewWeaponCue, ShipRuntimeState, SubsystemState, SystemEffectValues } from "../shared/index.js";
 
 export type WeaponCueEngagementState = "none" | "tracked" | "armed" | "blocked";

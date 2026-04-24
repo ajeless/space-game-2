@@ -1,3 +1,7 @@
+// Runs a single resolver sub-tick by composing the intent, dynamics, sensing, events, state-updates, and logging phases in order.
+// Depends on: the six phase modules and resolver types. Consumed by: resolver/index.ts.
+// Invariant: phase order is fixed; rearranging it changes resolution semantics.
+
 import { runDynamicsPhase } from "./phases/dynamics.js";
 import { runEventsPhase } from "./phases/events.js";
 import { runIntentPhase } from "./phases/intent.js";

@@ -1,3 +1,7 @@
+// Pure derivations that turn session + identity + playback state into presenter view-models for the bridge views.
+// Depends on: shared contracts and resolution_playback. Consumed by: src/client/main.ts and the bridge_*_view modules.
+// Invariant: all presenters must be side-effect-free and deterministic for a given input tuple.
+
 import {
   getShipConfig,
   getSystemStateAndEffects,

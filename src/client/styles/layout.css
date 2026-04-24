@@ -1,0 +1,92 @@
+/* Top-level bridge shell layout: mission bar, bridge panels, main grid.
+   Depends on: base.css tokens. Consumed by: style.css.
+*/
+
+.bridge-shell {
+  max-width: 1720px;
+  margin: 0 auto;
+  height: calc(100vh - 20px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  border: 1px solid var(--line-1);
+  background: rgba(8, 19, 30, 0.88);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+}
+
+.mission-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-0);
+  background: linear-gradient(180deg, rgba(10, 23, 34, 0.98), rgba(9, 20, 31, 0.9));
+}
+
+.mission-bar--aim {
+  background: linear-gradient(180deg, rgba(59, 39, 15, 0.96), rgba(36, 24, 11, 0.92));
+}
+
+.mission-bar__mode {
+  padding: 8px 12px;
+  border: 1px solid rgba(125, 176, 218, 0.34);
+  background: rgba(16, 40, 58, 0.86);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.mission-bar__meta,
+.mission-bar__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--text-1);
+  font-size: 0.88rem;
+}
+
+.mission-bar__status {
+  justify-content: flex-end;
+}
+
+.section-kicker {
+  display: inline-block;
+  color: var(--text-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.status--ok {
+  color: var(--ok);
+}
+
+.status--warn {
+  color: var(--warn);
+}
+
+.bridge-main {
+  display: grid;
+  grid-template-columns: minmax(316px, 32fr) minmax(580px, 68fr);
+  gap: 8px;
+  padding: 10px 12px 0;
+  min-height: 0;
+}
+
+.bridge-panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-0);
+  background: rgba(12, 28, 42, 0.66);
+  padding: 10px;
+}
+
+.bridge-panel--tactical {
+  padding: 6px;
+}
+

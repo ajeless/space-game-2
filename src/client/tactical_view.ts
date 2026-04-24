@@ -1,3 +1,7 @@
+// Renders the tactical board SVG: ship glyphs, off-screen markers, plot preview paths and handles, and replay overlays.
+// Depends on: shared tactical-camera helpers, bridge_ui_config, and combat_readability labels. Consumed by: src/client/main.ts.
+// Invariant: no DOM mutation — the function returns a string that main.ts commits via innerHTML.
+
 import {
   clampWorldPointToTacticalViewportEdge,
   getArcPolygonPoints,

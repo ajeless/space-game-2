@@ -1,3 +1,7 @@
+// Derived accessors over a BattleState: resolve ship configs, system configs, subsystem state, and reactor pips.
+// Depends on: shared contracts. Consumed by: resolver phases, plot_authoring, plot_preview, and client presenters.
+// Invariant: derivations must be pure — never mutate the input state.
+
 import type {
   BattleState,
   MatchRulesConfig,

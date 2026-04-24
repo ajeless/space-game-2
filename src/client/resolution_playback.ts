@@ -1,3 +1,7 @@
+// Client-side replay scheduler: turns a just-resolved MatchSessionView into a sequence of timed playback steps.
+// Depends on: shared BattleState, MatchSessionView, and ResolverEvent types. Consumed by: src/client/main.ts and bridge_presenters.
+// Invariant: the playback key is stable for a given (match, resolved turn) pair so dedupe-on-reconnect works.
+
 import type {
   BattleState,
   MatchSessionView,
