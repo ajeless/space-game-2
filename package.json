@@ -1,9 +1,9 @@
 {
-  "name": "space-game-2",
-  "version": "0.1.0",
+  "name": "burn-vector",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "v0.1 foundation scaffold for space_game_2",
+  "description": "Burn Vector — a turn-based tactical starship-combat duel with a pure shared resolver and SSD-centric interface.",
   "engines": {
     "node": ">=24.0.0"
   },

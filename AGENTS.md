@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository now carries the shipped `v0.2` duel build of `space_game_2`: a deployable, internet-playable, peer-hosted duel with a pure shared resolver and SSD-centric UI.
+This repository now carries the shipped `v0.2` duel build of Burn Vector: a deployable, internet-playable, peer-hosted duel with a pure shared resolver and SSD-centric UI.
 
 `v0.2` shipped as a stabilization pass over the original `v0.1` rules/contracts. Unless a real defect forces it, keep gameplay behavior inside those existing invariants.
 

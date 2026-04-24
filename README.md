@@ -1,4 +1,4 @@
-# space_game_2
+# Burn Vector
 
 > Imported from `ajeless/docs/sg/space_game_2/README.md` on 2026-04-21.
 > This copy is now maintained in this repository. The old docs repo remains the archive/reference source for earlier ideation.

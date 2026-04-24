@@ -419,7 +419,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<SpaceGa
   const address = await app.listen();
   const log = options.log ?? console.log;
 
-  log(`space_game_2 server listening on http://${address.address}:${address.port}`);
+  log(`Burn Vector server listening on http://${address.address}:${address.port}`);
 
   if (app.config.external_origin) {
     log(`external origin: ${app.config.external_origin}`);
