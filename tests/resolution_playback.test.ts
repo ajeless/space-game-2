@@ -104,12 +104,17 @@ describe("resolution playback", () => {
 
     expect(playback).not.toBeNull();
     expect(playback?.steps[0]).toMatchObject({
-      kind: "motion",
+      kind: "preroll",
       display_sub_tick: 0,
       focus_event: null
     });
+    expect(playback?.steps[1]).toMatchObject({
+      kind: "motion",
+      display_sub_tick: 1,
+      focus_event: null
+    });
     expect(playback?.steps.some((step) => step.kind === "settle")).toBe(true);
-    expect(playback?.steps[1]?.ship_poses.alpha_ship?.position).not.toEqual(previousState.ships.alpha_ship?.pose.position);
+    expect(playback?.steps[2]?.ship_poses.alpha_ship?.position).not.toEqual(previousState.ships.alpha_ship?.pose.position);
     expect(playback?.steps.at(-1)).toMatchObject({
       kind: "event",
       display_sub_tick: 60,
@@ -211,6 +216,8 @@ describe("resolution playback", () => {
     const eventTypes = playback?.steps
       .filter((step) => step.kind === "event")
       .map((step) => step.focus_event?.type);
+    const immediateEventSteps =
+      playback?.steps.filter((step) => step.kind === "event" && step.focus_event?.type !== "turn_ended") ?? [];
     const lastImmediateEventIndex =
       playback?.steps.findLastIndex((step) => step.kind === "event" && step.focus_event?.type !== "turn_ended") ?? -1;
     const turnEndedIndex =
@@ -220,6 +227,9 @@ describe("resolution playback", () => {
         .length ?? 0;
 
     expect(eventTypes).toEqual(["weapon_fired", "hit_registered", "subsystem_damaged", "turn_ended"]);
+    expect(immediateEventSteps.map((step) => step.exchange_event_index)).toEqual([0, 1, 2]);
+    expect(immediateEventSteps.map((step) => step.exchange_event_count)).toEqual([3, 3, 3]);
+    expect(immediateEventSteps[0]?.duration_ms).toBeGreaterThan(immediateEventSteps[1]?.duration_ms ?? 0);
     expect(lastImmediateEventIndex).toBeGreaterThanOrEqual(0);
     expect(turnEndedIndex).toBeGreaterThan(lastImmediateEventIndex);
     expect(settleStepsBetweenEvents).toBeGreaterThan(0);

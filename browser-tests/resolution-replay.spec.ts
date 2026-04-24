@@ -41,6 +41,9 @@ test("movement-only replay settles into a completed turn summary", async ({ brow
     await submitPlot(guest.page);
 
     await expect(host.page.locator("[data-turn-number]")).toHaveText("Turn 2");
+    await expect(host.page.locator("[data-turn-status]")).toContainText("resolving turn 1");
+    await expect(host.page.locator("[data-current-resolution]")).toHaveText("Resolving committed plots");
+    await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/resolving committed plots/i);
     await expect(host.page.locator("[data-turn-status]")).toContainText("replaying turn 1");
     await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/replay turn 1/i);
     await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {

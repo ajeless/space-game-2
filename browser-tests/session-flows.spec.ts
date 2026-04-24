@@ -98,6 +98,54 @@ test("host reset returns both connected crews to a fresh turn-one duel", async (
   }
 });
 
+test("submitted plots lock the order interface until replay completes", async ({ browser }) => {
+  const server = await startBridgeServer();
+  const host = await openBridgePage(browser, server.origin);
+  const guest = await openBridgePage(browser, server.origin);
+
+  try {
+    await expect(host.page.locator("[data-submit-plot]")).toBeEnabled();
+    await expect(host.page.locator("[data-reset-plot]")).toBeEnabled();
+    await expect(host.page.locator("[data-plot-heading]")).toBeEnabled();
+
+    await submitPlot(host.page);
+
+    await expect(host.page.locator("[data-submit-plot]")).toBeDisabled();
+    await expect(host.page.locator("[data-reset-plot]")).toBeDisabled();
+    await expect(host.page.locator("[data-plot-heading]")).toBeDisabled();
+    await expect(host.page.locator("[data-station-keep]")).toBeDisabled();
+    await expect(host.page.locator("[data-plot-lock-note]")).toContainText(
+      "Orders are committed. Plot controls stay locked until the turn replay completes."
+    );
+
+    await host.page.locator('[data-select-system-hit="forward_mount"]').click();
+    await expect(host.page.locator("[data-phase-label]")).toHaveText("PLOT PHASE");
+    await expect(host.page.locator('[data-selected-panel="forward_mount"]')).toHaveCount(0);
+
+    await submitPlot(guest.page);
+
+    await expect(host.page.locator("[data-turn-number]")).toHaveText("Turn 2");
+    await expect(host.page.locator("[data-submit-plot]")).toBeDisabled();
+    await expect(host.page.locator("[data-plot-heading]")).toBeDisabled();
+    await expect(host.page.locator("[data-plot-lock-note]")).toContainText(
+      "The previous exchange is still replaying. Plot controls unlock when replay completes."
+    );
+
+    await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
+      timeout: 18_000
+    });
+    await expect(host.page.locator("[data-submit-plot]")).toBeEnabled();
+    await expect(host.page.locator("[data-reset-plot]")).toBeEnabled();
+    await expect(host.page.locator("[data-plot-heading]")).toBeEnabled();
+
+    await host.page.locator('[data-select-system-hit="forward_mount"]').click();
+    await expect(host.page.locator("[data-phase-label]")).toHaveText("AIM MODE");
+  } finally {
+    await closeBridgePages(host, guest);
+    await server.close();
+  }
+});
+
 test("ended matches lock plotting and only expose post-duel state", async ({ browser }) => {
   const server = await startBridgeServer({
     fixturePath: fixturePath("fixtures/battle_states/ended_duel_turn_5.json")

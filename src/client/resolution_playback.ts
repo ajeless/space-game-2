@@ -6,11 +6,13 @@ import type {
   ThrustAppliedEvent
 } from "../shared/index.js";
 
-const MOTION_STEP_DURATION_MS = 84;
-const EVENT_STEP_DURATION_MS = 840;
-const CAMERA_SETTLE_STEP_DURATION_MS = 160;
-const CAMERA_SETTLE_STEP_COUNT = 6;
-const FINAL_STEP_DURATION_MS = 2200;
+const REPLAY_PREROLL_DURATION_MS = 800;
+const MOTION_STEP_DURATION_MS = 72;
+const EVENT_STEP_DURATION_MS = 760;
+const EXCHANGE_CHAIN_EVENT_DURATION_MS = 360;
+const CAMERA_SETTLE_STEP_DURATION_MS = 140;
+const CAMERA_SETTLE_STEP_COUNT = 4;
+const FINAL_STEP_DURATION_MS = 1600;
 
 type ShipPoseMap = Record<
   ShipInstanceId,
@@ -18,7 +20,7 @@ type ShipPoseMap = Record<
 >;
 
 export type ResolutionPlaybackStep = {
-  kind: "motion" | "event" | "settle";
+  kind: "preroll" | "motion" | "event" | "settle";
   duration_ms: number;
   display_sub_tick: number;
   total_sub_ticks: number;
@@ -26,6 +28,8 @@ export type ResolutionPlaybackStep = {
   focus_event: ResolverEvent | null;
   focus_event_index: number | null;
   focus_event_count: number;
+  exchange_event_index: number | null;
+  exchange_event_count: number;
   camera_transition_ratio: number;
   progress_ratio: number;
 };
@@ -78,6 +82,24 @@ function getDisplaySubTick(event: ResolverEvent, totalSubTicks: number): number 
   }
 
   return Math.min(totalSubTicks, event.sub_tick + 1);
+}
+
+function getEventStepDuration(input: {
+  event: ResolverEvent;
+  exchange_event_count: number;
+  exchange_event_index: number;
+}): number {
+  const { event, exchange_event_count: exchangeEventCount, exchange_event_index: exchangeEventIndex } = input;
+
+  if (event.type === "turn_ended") {
+    return FINAL_STEP_DURATION_MS;
+  }
+
+  if (exchangeEventCount > 1 && exchangeEventIndex > 0) {
+    return EXCHANGE_CHAIN_EVENT_DURATION_MS;
+  }
+
+  return EVENT_STEP_DURATION_MS;
 }
 
 export function buildResolutionPlaybackState(input: {
@@ -144,14 +166,16 @@ export function buildResolutionPlaybackState(input: {
 
   const steps: ResolutionPlaybackStep[] = [
     {
-      kind: "motion",
-      duration_ms: MOTION_STEP_DURATION_MS,
+      kind: "preroll",
+      duration_ms: REPLAY_PREROLL_DURATION_MS,
       display_sub_tick: 0,
       total_sub_ticks: totalSubTicks,
       ship_poses: shipPosesByFrame[0] ?? cloneShipPoses(previousBattleState),
       focus_event: null,
       focus_event_index: null,
       focus_event_count: focusEvents.length,
+      exchange_event_index: null,
+      exchange_event_count: 0,
       camera_transition_ratio: 0,
       progress_ratio: 0
     }
@@ -172,12 +196,7 @@ export function buildResolutionPlaybackState(input: {
 
     steps.push({
       kind: "motion",
-      duration_ms:
-        displaySubTick === totalSubTicks &&
-        immediateFocusEvents.length === 0 &&
-        deferredTurnEndedEvents.length === 0
-          ? FINAL_STEP_DURATION_MS
-          : MOTION_STEP_DURATION_MS,
+      duration_ms: MOTION_STEP_DURATION_MS,
       display_sub_tick: displaySubTick,
       total_sub_ticks: totalSubTicks,
       ship_poses:
@@ -185,16 +204,20 @@ export function buildResolutionPlaybackState(input: {
       focus_event: null,
       focus_event_index: null,
       focus_event_count: focusEvents.length,
+      exchange_event_index: null,
+      exchange_event_count: 0,
       camera_transition_ratio: 0,
       progress_ratio: displaySubTick / totalSubTicks
     });
 
-    for (const event of immediateFocusEvents) {
-      const isFinalEvent = displaySubTick === totalSubTicks && focusEventIndex === focusEvents.length - 1;
-
+    for (const [exchangeEventIndex, event] of immediateFocusEvents.entries()) {
       steps.push({
         kind: "event",
-        duration_ms: isFinalEvent ? FINAL_STEP_DURATION_MS : EVENT_STEP_DURATION_MS,
+        duration_ms: getEventStepDuration({
+          event,
+          exchange_event_count: immediateFocusEvents.length,
+          exchange_event_index: exchangeEventIndex
+        }),
         display_sub_tick: displaySubTick,
         total_sub_ticks: totalSubTicks,
         ship_poses:
@@ -202,6 +225,8 @@ export function buildResolutionPlaybackState(input: {
         focus_event: event,
         focus_event_index: focusEventIndex,
         focus_event_count: focusEvents.length,
+        exchange_event_index: exchangeEventIndex,
+        exchange_event_count: immediateFocusEvents.length,
         camera_transition_ratio: 0,
         progress_ratio: displaySubTick / totalSubTicks
       });
@@ -224,23 +249,29 @@ export function buildResolutionPlaybackState(input: {
       focus_event: null,
       focus_event_index: null,
       focus_event_count: focusEvents.length,
+      exchange_event_index: null,
+      exchange_event_count: 0,
       camera_transition_ratio: (settleIndex + 1) / CAMERA_SETTLE_STEP_COUNT,
       progress_ratio: 1
     });
   }
 
-  for (const event of deferredFinalEvents) {
-    const isFinalEvent = focusEventIndex === focusEvents.length - 1;
-
+  for (const [exchangeEventIndex, event] of deferredFinalEvents.entries()) {
     steps.push({
       kind: "event",
-      duration_ms: isFinalEvent ? FINAL_STEP_DURATION_MS : EVENT_STEP_DURATION_MS,
+      duration_ms: getEventStepDuration({
+        event,
+        exchange_event_count: deferredFinalEvents.length,
+        exchange_event_index: exchangeEventIndex
+      }),
       display_sub_tick: totalSubTicks,
       total_sub_ticks: totalSubTicks,
       ship_poses: cloneShipPoseMap(finalShipPoses),
       focus_event: event,
       focus_event_index: focusEventIndex,
       focus_event_count: focusEvents.length,
+      exchange_event_index: exchangeEventIndex,
+      exchange_event_count: deferredFinalEvents.length,
       camera_transition_ratio: 1,
       progress_ratio: 1
     });

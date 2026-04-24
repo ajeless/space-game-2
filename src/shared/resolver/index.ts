@@ -2,7 +2,7 @@ import type { BattleState, PlotSubmission, ShipInstanceId } from "../contracts.j
 import { validateBattleState, validatePlotSubmission } from "../validation.js";
 import { buildPlannedShots } from "./planned_shots.js";
 import { runSubTick } from "./sub_tick.js";
-import type { ResolveTurnInput, ResolveTurnOutput, TurnEndedEvent } from "./types.js";
+import type { ResolveTurnInput, ResolveTurnOutput, ResolverEvent, TurnEndedEvent } from "./types.js";
 
 function cloneBattleState(state: BattleState): BattleState {
   return structuredClone(state);
@@ -63,6 +63,22 @@ function makeTurnEndedEvent(state: BattleState): TurnEndedEvent {
   };
 }
 
+function hydrateTerminalEventFinalPositions(state: BattleState, events: ResolverEvent[]): void {
+  for (const event of events) {
+    if ((event.type !== "ship_destroyed" && event.type !== "ship_disengaged") || !event.target) {
+      continue;
+    }
+
+    const ship = state.ships[event.target];
+
+    if (!ship) {
+      continue;
+    }
+
+    event.details.finalPosition = { ...ship.pose.position };
+  }
+}
+
 export function resolve(input: ResolveTurnInput): ResolveTurnOutput {
   const validatedState = validateBattleState(input.state);
   const validatedPlots = validatePlotsByShip(validatedState, input.plots_by_ship);
@@ -86,6 +102,7 @@ export function resolve(input: ResolveTurnInput): ResolveTurnOutput {
     events.push(...subTickResult.events);
   }
 
+  hydrateTerminalEventFinalPositions(context.next_state, events);
   context.next_state.turn_number += 1;
   events.push(makeTurnEndedEvent(context.next_state));
 

@@ -46,6 +46,18 @@ describe("MatchSession", () => {
     expect(() => session.submitPlot("client_1", bravoPlot)).toThrow("only submit plots");
   });
 
+  it("rejects resubmitting a plot after that ship already committed orders for the turn", async () => {
+    const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+    const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/alpha_turn_1.json"), battleState);
+    const session = new MatchSession(battleState);
+
+    session.connectClient("client_1");
+    session.submitPlot("client_1", alphaPlot);
+
+    expect(() => session.submitPlot("client_1", alphaPlot)).toThrow("plot already submitted");
+    expect(session.getView().pending_plot_ship_ids).toEqual(["alpha_ship"]);
+  });
+
   it("can reset the match state while preserving connected player slots", async () => {
     const battleState = validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
     const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/alpha_turn_1.json"), battleState);

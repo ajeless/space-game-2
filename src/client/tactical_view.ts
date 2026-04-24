@@ -54,6 +54,7 @@ type RenderTacticalBoardArgs = {
   identityValue: SessionIdentity | null;
   plotSummary: PlotDraftSummary | null;
   plotPreview: PlotPreview | null;
+  plotLocked?: boolean;
   focusedMountId: SystemId | null;
   camera: TacticalCamera;
   playbackStep: ResolutionPlaybackStep | null;
@@ -689,7 +690,11 @@ function renderOffscreenMarker(
   `;
 }
 
-function renderResolutionPlaybackOverlay(camera: TacticalCamera, playbackEvent: ResolverEvent | null): string {
+function renderResolutionPlaybackOverlay(
+  camera: TacticalCamera,
+  playbackEvent: ResolverEvent | null,
+  playbackStep: ResolutionPlaybackStep | null
+): string {
   if (!playbackEvent) {
     return "";
   }
@@ -734,13 +739,17 @@ function renderResolutionPlaybackOverlay(camera: TacticalCamera, playbackEvent: 
   }
 
   if (playbackEvent.type === "ship_destroyed" || playbackEvent.type === "ship_disengaged") {
-    const finalPoint = worldToTacticalViewport(camera, playbackEvent.details.finalPosition);
+    const currentPose =
+      playbackEvent.target && playbackStep?.ship_poses[playbackEvent.target]
+        ? playbackStep.ship_poses[playbackEvent.target]
+        : null;
+    const markerPoint = worldToTacticalViewport(camera, currentPose?.position ?? playbackEvent.details.finalPosition);
     const label = playbackEvent.type === "ship_destroyed" ? "destroyed" : "boundary disengage";
 
     return `
       <g class="resolution-playback resolution-playback--terminal">
-        <circle class="resolution-playback__terminal-ring" cx="${finalPoint.x.toFixed(2)}" cy="${finalPoint.y.toFixed(2)}" r="26" />
-        <text class="resolution-playback__terminal-label" x="${finalPoint.x.toFixed(2)}" y="${(finalPoint.y - 32).toFixed(2)}">${label}</text>
+        <circle class="resolution-playback__terminal-ring" cx="${markerPoint.x.toFixed(2)}" cy="${markerPoint.y.toFixed(2)}" r="26" />
+        <text class="resolution-playback__terminal-label" x="${markerPoint.x.toFixed(2)}" y="${(markerPoint.y - 32).toFixed(2)}">${label}</text>
       </g>
     `;
   }
@@ -784,6 +793,7 @@ export function renderTacticalBoard({
   identityValue,
   plotSummary,
   plotPreview,
+  plotLocked = false,
   focusedMountId,
   camera,
   playbackStep,
@@ -821,7 +831,7 @@ export function renderTacticalBoard({
 
     const isSelf = identityValue?.ship_instance_id === ship.ship_instance_id;
     const targetCue = selectedCueByTargetShipId.get(ship.ship_instance_id) ?? null;
-    const isTargetable = focusedMountId !== null && !isSelf;
+    const isTargetable = !plotLocked && focusedMountId !== null && !isSelf;
     const playbackTone = getShipPlaybackTone(playbackEvent, ship.ship_instance_id);
     const visible = isWorldPointVisibleInTacticalCamera(camera, ship.pose.position, 34);
     const label = getTacticalShipLabel(identityValue, ship, shipConfig);
@@ -860,8 +870,8 @@ export function renderTacticalBoard({
   }
 
   const overlay = renderPlotPreviewOverlay(sessionValue, camera, plotPreview, focusedMountId);
-  const interactionHandles = renderPlotInteractionHandles(sessionValue, camera, plotSummary, plotPreview);
-  const playbackOverlay = renderResolutionPlaybackOverlay(camera, playbackEvent);
+  const interactionHandles = plotLocked ? "" : renderPlotInteractionHandles(sessionValue, camera, plotSummary, plotPreview);
+  const playbackOverlay = renderResolutionPlaybackOverlay(camera, playbackEvent, playbackStep);
   const playbackClass = playbackStep ? " tactical-board--replaying" : "";
 
   return `

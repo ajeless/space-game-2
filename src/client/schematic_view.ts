@@ -61,6 +61,11 @@ type OutcomePresentation = {
   detail: string;
 } | null;
 
+type PlotLockPresentation = {
+  status_label: string;
+  note_label: string;
+} | null;
+
 type RenderSchematicPanelArgs = {
   sessionValue: MatchSessionView | null;
   identityValue: SessionIdentity | null;
@@ -68,6 +73,7 @@ type RenderSchematicPanelArgs = {
   plotSummary: PlotDraftSummary | null;
   selectedSystemContext: SelectedSystemContext | null;
   plotPreview: PlotPreview | null;
+  plotLockState: PlotLockPresentation;
   playbackEvent: ResolverEvent | null;
   selectedSystemId: SystemId | null;
   outcomePresentation: OutcomePresentation;
@@ -339,6 +345,7 @@ function renderSchematicControlDeck(
   plotSummary: PlotDraftSummary | null,
   selectedSystemContext: SelectedSystemContext | null,
   plotPreview: PlotPreview | null,
+  plotLockState: PlotLockPresentation,
   outcomePresentation: OutcomePresentation,
   getContactLabel: (shipInstanceId: ShipInstanceId | null) => string
 ): string {
@@ -371,10 +378,16 @@ function renderSchematicControlDeck(
 
   const { context, draft, power, desired_end_heading_degrees: desiredHeading, world_thrust_fraction: worldThrust } = plotSummary;
   const isPending = sessionValue.pending_plot_ship_ids.includes(context.ship_instance_id);
+  const isLocked = plotLockState !== null;
+  const controlDeckStatusLabel = plotLockState?.status_label ?? (isPending ? "submitted" : "editing");
+  const controlDeckStatusClass = isLocked || isPending ? "ssd-control-deck__status ssd-control-deck__status--pending" : "ssd-control-deck__status";
   const driftSpeed = Math.hypot(
     sessionValue.battle_state.ships[context.ship_instance_id]?.pose.velocity.x ?? 0,
     sessionValue.battle_state.ships[context.ship_instance_id]?.pose.velocity.y ?? 0
   );
+  const lockNoteMarkup = plotLockState
+    ? `<p class="ssd-control-deck__note" data-plot-lock-note>${plotLockState.note_label}</p>`
+    : "";
   let selectedPanel = `<div class="ssd-control-deck__note">Select a system on the SSD. Weapon mounts enter aim mode and use tactical contact clicks for fire intent.</div>`;
 
   if (selectedSystemContext) {
@@ -418,14 +431,14 @@ function renderSchematicControlDeck(
           <div class="ssd-selected-panel__controls">
             <label class="ssd-inline-field">
               <span>Charge</span>
-              <select data-aim-charge="${selectedSystemContext.system.id}" ${!mountContext?.firing_enabled ? "disabled" : ""}>
+              <select data-aim-charge="${selectedSystemContext.system.id}" ${!mountContext?.firing_enabled || isLocked ? "disabled" : ""}>
                 ${chargeOptions}
               </select>
             </label>
             <button
               class="action-button action-button--secondary action-button--compact"
               data-clear-aim-target="${selectedSystemContext.system.id}"
-              ${canClearTarget ? "" : "disabled"}
+              ${canClearTarget && !isLocked ? "" : "disabled"}
             >
               <span class="action-button__row">
                 <span class="action-button__label">Clear Target</span>
@@ -477,16 +490,17 @@ function renderSchematicControlDeck(
   }
 
   return `
-    <div class="ssd-control-deck" data-schematic-control-deck>
+    <div class="ssd-control-deck${isLocked ? " ssd-control-deck--locked" : ""}" data-schematic-control-deck>
       <div class="ssd-control-deck__header">
         <div>
           <span class="section-kicker">Plot Controls</span>
           <strong>Turn ${context.turn_number}</strong>
         </div>
-        <span class="ssd-control-deck__status ${isPending ? "ssd-control-deck__status--pending" : ""}">
-          ${isPending ? "submitted" : "editing"}
+        <span class="${controlDeckStatusClass}">
+          ${controlDeckStatusLabel}
         </span>
       </div>
+      ${lockNoteMarkup}
       <div class="ssd-plot-controls">
         <div class="ssd-control-grid">
           <label class="ssd-slider-card">
@@ -500,6 +514,7 @@ function renderSchematicControlDeck(
               step="1"
               value="${draft.heading_delta_degrees}"
               data-plot-heading
+              ${isLocked ? "disabled" : ""}
             />
           </label>
           <label class="ssd-slider-card">
@@ -513,6 +528,7 @@ function renderSchematicControlDeck(
               step="5"
               value="${Math.round(draft.thrust_input.axial_fraction * 100)}"
               data-plot-axial
+              ${isLocked ? "disabled" : ""}
             />
           </label>
           <label class="ssd-slider-card">
@@ -526,6 +542,7 @@ function renderSchematicControlDeck(
               step="5"
               value="${Math.round(draft.thrust_input.lateral_fraction * 100)}"
               data-plot-lateral
+              ${isLocked ? "disabled" : ""}
             />
           </label>
         </div>
@@ -536,7 +553,7 @@ function renderSchematicControlDeck(
           )}, ${formatSignedNumber(worldThrust.y, 2)}
         </p>
         <div class="ssd-control-actions">
-          <button class="action-button action-button--secondary action-button--compact" data-station-keep>
+          <button class="action-button action-button--secondary action-button--compact" data-station-keep ${isLocked ? "disabled" : ""}>
             <span class="action-button__row">
               <span class="action-button__label">Station Keep</span>
               <span class="action-button__hint">Null drift · ${formatNumber(driftSpeed)}</span>
@@ -556,6 +573,7 @@ export function renderSchematicPanel({
   plotSummary,
   selectedSystemContext,
   plotPreview,
+  plotLockState,
   playbackEvent,
   selectedSystemId,
   outcomePresentation,
@@ -610,6 +628,7 @@ export function renderSchematicPanel({
     plotSummary,
     selectedSystemContext,
     plotPreview,
+    plotLockState,
     outcomePresentation,
     getContactLabel
   );

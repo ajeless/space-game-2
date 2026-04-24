@@ -74,6 +74,12 @@ type HealthResponse = {
   reconnectGraceMs: number;
 };
 
+type PlotLockState = {
+  reason: "submitted" | "replay";
+  status_label: string;
+  note_label: string;
+};
+
 function getRootElement(): HTMLDivElement {
   const candidate = document.querySelector<HTMLDivElement>("#app");
 
@@ -108,6 +114,10 @@ let resolutionPlayback: ResolutionPlaybackState | null = null;
 let resolutionPlaybackTimer: number | null = null;
 let lastPresentedResolutionKey: string | null = readStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY);
 let hostToolsOpen = false;
+let optimisticSubmittedPlot: {
+  ship_instance_id: ShipInstanceId;
+  turn_number: number;
+} | null = null;
 // Keep discrete zoom support wired up, but hide the controls until tactical scale tuning resumes.
 const SHOW_TACTICAL_ZOOM_CONTROLS = false;
 
@@ -176,6 +186,10 @@ function clearResolutionPlaybackTimer(): void {
 function clearResolutionPlayback(): void {
   clearResolutionPlaybackTimer();
   resolutionPlayback = null;
+}
+
+function clearOptimisticSubmittedPlot(): void {
+  optimisticSubmittedPlot = null;
 }
 
 function queueResolutionPlaybackAdvance(): void {
@@ -248,6 +262,71 @@ function getCurrentResolutionPlaybackStepForSession(
   sessionValue: MatchSessionView | null
 ): ResolutionPlaybackStep | null {
   return getCurrentResolutionPlaybackStep(resolutionPlayback, sessionValue);
+}
+
+function reconcileOptimisticSubmittedPlot(
+  sessionValue: MatchSessionView | null,
+  identityValue: SessionIdentity | null,
+  playbackStep: ResolutionPlaybackStep | null
+): void {
+  if (!optimisticSubmittedPlot) {
+    return;
+  }
+
+  if (!sessionValue || !identityValue || identityValue.role !== "player" || !identityValue.ship_instance_id) {
+    clearOptimisticSubmittedPlot();
+    return;
+  }
+
+  if (
+    identityValue.ship_instance_id !== optimisticSubmittedPlot.ship_instance_id ||
+    sessionValue.battle_state.turn_number !== optimisticSubmittedPlot.turn_number ||
+    sessionValue.pending_plot_ship_ids.includes(identityValue.ship_instance_id) ||
+    playbackStep
+  ) {
+    clearOptimisticSubmittedPlot();
+  }
+}
+
+function getPlotLockState(
+  sessionValue: MatchSessionView | null,
+  identityValue: SessionIdentity | null,
+  playbackStep: ResolutionPlaybackStep | null
+): PlotLockState | null {
+  if (!sessionValue || !identityValue || identityValue.role !== "player" || !identityValue.ship_instance_id) {
+    return null;
+  }
+
+  const shipInstanceId = identityValue.ship_instance_id;
+  const hasOptimisticSubmit =
+    optimisticSubmittedPlot?.ship_instance_id === shipInstanceId &&
+    optimisticSubmittedPlot.turn_number === sessionValue.battle_state.turn_number;
+
+  if (sessionValue.pending_plot_ship_ids.includes(shipInstanceId) || hasOptimisticSubmit) {
+    return {
+      reason: "submitted",
+      status_label: "Orders submitted",
+      note_label: "Orders are committed. Plot controls stay locked until the turn replay completes."
+    };
+  }
+
+  if (playbackStep) {
+    return {
+      reason: "replay",
+      status_label: "Replay in progress",
+      note_label: "The previous exchange is still replaying. Plot controls unlock when replay completes."
+    };
+  }
+
+  return null;
+}
+
+function isPlotInteractionLocked(
+  sessionValue: MatchSessionView | null = session,
+  identityValue: SessionIdentity | null = identity,
+  playbackStep: ResolutionPlaybackStep | null = getCurrentResolutionPlaybackStepForSession(sessionValue)
+): boolean {
+  return getPlotLockState(sessionValue, identityValue, playbackStep) !== null;
 }
 
 function smoothstep(value: number): number {
@@ -376,6 +455,10 @@ function updatePlotDraft(mutator: (draft: PlotDraft) => PlotDraft): void {
     return;
   }
 
+  if (isPlotInteractionLocked(session, identity)) {
+    return;
+  }
+
   const current = getPlayerPlotSummary(session, identity);
 
   if (!current) {
@@ -389,6 +472,10 @@ function updatePlotDraft(mutator: (draft: PlotDraft) => PlotDraft): void {
 
 function applyTacticalDrag(clientX: number, clientY: number): void {
   if (!activeTacticalDrag) {
+    return;
+  }
+
+  if (isPlotInteractionLocked(session, identity)) {
     return;
   }
 
@@ -575,12 +662,20 @@ function resetCurrentPlotDraft(): void {
     return;
   }
 
+  if (isPlotInteractionLocked(session, identity)) {
+    return;
+  }
+
   plotDraft = createPlotDraft(session.battle_state, identity.ship_instance_id);
   render();
 }
 
 function submitCurrentPlot(): void {
   if (!socket || socket.readyState !== WebSocket.OPEN || !session) {
+    return;
+  }
+
+  if (isPlotInteractionLocked(session, identity)) {
     return;
   }
 
@@ -599,6 +694,10 @@ function submitCurrentPlot(): void {
         plot
       })
     );
+    optimisticSubmittedPlot = {
+      ship_instance_id: plot.ship_instance_id,
+      turn_number: plot.turn_number
+    };
     logMessage(`submitted direct plot for ${plot.ship_instance_id} on turn ${plot.turn_number}`);
     render();
   } catch (error) {
@@ -636,6 +735,10 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     return;
   }
 
+  if (isPlotInteractionLocked(session, identity)) {
+    return;
+  }
+
   if (event.code === "KeyR") {
     event.preventDefault();
     resetCurrentPlotDraft();
@@ -649,18 +752,26 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
 }
 
 function toggleSelectedSystem(systemId: SystemId): void {
+  if (isPlotInteractionLocked(session, identity)) {
+    return;
+  }
+
   selectedSystemId = selectedSystemId === systemId ? null : systemId;
   render();
 }
 
 function render(): void {
   const sessionValue = session;
+  const playbackStep = getCurrentResolutionPlaybackStepForSession(sessionValue);
+
+  reconcileOptimisticSubmittedPlot(sessionValue, identity, playbackStep);
+
+  const plotLockState = getPlotLockState(sessionValue, identity, playbackStep);
   const displayed = getDisplayedShipContext(sessionValue, identity);
   const plotSummary = getPlayerPlotSummary(sessionValue, identity);
   const selectedSystemContext = getSelectedSystemContext(sessionValue, identity);
-  const isAimMode = selectedSystemContext?.system.type === "weapon_mount";
+  const isAimMode = !plotLockState && selectedSystemContext?.system.type === "weapon_mount";
   const plotPreview = sessionValue && plotSummary ? buildPlotPreview(sessionValue.battle_state, plotSummary.draft) : null;
-  const playbackStep = getCurrentResolutionPlaybackStepForSession(sessionValue);
   const tacticalBattleState =
     sessionValue && playbackStep
       ? applyResolutionPlaybackStepToBattleState(sessionValue.battle_state, playbackStep)
@@ -683,13 +794,14 @@ function render(): void {
   const tacticalViewport = !sessionValue
     ? "<p>Waiting for the session snapshot before rendering the tactical board.</p>"
     : !camera
-      ? "<p>The current battlefield boundary is not yet supported by the tactical viewport.</p>"
+        ? "<p>The current battlefield boundary is not yet supported by the tactical viewport.</p>"
       : renderTacticalBoard({
           sessionValue,
           battleStateValue: tacticalBattleState ?? sessionValue.battle_state,
           identityValue: identity,
           plotSummary,
           plotPreview,
+          plotLocked: plotLockState !== null,
           focusedMountId,
           camera,
           playbackStep,
@@ -702,6 +814,7 @@ function render(): void {
     plotSummary,
     selectedSystemContext,
     plotPreview,
+    plotLockState,
     playbackEvent,
     selectedSystemId,
     outcomePresentation,
@@ -715,7 +828,8 @@ function render(): void {
       identityValue: identity,
       plotSummary,
       outcomePresentation,
-      playbackStep
+      playbackStep,
+      plotLocked: plotLockState !== null
     })
   );
   const outcomeBanner = renderMatchOutcomeBanner(outcomePresentation);
@@ -737,8 +851,12 @@ function render(): void {
   const tacticalHint =
     isAimMode
       ? "Click contact to lock. Click again to clear."
+      : plotLockState?.reason === "submitted"
+        ? "Orders committed. Plotting stays locked until the replay for this exchange finishes."
+      : sessionValue?.last_resolution && playbackStep?.kind === "preroll"
+        ? `Turn ${sessionValue.last_resolution.resolved_from_turn_number} resolved on the host. Scope cueing replay while you plot turn ${sessionValue.battle_state.turn_number}.`
       : sessionValue?.last_resolution && playbackStep
-        ? `Resolution replay running · drag burn and heading to plot turn ${sessionValue.battle_state.turn_number}.`
+        ? "Resolution replay running. Plot controls unlock when the replay finishes."
         : "Drag burn and heading on the plot.";
   const stationLabel = getBridgeStationLabel(identity, displayed?.shipConfig.name ?? null);
   const situationalStatus =
@@ -782,6 +900,10 @@ function render(): void {
     onToggleSystemSelection: toggleSelectedSystem,
     onClearSystemSelection: clearSelectedSystem,
     onStartTacticalDrag: (handleId, pointerId, clientX, clientY) => {
+      if (isPlotInteractionLocked(session, identity)) {
+        return;
+      }
+
       activeTacticalDrag = {
         handle_id: handleId,
         pointer_id: pointerId
@@ -882,6 +1004,7 @@ function handleServerMessage(message: ServerToClientMessage): void {
     plotDraft = null;
     selectedSystemId = null;
     hostToolsOpen = false;
+    clearOptimisticSubmittedPlot();
     lastPresentedResolutionKey = null;
     writeStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY, null);
     clearResolutionPlayback();
@@ -908,6 +1031,7 @@ function handleServerMessage(message: ServerToClientMessage): void {
   }
 
   if (message.type === "plot_rejected" || message.type === "error") {
+    clearOptimisticSubmittedPlot();
     logMessage(message.message);
     render();
   }

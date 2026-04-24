@@ -226,6 +226,8 @@ Emitted when a ship reaches zero hull.
   } }
 ```
 
+`finalPosition` is the ship's end-of-turn position after any remaining inertial drift later in the turn, not only the position at the exact destruction sub-tick.
+
 ### `turn_ended`
 
 Emitted at sub-tick 60 (one past the last simulated sub-tick) to mark the end of the turn.

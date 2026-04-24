@@ -76,10 +76,18 @@ describe("bridge presenters", () => {
       focus_event: null,
       focus_event_index: null,
       focus_event_count: 2,
+      exchange_event_index: null,
+      exchange_event_count: 0,
       camera_transition_ratio: 0.5,
       progress_ratio: 0.4
     };
 
+    expect(
+      getResolutionPlaybackMetaLabel(session, {
+        ...baseStep,
+        kind: "preroll"
+      })
+    ).toBe("Replay turn 3 · resolving committed plots");
     expect(
       getResolutionPlaybackMetaLabel(session, {
         ...baseStep,
@@ -91,7 +99,7 @@ describe("bridge presenters", () => {
         ...baseStep,
         kind: "settle"
       })
-    ).toBe("Replay turn 3 · re-centering scope");
+    ).toBe("Replay turn 3 · settling back onto the plot");
     expect(getResolutionPlaybackMetaLabel(session, null)).toBe("Turn 3 replay complete");
   });
 
@@ -145,6 +153,8 @@ describe("bridge presenters", () => {
       focus_event: null,
       focus_event_index: null,
       focus_event_count: 0,
+      exchange_event_index: null,
+      exchange_event_count: 0,
       camera_transition_ratio: 0,
       progress_ratio: 0.2
     };
@@ -153,7 +163,8 @@ describe("bridge presenters", () => {
       identityValue: makePlayerIdentity(),
       plotSummary,
       outcomePresentation: null,
-      playbackStep
+      playbackStep,
+      plotLocked: true
     });
 
     expect(presentation.kind).toBe("player");
@@ -161,5 +172,41 @@ describe("bridge presenters", () => {
       throw new Error("Expected player presentation");
     }
     expect(presentation.status_label).toContain("replaying turn 1");
+    expect(presentation.controls_locked).toBe(true);
+  });
+
+  it("shows a resolving status before replay motion begins", async () => {
+    const state = await readBattleStateFixture();
+    const session = makeSessionView(state, 1);
+    const plotSummary = summarizePlotDraft(state, createPlotDraft(state, "alpha_ship"));
+    const playbackStep: ResolutionPlaybackStep = {
+      kind: "preroll",
+      duration_ms: 100,
+      display_sub_tick: 0,
+      total_sub_ticks: state.match_setup.rules.turn.sub_ticks,
+      ship_poses: makeShipPoses(state),
+      focus_event: null,
+      focus_event_index: null,
+      focus_event_count: 0,
+      exchange_event_index: null,
+      exchange_event_count: 0,
+      camera_transition_ratio: 0,
+      progress_ratio: 0
+    };
+    const presentation = getActionStripPresentation({
+      sessionValue: session,
+      identityValue: makePlayerIdentity(),
+      plotSummary,
+      outcomePresentation: null,
+      playbackStep,
+      plotLocked: true
+    });
+
+    expect(presentation.kind).toBe("player");
+    if (presentation.kind !== "player") {
+      throw new Error("Expected player presentation");
+    }
+    expect(presentation.status_label).toContain("resolving turn 1");
+    expect(presentation.controls_locked).toBe(true);
   });
 });

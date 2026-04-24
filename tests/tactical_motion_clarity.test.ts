@@ -321,6 +321,8 @@ describe("tactical motion clarity", () => {
         },
         focus_event_index: 0,
         focus_event_count: 1,
+        exchange_event_index: 0,
+        exchange_event_count: 1,
         camera_transition_ratio: 0,
         progress_ratio: 0.5
       },

@@ -50,6 +50,7 @@ type ActionStripPresentation =
       kind: "player";
       status_label: string;
       claim_actions: ClaimSeatAction[];
+      controls_locked: boolean;
     };
 
 type ZoomPresetPresentation = {
@@ -262,13 +263,13 @@ export function renderActionStripControls(actionStrip: ActionStripPresentation):
       </div>
       <div class="commit-strip__actions">
         ${renderClaimSeatButtons(actionStrip.claim_actions)}
-        <button class="action-button action-button--secondary" data-reset-plot>
+        <button class="action-button action-button--secondary" data-reset-plot ${actionStrip.controls_locked ? "disabled" : ""}>
           <span class="action-button__row">
             <span class="action-button__label">Reset Plot</span>
             <small class="action-button__hotkey">R</small>
           </span>
         </button>
-        <button class="action-button action-button--primary" data-submit-plot>
+        <button class="action-button action-button--primary" data-submit-plot ${actionStrip.controls_locked ? "disabled" : ""}>
           <span class="action-button__row">
             <span class="action-button__label">Submit Plot</span>
             <small class="action-button__hotkey">␣</small>

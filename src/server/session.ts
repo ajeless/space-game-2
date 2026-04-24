@@ -337,6 +337,10 @@ export class MatchSession {
       throw new Error("match already ended");
     }
 
+    if (this.pendingPlots.has(identity.ship_instance_id)) {
+      throw new Error(`plot already submitted for '${identity.ship_instance_id}' on turn ${this.battleState.turn_number}`);
+    }
+
     const plot = validatePlotSubmission(plotInput, this.battleState);
 
     if (plot.ship_instance_id !== identity.ship_instance_id) {

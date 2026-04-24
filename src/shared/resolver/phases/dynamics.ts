@@ -1,6 +1,6 @@
 import type { BattleState, PlotSubmission, ShipInstanceId, ShipRuntimeState, Vector2 } from "../../contracts.js";
 import type { ResolverEvent, ThrustAppliedEvent } from "../types.js";
-import { advanceShipDynamics } from "../motion.js";
+import { advanceShipCoasting, advanceShipDynamics } from "../motion.js";
 
 export interface DynamicsPhaseInput {
   state: BattleState;
@@ -36,11 +36,12 @@ export function runDynamicsPhase(input: DynamicsPhaseInput): DynamicsPhaseOutput
     const ship = state.ships[shipId];
     const plot = plotsByShip[shipId];
 
-    if (!ship || !plot || ship.status !== "active") {
+    if (!ship || !plot) {
       continue;
     }
 
-    const { applied_thrust: appliedThrust } = advanceShipDynamics(state, ship, plot, subTick);
+    const { applied_thrust: appliedThrust } =
+      ship.status === "active" ? advanceShipDynamics(state, ship, plot, subTick) : advanceShipCoasting(state, ship);
     events.push(makeThrustAppliedEvent(subTick, ship, appliedThrust));
   }
 

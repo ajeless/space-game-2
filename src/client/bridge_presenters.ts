@@ -46,6 +46,7 @@ export type ActionStripPresentation =
       kind: "player";
       status_label: string;
       claim_actions: { slot_id: string; label: string }[];
+      controls_locked: boolean;
     };
 
 export type FooterStripPresentation = {
@@ -353,11 +354,21 @@ export function getResolutionPlaybackMetaLabel(
       : "Awaiting first exchange.";
   }
 
+  if (playbackStep.kind === "preroll") {
+    return `Replay turn ${sessionValue.last_resolution.resolved_from_turn_number} · resolving committed plots`;
+  }
+
   if (playbackStep.kind === "settle") {
-    return `Replay turn ${sessionValue.last_resolution.resolved_from_turn_number} · re-centering scope`;
+    return `Replay turn ${sessionValue.last_resolution.resolved_from_turn_number} · settling back onto the plot`;
   }
 
   if (playbackStep.focus_event && playbackStep.focus_event_index !== null) {
+    if (playbackStep.exchange_event_count > 1 && playbackStep.exchange_event_index !== null) {
+      return `Replay turn ${sessionValue.last_resolution.resolved_from_turn_number} · exchange T${playbackStep.display_sub_tick
+        .toString()
+        .padStart(2, "0")} · ${playbackStep.exchange_event_index + 1} of ${playbackStep.exchange_event_count}`;
+    }
+
     return `Replay turn ${sessionValue.last_resolution.resolved_from_turn_number} · event ${
       playbackStep.focus_event_index + 1
     } of ${playbackStep.focus_event_count}`;
@@ -611,14 +622,16 @@ export function getFooterStripPresentation(input: {
     hostToolsOpen
   } = input;
   const currentResolutionLabel =
-    sessionValue && playbackStep?.kind === "settle"
-      ? "Re-centering ship-relative scope"
+    sessionValue && playbackStep?.kind === "preroll"
+      ? "Resolving committed plots"
+      : sessionValue && playbackStep?.kind === "settle"
+        ? "Replay settling back to plot"
       : sessionValue && playbackEvent
         ? formatResolutionEventSummary(sessionValue, identityValue, playbackEvent)
         : sessionValue && playbackStep
           ? `Replaying turn ${sessionValue.last_resolution?.resolved_from_turn_number ?? "?"}`
           : sessionValue?.last_resolution
-            ? `Turn ${sessionValue.last_resolution.resolved_from_turn_number} resolved`
+            ? `Turn ${sessionValue.last_resolution.resolved_from_turn_number} replay complete`
             : "No turn resolved yet";
   const combatFeedItems = sessionValue?.last_resolution
     ? getRecentResolutionEvents(sessionValue).map((event) => ({
@@ -652,8 +665,9 @@ export function getActionStripPresentation(input: {
   plotSummary: PlotDraftSummary | null;
   outcomePresentation: MatchOutcomePresentation | null;
   playbackStep: ResolutionPlaybackStep | null;
+  plotLocked: boolean;
 }): ActionStripPresentation {
-  const { sessionValue, identityValue, plotSummary, outcomePresentation, playbackStep } = input;
+  const { sessionValue, identityValue, plotSummary, outcomePresentation, playbackStep, plotLocked } = input;
   const claimActions = getClaimableSlotStates(sessionValue, identityValue).map((slotState) => ({
     slot_id: slotState.slot_id,
     label: getClaimSeatLabel(sessionValue, slotState.slot_id)
@@ -686,16 +700,19 @@ export function getActionStripPresentation(input: {
 
   const isPending = sessionValue.pending_plot_ship_ids.includes(plotSummary.context.ship_instance_id);
   const replaySuffix =
-    sessionValue.last_resolution && playbackStep
-      ? ` · replaying turn ${sessionValue.last_resolution.resolved_from_turn_number}`
-      : "";
+    sessionValue.last_resolution && playbackStep?.kind === "preroll"
+      ? ` · resolving turn ${sessionValue.last_resolution.resolved_from_turn_number}`
+      : sessionValue.last_resolution && playbackStep
+        ? ` · replaying turn ${sessionValue.last_resolution.resolved_from_turn_number}`
+        : "";
 
   return {
     kind: "player",
     status_label: `Turn ${plotSummary.context.turn_number} · ${
       isPending ? "Plot submitted" : "Plot in progress"
     }${replaySuffix}`,
-    claim_actions: claimActions
+    claim_actions: claimActions,
+    controls_locked: plotLocked
   };
 }
 

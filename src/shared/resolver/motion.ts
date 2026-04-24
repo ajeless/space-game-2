@@ -125,3 +125,20 @@ export function advanceShipDynamics(
     applied_thrust: appliedThrust
   };
 }
+
+export function advanceShipCoasting(
+  state: BattleState,
+  ship: ShipRuntimeState
+): {
+  applied_thrust: Vector2;
+} {
+  const subTicksPerTurn = state.match_setup.rules.turn.sub_ticks;
+  const dt = state.match_setup.rules.turn.duration_seconds / subTicksPerTurn;
+
+  ship.pose.position.x += ship.pose.velocity.x * dt;
+  ship.pose.position.y += ship.pose.velocity.y * dt;
+
+  return {
+    applied_thrust: { x: 0, y: 0 }
+  };
+}
