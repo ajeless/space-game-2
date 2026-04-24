@@ -1,7 +1,8 @@
 # Layout And Hit Model
 
-**Audience:** developers, future contributors, future-you
-**Status:** design-direction document
+**Status:** current  
+**Audience:** contributors
+
 **Last updated:** 2026-04-21
 
 ## Why this doc exists

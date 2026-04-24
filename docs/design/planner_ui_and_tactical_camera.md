@@ -1,8 +1,10 @@
 # Planner UI And Tactical Camera
 
+**Status:** current  
+**Audience:** contributors
+
 > Shipped planner/control behavior and the seams that keep it separate from resolver contracts.
 
-**Status:** shipped `v0.2` presentation behavior  
 **Scope:** client-side plotting controls, tactical camera behavior, and current config ownership  
 **Last updated:** 2026-04-24
 

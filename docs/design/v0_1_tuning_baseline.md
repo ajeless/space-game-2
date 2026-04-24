@@ -1,9 +1,11 @@
 # v0.1 tuning baseline
 
+**Status:** current  
+**Audience:** contributors
+
 > Created in this repository on 2026-04-21.
 > This doc is the first-pass numeric baseline for `v0.1`. It is intended to be data-driven and easy to revise after playtesting.
 
-**Status:** proposed starting values
 **Scope:** v0.1 numeric rules and tuning constants
 **Last updated:** 2026-04-21
 

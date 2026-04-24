@@ -1,8 +1,10 @@
 # SSD Layout
 
+**Status:** current  
+**Audience:** contributors
+
 > Structural description of the shipped bridge shell, not an aspirational wireframe.
 
-**Status:** shipped `v0.2` shell structure  
 **Scope:** player-facing panel ownership and interaction layout  
 **Last updated:** 2026-04-24
 

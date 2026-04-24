@@ -1,8 +1,10 @@
 # Remote Play Runbook
 
+**Status:** current  
+**Audience:** contributors, maintainers
+
 > Current host workflow for the shipped peer-hosted duel build.
 
-**Status:** shipped workflow  
 **Scope:** local host, same-machine smoke tests, and Cloudflare Tunnel sessions
 
 ## Goal

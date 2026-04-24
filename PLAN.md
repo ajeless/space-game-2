@@ -3,7 +3,7 @@
 > Canonical backlog and deferred-work capture for the repository after the final `v0.2` stabilization pass.
 > If a task is unfinished, deferred, speculative, or only loosely scheduled, it belongs here rather than in multiple slice-era notes.
 
-**Status:** active handoff doc  
+**Status:** archived — v0.3 retirement in progress  
 **Current shipped baseline:** `v0.2` duel build on top of the unchanged `sg2/v0.1` rules/contracts  
 **Rule:** preserve the shipped duel behavior unless a real defect forces a change
 
@@ -18,7 +18,9 @@ The shipped build now includes:
 
 The combat schema, resolver rules, ship data, and fixture contracts are still the `v0.1` baseline. `v0.2` changed maintainability, presentation, and workflow clarity, not gameplay scope.
 
-## Near-term post-v0.2 work
+## Parked work (not planned)
+
+*Captured for reference. None of this is scheduled; the project is in maintenance mode.*
 
 ### Presentation and usability
 
@@ -58,8 +60,3 @@ The combat schema, resolver rules, ship data, and fixture contracts are still th
 - What does imitation learning from player data look like once there is enough data to matter?
 - What safeguards keep future AI opponents challenging without cheating on information or reaction time?
 
-## Planning rules
-
-- Update this file when work is deferred, not the design docs.
-- Update the design docs when shipped behavior or contracts change.
-- Remove stale plan items rather than letting them accumulate as historical debris.

@@ -1,9 +1,11 @@
 # Stack decision — v0.1
 
+**Status:** reference  
+**Audience:** contributors
+
 > Imported from `ajeless/docs/sg/space_game_2/design/stack_decision.md` on 2026-04-21.
 > This copy is now maintained in this repository.
 
-**Status:** decided
 **Scope:** v0.1 vertical slice
 **Last updated:** 2026-04-21
 

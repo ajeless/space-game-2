@@ -1,9 +1,10 @@
 # User Manual
 
+**Status:** current  
+**Audience:** players, playtesters
+
 > Lean guide for the currently playable duel build.
 
-**Status:** current shipped behavior  
-**Audience:** players and playtesters  
 **Rule:** keep this aligned with the browser build, not with future ideas
 
 ## Starting a match

@@ -1,9 +1,11 @@
 # v0.1 data contracts
 
+**Status:** current  
+**Audience:** contributors
+
 > Created in this repository on 2026-04-21.
 > This doc turns the existing v0.1 design direction into concrete config and runtime contract shapes.
 
-**Status:** working contract draft
 **Scope:** v0.1 rules config, ship config, battle state, and plot submission
 **Last updated:** 2026-04-21
 

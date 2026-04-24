@@ -1,7 +1,8 @@
 # Ship Layout And Damage
 
-**Audience:** players, playtesters, curious readers
-**Status:** current player-facing explainer
+**Status:** current  
+**Audience:** players, playtesters
+
 **Last updated:** 2026-04-24
 
 This still describes the shipped duel build. `v0.2` did not change the underlying hit-layout model; it only improved presentation and workflow around it.

@@ -3,7 +3,7 @@
 > Imported from `ajeless/docs/sg/space_game_2/README.md` on 2026-04-21.
 > This copy is now maintained in this repository. The old docs repo remains the archive/reference source for earlier ideation.
 
-A tactical starship combat videogame. Turn-based planning, animated execution, SSD-centric interface. Original IP. Built in deployable vertical slices.
+A tactical starship combat videogame. Turn-based planning, animated execution, SSD-centric interface. Original IP. Built in deployable vertical slices — each release is a fully playable, internet-reachable build.
 
 ## What this project is
 
@@ -41,7 +41,7 @@ This project is built in **deployable vertical slices**. Each slice is a working
 
 ## v0.1 slice target
 
-The first deployable slice. Everything below is required; anything not listed is out of scope.
+The first deployable release. Everything below is required; anything not listed is out of scope.
 
 - **Two identical ships in space.** Symmetric. Fairness is free when both sides are the same.
 - **Continuous Newtonian movement** with planning UI: velocity arrows, ghost projections, draggable thrust handles, reachable-region envelopes, collision/constraint feedback.
@@ -56,11 +56,11 @@ The first deployable slice. Everything below is required; anything not listed is
 
 The sequence in which capabilities are added matters. These are the ordering commitments:
 
-- **Networked peer-hosted multiplayer is first.** This is the v0.1 slice. All later modes ride on this foundation.
+- **Networked peer-hosted multiplayer is first.** This is the v0.1 release. All later modes ride on this foundation.
 - **AI opponent in networked-style comes after human-vs-human works.** The AI is another participant from the protocol's perspective; the networking layer is already proven.
 - **Hot-seat comes after networked play.** Hot-seat is structurally harder than networked play in WEGO (secret-state management on a shared screen, physical handoff, social awkwardness). Building networked-first produces a cleaner foundation; hot-seat rides on top of it. Hot-seat is *not* part of the initial slices.
 - **Dedicated server comes when peer-hosting is the actual bottleneck.** Not before. The game must be good enough that the friction of peer-hosting is a real problem players complain about.
-- **Campaign, persistence, and other single-player modes come later still.** Each is earned.
+- **Campaign, persistence, and other single-player modes come later still.** Each is earned by a later release.
 
 ## Current docs
 
