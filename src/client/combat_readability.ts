@@ -14,6 +14,22 @@ function formatDistance(distanceKm: number): string {
   return `${Math.round(distanceKm)} km`;
 }
 
+function formatHitProbability(probability: number | null): string | null {
+  if (probability === null) {
+    return null;
+  }
+
+  return `${Math.round(probability * 100)}% hit`;
+}
+
+function formatFireWindowLabel(cue: PlotPreviewWeaponCue): string | null {
+  if (cue.best_fire_sub_tick === null) {
+    return null;
+  }
+
+  return `T${(cue.best_fire_sub_tick + 1).toString().padStart(2, "0")}`;
+}
+
 export function getWeaponCueEngagementState(cue: PlotPreviewWeaponCue | null | undefined): WeaponCueEngagementState {
   if (!cue || cue.target_ship_instance_id === null) {
     return "none";
@@ -78,14 +94,19 @@ export function getWeaponCueSolutionLabel(cue: PlotPreviewWeaponCue | null | und
   }
 
   if (cue.charge_pips <= 0) {
-    return "HOLD FIRE";
+    return "Hold fire";
   }
 
   if (cue.predicted_hit_probability !== null) {
-    return `${Math.round(cue.predicted_hit_probability * 100)}% · T${cue.best_fire_sub_tick ?? "?"}`;
+    const hitLabel = formatHitProbability(cue.predicted_hit_probability);
+    const fireWindowLabel = formatFireWindowLabel(cue);
+
+    return [hitLabel, fireWindowLabel ? `fire window ${fireWindowLabel}` : "awaiting shot window"].filter(Boolean).join(
+      " · "
+    );
   }
 
-  return getWeaponCueBlockedReason(cue);
+  return `Shot blocked · ${getWeaponCueBlockedReason(cue).toLowerCase()}`;
 }
 
 export function getWeaponMountStateLabel(
@@ -124,6 +145,43 @@ export function getWeaponMountStateLabel(
   return parts.join(" · ");
 }
 
+export function getWeaponCueGuidanceLabel(cue: PlotPreviewWeaponCue | null | undefined): string | null {
+  if (!cue || cue.target_ship_instance_id === null) {
+    return null;
+  }
+
+  const state = getWeaponCueEngagementState(cue);
+
+  if (state === "tracked") {
+    return "Target tracked. Charge is set to hold fire, so this mount will not shoot.";
+  }
+
+  if (state === "armed") {
+    const hitLabel = formatHitProbability(cue.predicted_hit_probability);
+    const fireWindowLabel = formatFireWindowLabel(cue);
+    const predictionLabel =
+      hitLabel && fireWindowLabel
+        ? `${hitLabel} at ${fireWindowLabel}`
+        : hitLabel ?? (fireWindowLabel ? `fire window ${fireWindowLabel}` : "a legal shot this turn");
+
+    return `Target tracked. Fire control predicts ${predictionLabel}.`;
+  }
+
+  if (!cue.firing_enabled) {
+    return "Target tracked, but this mount is offline and cannot accept fire orders.";
+  }
+
+  if (cue.target_in_arc === false) {
+    return "Target tracked, but it never enters this mount's firing arc. Adjust heading or choose another mount.";
+  }
+
+  if (cue.target_in_range === false) {
+    return "Target tracked, but it stays out of range this turn. Close distance or hold fire.";
+  }
+
+  return "Target tracked, but no legal shot window opens this turn. Adjust heading, range, or charge.";
+}
+
 export function getWeaponCueEngagementLabel(cue: PlotPreviewWeaponCue | null | undefined): string | null {
   if (!cue || cue.target_ship_instance_id === null) {
     return null;
@@ -132,18 +190,17 @@ export function getWeaponCueEngagementLabel(cue: PlotPreviewWeaponCue | null | u
   const state = getWeaponCueEngagementState(cue);
 
   if (state === "tracked") {
-    return "TRACKED · HOLD";
+    return "TRACKED · HOLD FIRE";
   }
 
   if (state === "armed") {
-    const probabilityLabel =
-      cue.predicted_hit_probability !== null ? ` · ${Math.round(cue.predicted_hit_probability * 100)}%` : "";
+    const probabilityLabel = cue.predicted_hit_probability !== null ? ` · ${Math.round(cue.predicted_hit_probability * 100)}% HIT` : "";
 
     return `ARMED · ${cue.charge_pips}P${probabilityLabel}`;
   }
 
   if (state === "blocked") {
-    return `BLOCKED · ${cue.charge_pips}P · ${getWeaponCueBlockedReason(cue)}`;
+    return `BLOCKED · ${getWeaponCueBlockedReason(cue)}`;
   }
 
   return null;

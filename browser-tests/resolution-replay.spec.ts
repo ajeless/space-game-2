@@ -143,8 +143,8 @@ test("combat replay keeps fire and hit events visible in the feed", async ({ bro
     await expect(host.page.locator("[data-resolution-projectile]")).toHaveCount(1);
     await expect(host.page.locator("[data-combat-feed-summary]")).toContainText([
       "Contact drive degraded",
-      "You hit contact · drive",
-      "You fired bow railgun at contact · 3P"
+      "Direct hit on contact · drive",
+      "You opened fire with bow railgun on contact · 3P"
     ]);
     await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
       timeout: 18_000

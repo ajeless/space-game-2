@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatResolutionEventSummary,
   getActionStripPresentation,
+  getMatchOutcomePresentation,
   getResolutionPlaybackMetaLabel
 } from "../src/client/bridge_presenters.js";
 import type { ResolutionPlaybackStep } from "../src/client/resolution_playback.js";
@@ -121,6 +122,19 @@ describe("bridge presenters", () => {
         baseDamage: 15
       }
     };
+    const hitEvent: ResolverEvent = {
+      sub_tick: 18,
+      type: "hit_registered",
+      actor: "alpha_ship",
+      target: "bravo_ship",
+      details: {
+        fromActor: "alpha_ship",
+        impactPoint: { x: 0, y: 0 },
+        impactSystemId: "drive",
+        hullDamageApplied: 9,
+        subsystemDamageApplied: 5
+      }
+    };
     const damageEvent: ResolverEvent = {
       sub_tick: 18,
       type: "subsystem_damaged",
@@ -135,9 +149,39 @@ describe("bridge presenters", () => {
     };
 
     expect(formatResolutionEventSummary(session, identity, weaponEvent)).toBe(
-      "You fired bow railgun at contact · 3P"
+      "You opened fire with bow railgun on contact · 3P"
     );
+    expect(formatResolutionEventSummary(session, identity, hitEvent)).toBe("Direct hit on contact · drive");
     expect(formatResolutionEventSummary(session, identity, damageEvent)).toBe("Contact drive degraded");
+  });
+
+  it("tightens match-end detail for victory and defeat states", async () => {
+    const state = await readBattleStateFixture();
+    const identity = makePlayerIdentity();
+
+    state.outcome = {
+      winner_ship_instance_id: "alpha_ship",
+      end_reason: "destroyed"
+    };
+
+    expect(getMatchOutcomePresentation(makeSessionView(state), identity)).toEqual(
+      expect.objectContaining({
+        headline: "Victory",
+        detail: "Contact destroyed. You hold the field."
+      })
+    );
+
+    state.outcome = {
+      winner_ship_instance_id: "bravo_ship",
+      end_reason: "boundary_disengage"
+    };
+
+    expect(getMatchOutcomePresentation(makeSessionView(state), identity)).toEqual(
+      expect.objectContaining({
+        headline: "Defeat",
+        detail: "Contact won by boundary disengage."
+      })
+    );
   });
 
   it("adds replay status to the player action strip while the previous turn is still playing", async () => {

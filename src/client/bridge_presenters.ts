@@ -284,21 +284,24 @@ export function formatResolutionEventSummary(
     case "weapon_fired": {
       const actor = getShipNarrationLabels(sessionValue, identityValue, event.actor ?? null);
       const target = getShipNarrationLabels(sessionValue, identityValue, event.target ?? null);
-      summary = `${actor.subject} fired ${formatSystemDisplayLabel(
+      summary = `${actor.subject} opened fire with ${formatSystemDisplayLabel(
         sessionValue,
         event.actor ?? null,
         event.details.mountId
-      )} at ${target.object} · ${event.details.chargePips}P`;
+      )} on ${target.object} · ${event.details.chargePips}P`;
       break;
     }
     case "hit_registered": {
       const attacker = getShipNarrationLabels(sessionValue, identityValue, event.details.fromActor);
       const target = getShipNarrationLabels(sessionValue, identityValue, event.target ?? null);
-      summary = `${attacker.subject} hit ${target.object}${
-        event.details.impactSystemId
-          ? ` · ${formatSystemDisplayLabel(sessionValue, event.target ?? null, event.details.impactSystemId)}`
-          : ""
-      }`;
+      const impactLabel = event.details.impactSystemId
+        ? ` · ${formatSystemDisplayLabel(sessionValue, event.target ?? null, event.details.impactSystemId)}`
+        : "";
+
+      summary =
+        attacker.subject === "You"
+          ? `Direct hit on ${target.object}${impactLabel}`
+          : `${attacker.subject} scored a hit on ${target.object}${impactLabel}`;
       break;
     }
     case "subsystem_damaged": {
@@ -307,7 +310,7 @@ export function formatResolutionEventSummary(
         sessionValue,
         event.actor ?? null,
         event.details.systemId
-      )} ${event.details.newState.toLowerCase()}`;
+      )} ${event.details.newState === "offline" ? "knocked offline" : "degraded"}`;
       break;
     }
     case "ship_destroyed": {
@@ -317,7 +320,10 @@ export function formatResolutionEventSummary(
     }
     case "ship_disengaged": {
       const target = getShipNarrationLabels(sessionValue, identityValue, event.target ?? null);
-      summary = target.subject === "You" ? "You crossed the boundary" : `${target.subject} withdrew`;
+      summary =
+        target.subject === "You"
+          ? "You crossed the boundary and withdrew"
+          : `${target.subject} crossed the boundary and withdrew`;
       break;
     }
     case "turn_ended": {
@@ -501,14 +507,27 @@ export function getMatchOutcomePresentation(
     identityValue.ship_instance_id !== null &&
     winnerShipId !== null &&
     identityValue.ship_instance_id !== winnerShipId;
-  const reasonLabel =
-    endReason === "destroyed" ? "Kill confirmed. The duel ended in destruction." : "Boundary disengage ended the duel.";
+  const victoryDetail =
+    endReason === "destroyed"
+      ? "Contact destroyed. You hold the field."
+      : "Contact withdrew across the boundary. You hold the field.";
+  const defeatDetail =
+    endReason === "destroyed"
+      ? `${winnerLabel} destroyed your ship.`
+      : `${winnerLabel} won by boundary disengage.`;
+  const neutralDetail = winnerShipId
+    ? endReason === "destroyed"
+      ? `${winnerLabel} destroyed the opposing ship.`
+      : `${winnerLabel} won by boundary disengage.`
+    : endReason === "destroyed"
+      ? "The duel ended in destruction."
+      : "The duel ended by boundary disengage.";
 
   if (playerWon) {
     return {
       tone: "victory",
       headline: "Victory",
-      detail: `You hold the field. ${reasonLabel}`,
+      detail: victoryDetail,
       reset_hint: "Host can reset the match to start a new duel."
     };
   }
@@ -517,7 +536,7 @@ export function getMatchOutcomePresentation(
     return {
       tone: "defeat",
       headline: "Defeat",
-      detail: `${winnerLabel} wins. ${reasonLabel}`,
+      detail: defeatDetail,
       reset_hint: "Host can reset the match to start a new duel."
     };
   }
@@ -525,7 +544,7 @@ export function getMatchOutcomePresentation(
   return {
     tone: "neutral",
     headline: winnerShipId ? `${winnerLabel} wins` : "Match ended",
-    detail: reasonLabel,
+    detail: neutralDetail,
     reset_hint: "Host can reset the match to start a new duel."
   };
 }

@@ -16,6 +16,7 @@ import type {
 import {
   getWeaponCueArcRangeLabel,
   getWeaponCueBlockedReason,
+  getWeaponCueGuidanceLabel,
   getWeaponMountStateLabel,
   getWeaponCueSolutionLabel
 } from "./combat_readability.js";
@@ -148,14 +149,12 @@ function getWeaponIntentPresentation(
   const isArmed = firingEnabled && chargePips > 0 && targetShipInstanceId !== null;
   const shotQualityLabel = getWeaponCueSolutionLabel(cue);
   const shotStateLabel = getWeaponCueArcRangeLabel(cue);
+  const targetGuidanceLabel = getWeaponCueGuidanceLabel(cue);
   const mountStateLabel = getWeaponMountStateLabel(subsystemState, effects, cue);
   const mountStateSummary = firingEnabled ? subsystemState.toUpperCase() : "OFFLINE";
   const mountStateNote = mountStateLabel !== mountStateSummary ? `Mount effect: ${mountStateLabel}. ` : "";
-  const baseGuidanceLabel =
-    targetShipInstanceId === null
-      ? "Click an enemy contact in the tactical plot to lock this mount."
-      : "Click the same contact again or use Clear Target to stand it down.";
-  const noteLabel = `${mountStateNote}${baseGuidanceLabel}`;
+  const targetAcquisitionLabel = "Click an enemy contact in the tactical plot to lock this mount.";
+  const standDownLabel = "Click the contact again or Clear Target to stand it down.";
 
   if (!firingEnabled) {
     return {
@@ -168,11 +167,17 @@ function getWeaponIntentPresentation(
   }
 
   if (!targetShipInstanceId) {
+    const standbyLabel = chargePips > 0 ? `${chargePips}P standby` : "Hold fire";
+    const guidanceLabel =
+      chargePips > 0
+        ? `Charge is committed, but no contact is assigned. ${targetAcquisitionLabel}`
+        : targetAcquisitionLabel;
+
     return {
       tone: "idle",
-      status_label: chargePips > 0 ? `No contact · SAFE ${chargePips}P` : "No contact · SAFE HOLD",
-      detail_label: `${mountStateSummary} · Await contact`,
-      note_label: noteLabel,
+      status_label: `No contact · ${standbyLabel}`,
+      detail_label: `${mountStateSummary} · Await target lock`,
+      note_label: `${mountStateNote}${guidanceLabel}`,
       is_armed: false
     };
   }
@@ -180,9 +185,9 @@ function getWeaponIntentPresentation(
   if (!isArmed) {
     return {
       tone: "idle",
-      status_label: chargePips > 0 ? `${targetLabel} · TRACKED ${chargePips}P` : `${targetLabel} · TRACKED HOLD`,
-      detail_label: `${mountStateSummary} · ${chargePips > 0 ? "Await fire solution" : "Hold fire"}`,
-      note_label: noteLabel,
+      status_label: `${targetLabel} · TRACKED`,
+      detail_label: `${mountStateSummary} · ${shotQualityLabel ?? "Hold fire"}`,
+      note_label: `${mountStateNote}${targetGuidanceLabel ?? "Target tracked."} ${standDownLabel}`,
       is_armed: false
     };
   }
@@ -191,8 +196,8 @@ function getWeaponIntentPresentation(
     return {
       tone: "armed",
       status_label: `${targetLabel} · ARMED ${chargePips}P`,
-      detail_label: `${mountStateSummary} · ${shotQualityLabel ?? "No fire solution"}`,
-      note_label: noteLabel,
+      detail_label: `${mountStateSummary} · ${shotQualityLabel ?? "Fire solution ready"}`,
+      note_label: `${mountStateNote}${targetGuidanceLabel ?? "Target tracked."} ${standDownLabel}`,
       is_armed: true
     };
   }
@@ -200,8 +205,10 @@ function getWeaponIntentPresentation(
   return {
     tone: "warn",
     status_label: `${targetLabel} · BLOCKED ${chargePips}P`,
-    detail_label: `${mountStateSummary} · ${shotStateLabel ?? (cue ? getWeaponCueBlockedReason(cue) : "NO SHOT")}`,
-    note_label: noteLabel,
+    detail_label: `${mountStateSummary} · ${
+      cue ? `Shot blocked · ${getWeaponCueBlockedReason(cue)}` : shotStateLabel ?? "Shot blocked"
+    }`,
+    note_label: `${mountStateNote}${targetGuidanceLabel ?? "Target tracked, but the shot is blocked."} ${standDownLabel}`,
     is_armed: false
   };
 }

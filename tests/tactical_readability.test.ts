@@ -12,6 +12,7 @@ import {
 import {
   getContactTelemetry,
   getWeaponCueBlockedReason,
+  getWeaponCueGuidanceLabel,
   getWeaponCueEngagementLabel,
   getWeaponCueEngagementState,
   getWeaponCueSolutionLabel,
@@ -46,7 +47,10 @@ describe("tactical readability", () => {
 
     const trackedCue = buildPlotPreview(state, trackedDraft).weapon_cues[0]!;
     expect(getWeaponCueEngagementState(trackedCue)).toBe("tracked");
-    expect(getWeaponCueEngagementLabel(trackedCue)).toBe("TRACKED · HOLD");
+    expect(getWeaponCueEngagementLabel(trackedCue)).toBe("TRACKED · HOLD FIRE");
+    expect(getWeaponCueGuidanceLabel(trackedCue)).toBe(
+      "Target tracked. Charge is set to hold fire, so this mount will not shoot."
+    );
 
     state.ships.alpha_ship!.pose.position = { x: 0, y: -90 };
     state.ships.alpha_ship!.pose.heading_degrees = 0;
@@ -63,12 +67,18 @@ describe("tactical readability", () => {
     const armedCue = buildPlotPreview(state, armedDraft).weapon_cues[0]!;
     expect(getWeaponCueEngagementState(armedCue)).toBe("armed");
     expect(getWeaponCueEngagementLabel(armedCue)).toContain("ARMED · 2P");
+    expect(getWeaponCueEngagementLabel(armedCue)).toContain("% HIT");
+    expect(getWeaponCueSolutionLabel(armedCue)).toMatch(/% hit · fire window T\d{2}/);
+    expect(getWeaponCueGuidanceLabel(armedCue)).toMatch(/^Target tracked\. Fire control predicts \d+% hit at T\d{2}\.$/);
 
     state.ships.bravo_ship!.pose.position = { x: 0, y: 260 };
 
     const blockedCue = buildPlotPreview(state, armedDraft).weapon_cues[0]!;
     expect(getWeaponCueEngagementState(blockedCue)).toBe("blocked");
-    expect(getWeaponCueEngagementLabel(blockedCue)).toBe("BLOCKED · 2P · OUT OF RANGE");
+    expect(getWeaponCueEngagementLabel(blockedCue)).toBe("BLOCKED · OUT OF RANGE");
+    expect(getWeaponCueGuidanceLabel(blockedCue)).toBe(
+      "Target tracked, but it stays out of range this turn. Close distance or hold fire."
+    );
   });
 
   it("treats a mount as armed when a legal shot exists later in the turn even if the live pose is not yet in arc", async () => {
@@ -108,7 +118,7 @@ describe("tactical readability", () => {
     const blockedCue = buildPlotPreview(state, blockedDraft).weapon_cues[0]!;
 
     expect(getWeaponCueBlockedReason(blockedCue)).toBe("OUT OF RANGE");
-    expect(getWeaponCueSolutionLabel(blockedCue)).toBe("OUT OF RANGE");
+    expect(getWeaponCueSolutionLabel(blockedCue)).toBe("Shot blocked · out of range");
 
     const closeActionState = await readBattleStateFixture("fixtures/battle_states/close_action_duel_turn_1.json");
     const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/close_action_alpha_turn_1.json"), closeActionState);

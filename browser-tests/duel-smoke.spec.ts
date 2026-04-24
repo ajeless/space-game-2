@@ -80,10 +80,11 @@ test.describe("selected mount panel", () => {
       await expect(host.page.locator("[data-phase-label]")).toHaveText("AIM MODE");
       await expect(host.page.locator("[data-selected-system-state]")).toContainText("BOW RAILGUN · OPERATIONAL");
       await expect(host.page.locator('[data-selected-summary="status"]')).toContainText("BLOCKED 2P");
-      await expect(host.page.locator('[data-selected-summary="detail"]')).toContainText("OPERATIONAL · IN ARC · OUT OF RANGE");
-      await expect(host.page.locator("[data-selected-system-note]")).toContainText(
-        "Click the same contact again or use Clear Target to stand it down."
+      await expect(host.page.locator('[data-selected-summary="detail"]')).toContainText(
+        "OPERATIONAL · Shot blocked · OUT OF RANGE"
       );
+      await expect(host.page.locator("[data-selected-system-note]")).toContainText("stays out of range this turn");
+      await expect(host.page.locator("[data-selected-system-note]")).toContainText("Clear Target to stand it down");
 
       const afterViewport = await schematicViewport.boundingBox();
 

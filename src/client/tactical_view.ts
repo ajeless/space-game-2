@@ -246,7 +246,7 @@ function renderShipGlyph(
       : baseLabel;
   const metaLabel =
     identityValue?.role === "player" && !isSelf
-      ? contactTelemetry?.closure_label ?? null
+      ? contactTelemetry?.closure_label.toUpperCase() ?? null
       : label && contactTelemetry
         ? contactTelemetry.summary_label
         : null;
@@ -635,7 +635,7 @@ function renderOffscreenMarker(
     : formatDistance(Math.hypot(ship.pose.position.x - camera.center_world.x, ship.pose.position.y - camera.center_world.y)));
   const engagementState = getWeaponCueEngagementState(targetCue);
   const isTargeted = engagementState !== "none";
-  const showTargetLock = !isSelf && Boolean(targetCue?.target_in_range);
+  const showTargetLock = !isSelf && isTargeted;
   const classes = [
     "offscreen-marker",
     isSelf ? "offscreen-marker--self" : "",
