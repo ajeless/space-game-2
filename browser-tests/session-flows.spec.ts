@@ -146,6 +146,69 @@ test("submitted plots lock the order interface until replay completes", async ({
   }
 });
 
+test("reloading during replay keeps the bridge locked until the replay finishes", async ({ browser }) => {
+  const server = await startBridgeServer();
+  const host = await openBridgePage(browser, server.origin);
+  const guest = await openBridgePage(browser, server.origin);
+
+  try {
+    await submitPlot(host.page);
+    await submitPlot(guest.page);
+
+    await expect(host.page.locator("[data-turn-number]")).toHaveText("Turn 2");
+    await expect(host.page.locator("[data-submit-plot]")).toBeDisabled();
+    await expect(host.page.locator("[data-plot-lock-note]")).toContainText(
+      "The previous exchange is still replaying. Plot controls unlock when replay completes."
+    );
+
+    await host.page.reload();
+
+    await expect(host.page.locator("[data-turn-number]")).toHaveText("Turn 2");
+    await expect(host.page.locator("[data-submit-plot]")).toBeDisabled();
+    await expect(host.page.locator("[data-reset-plot]")).toBeDisabled();
+    await expect(host.page.locator("[data-plot-heading]")).toBeDisabled();
+    await expect(host.page.locator("[data-plot-lock-note]")).toContainText(
+      "The previous exchange is still replaying. Plot controls unlock when replay completes."
+    );
+    await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/replay turn 1/i);
+
+    await expect(host.page.locator("[data-current-resolution-meta]")).toContainText(/turn 1 replay complete/i, {
+      timeout: 18_000
+    });
+    await expect(host.page.locator("[data-submit-plot]")).toBeEnabled();
+    await expect(host.page.locator("[data-reset-plot]")).toBeEnabled();
+  } finally {
+    await closeBridgePages(host, guest);
+    await server.close();
+  }
+});
+
+test("link loss disables live plot controls until the host link returns", async ({ browser }) => {
+  const server = await startBridgeServer();
+  const host = await openBridgePage(browser, server.origin);
+  let serverClosed = false;
+
+  try {
+    await expect(host.page.locator("[data-submit-plot]")).toBeEnabled();
+    await expect(host.page.locator("[data-reset-plot]")).toBeEnabled();
+    await expect(host.page.locator("[data-plot-heading]")).toBeEnabled();
+
+    await server.close();
+    serverClosed = true;
+
+    await expect(host.page.locator("header")).toContainText("Link closed", { timeout: 8_000 });
+    await expect(host.page.locator("[data-submit-plot]")).toBeDisabled();
+    await expect(host.page.locator("[data-reset-plot]")).toBeDisabled();
+    await expect(host.page.locator("[data-plot-heading]")).toBeDisabled();
+    await expect(host.page.locator("[data-station-keep]")).toBeDisabled();
+  } finally {
+    await closeBridgePages(host);
+    if (!serverClosed) {
+      await server.close();
+    }
+  }
+});
+
 test("ended matches lock plotting and only expose post-duel state", async ({ browser }) => {
   const server = await startBridgeServer({
     fixturePath: fixturePath("fixtures/battle_states/ended_duel_turn_5.json")

@@ -139,6 +139,18 @@ export function formatBridgeMessage(
     return "Seat claim sent.";
   }
 
+  if (message.startsWith("session resumed in another browser tab")) {
+    return "This bridge resumed in another tab.";
+  }
+
+  if (message.startsWith("link closed")) {
+    return "Host link lost. Reconnecting when available.";
+  }
+
+  if (message.startsWith("link error")) {
+    return "Host link error. Reconnecting when available.";
+  }
+
   if (message.includes("failed") || message.includes("error") || message.startsWith("plot rejected")) {
     return capitalizeLabel(message);
   }
@@ -666,8 +678,9 @@ export function getActionStripPresentation(input: {
   outcomePresentation: MatchOutcomePresentation | null;
   playbackStep: ResolutionPlaybackStep | null;
   plotLocked: boolean;
+  wsState: LinkState;
 }): ActionStripPresentation {
-  const { sessionValue, identityValue, plotSummary, outcomePresentation, playbackStep, plotLocked } = input;
+  const { sessionValue, identityValue, plotSummary, outcomePresentation, playbackStep, plotLocked, wsState } = input;
   const claimActions = getClaimableSlotStates(sessionValue, identityValue).map((slotState) => ({
     slot_id: slotState.slot_id,
     label: getClaimSeatLabel(sessionValue, slotState.slot_id)
@@ -705,12 +718,13 @@ export function getActionStripPresentation(input: {
       : sessionValue.last_resolution && playbackStep
         ? ` · replaying turn ${sessionValue.last_resolution.resolved_from_turn_number}`
         : "";
+  const linkSuffix = wsState === "connected" ? "" : ` · ${formatLinkStatusLabel(wsState).toLowerCase().replace("link ", "")}`;
 
   return {
     kind: "player",
     status_label: `Turn ${plotSummary.context.turn_number} · ${
       isPending ? "Plot submitted" : "Plot in progress"
-    }${replaySuffix}`,
+    }${replaySuffix}${linkSuffix}`,
     claim_actions: claimActions,
     controls_locked: plotLocked
   };

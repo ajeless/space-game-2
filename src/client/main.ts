@@ -48,6 +48,7 @@ import {
   summarizePlotDraft,
   TACTICAL_ZOOM_PRESETS,
   tacticalViewportToWorld,
+  validateBattleState,
   worldToTacticalViewport
 } from "../shared/index.js";
 import type { MatchSessionView, ServerToClientMessage, SessionIdentity } from "../shared/index.js";
@@ -75,7 +76,7 @@ type HealthResponse = {
 };
 
 type PlotLockState = {
-  reason: "submitted" | "replay";
+  reason: "submitted" | "replay" | "link";
   status_label: string;
   note_label: string;
 };
@@ -93,7 +94,8 @@ function getRootElement(): HTMLDivElement {
 const root = getRootElement();
 const RECONNECT_TOKEN_STORAGE_KEY = "sg2_reconnect_token";
 const ADMIN_TOKEN_STORAGE_KEY = "sg2_admin_token";
-const LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY = "sg2_last_presented_resolution_key";
+const LAST_COMPLETED_RESOLUTION_KEY_STORAGE_KEY = "sg2_last_completed_resolution_key";
+const LAST_RESOLUTION_SOURCE_STORAGE_KEY = "sg2_last_resolution_source_state";
 
 let health: HealthResponse | null = null;
 let wsState: "connecting" | "connected" | "closed" | "error" = "connecting";
@@ -112,7 +114,7 @@ type ActiveTacticalDrag = {
 let activeTacticalDrag: ActiveTacticalDrag | null = null;
 let resolutionPlayback: ResolutionPlaybackState | null = null;
 let resolutionPlaybackTimer: number | null = null;
-let lastPresentedResolutionKey: string | null = readStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY);
+let lastCompletedResolutionKey: string | null = readStoredValue(LAST_COMPLETED_RESOLUTION_KEY_STORAGE_KEY);
 let hostToolsOpen = false;
 let optimisticSubmittedPlot: {
   ship_instance_id: ShipInstanceId;
@@ -140,6 +142,60 @@ function writeStoredValue(key: string, value: string | null): void {
   } catch {
     // ignore storage failures in v0.1
   }
+}
+
+function readStoredResolutionPlaybackSource(): {
+  key: string;
+  battle_state: BattleState;
+} | null {
+  const raw = readStoredValue(LAST_RESOLUTION_SOURCE_STORAGE_KEY);
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      key?: unknown;
+      battle_state?: unknown;
+    };
+
+    if (typeof parsed.key !== "string" || !parsed.battle_state) {
+      return null;
+    }
+
+    return {
+      key: parsed.key,
+      battle_state: validateBattleState(parsed.battle_state)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredResolutionPlaybackSource(key: string | null, battleState: BattleState | null): void {
+  if (!key || !battleState) {
+    writeStoredValue(LAST_RESOLUTION_SOURCE_STORAGE_KEY, null);
+    return;
+  }
+
+  try {
+    writeStoredValue(
+      LAST_RESOLUTION_SOURCE_STORAGE_KEY,
+      JSON.stringify({
+        key,
+        battle_state: battleState
+      })
+    );
+  } catch {
+    writeStoredValue(LAST_RESOLUTION_SOURCE_STORAGE_KEY, null);
+  }
+}
+
+function getStoredResolutionPlaybackSource(key: string): BattleState | null {
+  const stored = readStoredResolutionPlaybackSource();
+
+  return stored?.key === key ? stored.battle_state : null;
 }
 
 function logMessage(message: string): void {
@@ -207,6 +263,8 @@ function queueResolutionPlaybackAdvance(): void {
     }
 
     if (resolutionPlayback.current_step_index >= resolutionPlayback.steps.length - 1) {
+      lastCompletedResolutionKey = resolutionPlayback.key;
+      writeStoredValue(LAST_COMPLETED_RESOLUTION_KEY_STORAGE_KEY, resolutionPlayback.key);
       resolutionPlayback = null;
       resolutionPlaybackTimer = null;
       render();
@@ -230,21 +288,30 @@ function syncResolutionPlayback(
 
   if (!key || !sessionValue?.last_resolution) {
     if (sessionValue && !sessionValue.last_resolution) {
-      lastPresentedResolutionKey = null;
-      writeStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY, null);
+      lastCompletedResolutionKey = null;
+      writeStoredValue(LAST_COMPLETED_RESOLUTION_KEY_STORAGE_KEY, null);
+      writeStoredResolutionPlaybackSource(null, null);
     }
 
     clearResolutionPlayback();
     return;
   }
 
-  if (resolutionPlayback?.key === key || lastPresentedResolutionKey === key) {
+  const isPreviousBattleStateUsable =
+    previousBattleState?.match_setup.match_id === sessionValue.battle_state.match_setup.match_id &&
+    previousBattleState.turn_number === sessionValue.last_resolution.resolved_from_turn_number;
+
+  if (isPreviousBattleStateUsable && previousBattleState) {
+    writeStoredResolutionPlaybackSource(key, previousBattleState);
+  }
+
+  if (resolutionPlayback?.key === key || lastCompletedResolutionKey === key) {
     return;
   }
 
   const nextPlayback = buildResolutionPlaybackState({
     sessionValue,
-    previousBattleState
+    previousBattleState: isPreviousBattleStateUsable && previousBattleState ? previousBattleState : getStoredResolutionPlaybackSource(key)
   });
 
   if (!nextPlayback) {
@@ -253,8 +320,6 @@ function syncResolutionPlayback(
   }
 
   resolutionPlayback = nextPlayback;
-  lastPresentedResolutionKey = key;
-  writeStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY, key);
   queueResolutionPlaybackAdvance();
 }
 
@@ -291,10 +356,19 @@ function reconcileOptimisticSubmittedPlot(
 function getPlotLockState(
   sessionValue: MatchSessionView | null,
   identityValue: SessionIdentity | null,
-  playbackStep: ResolutionPlaybackStep | null
+  playbackStep: ResolutionPlaybackStep | null,
+  linkState: "connecting" | "connected" | "closed" | "error" = wsState
 ): PlotLockState | null {
   if (!sessionValue || !identityValue || identityValue.role !== "player" || !identityValue.ship_instance_id) {
     return null;
+  }
+
+  if (linkState !== "connected") {
+    return {
+      reason: "link",
+      status_label: "Host link unavailable",
+      note_label: "Host link unavailable. Plot controls stay paused until the bridge reconnects."
+    };
   }
 
   const shipInstanceId = identityValue.ship_instance_id;
@@ -324,9 +398,10 @@ function getPlotLockState(
 function isPlotInteractionLocked(
   sessionValue: MatchSessionView | null = session,
   identityValue: SessionIdentity | null = identity,
-  playbackStep: ResolutionPlaybackStep | null = getCurrentResolutionPlaybackStepForSession(sessionValue)
+  playbackStep: ResolutionPlaybackStep | null = getCurrentResolutionPlaybackStepForSession(sessionValue),
+  linkState: "connecting" | "connected" | "closed" | "error" = wsState
 ): boolean {
-  return getPlotLockState(sessionValue, identityValue, playbackStep) !== null;
+  return getPlotLockState(sessionValue, identityValue, playbackStep, linkState) !== null;
 }
 
 function smoothstep(value: number): number {
@@ -766,7 +841,7 @@ function render(): void {
 
   reconcileOptimisticSubmittedPlot(sessionValue, identity, playbackStep);
 
-  const plotLockState = getPlotLockState(sessionValue, identity, playbackStep);
+  const plotLockState = getPlotLockState(sessionValue, identity, playbackStep, wsState);
   const displayed = getDisplayedShipContext(sessionValue, identity);
   const plotSummary = getPlayerPlotSummary(sessionValue, identity);
   const selectedSystemContext = getSelectedSystemContext(sessionValue, identity);
@@ -829,7 +904,8 @@ function render(): void {
       plotSummary,
       outcomePresentation,
       playbackStep,
-      plotLocked: plotLockState !== null
+      plotLocked: plotLockState !== null,
+      wsState
     })
   );
   const outcomeBanner = renderMatchOutcomeBanner(outcomePresentation);
@@ -851,6 +927,8 @@ function render(): void {
   const tacticalHint =
     isAimMode
       ? "Click contact to lock. Click again to clear."
+      : plotLockState?.reason === "link"
+        ? "Bridge link down. Plot controls pause until the host session reconnects."
       : plotLockState?.reason === "submitted"
         ? "Orders committed. Plotting stays locked until the replay for this exchange finishes."
       : sessionValue?.last_resolution && playbackStep?.kind === "preroll"
@@ -1005,8 +1083,9 @@ function handleServerMessage(message: ServerToClientMessage): void {
     selectedSystemId = null;
     hostToolsOpen = false;
     clearOptimisticSubmittedPlot();
-    lastPresentedResolutionKey = null;
-    writeStoredValue(LAST_PRESENTED_RESOLUTION_KEY_STORAGE_KEY, null);
+    lastCompletedResolutionKey = null;
+    writeStoredValue(LAST_COMPLETED_RESOLUTION_KEY_STORAGE_KEY, null);
+    writeStoredResolutionPlaybackSource(null, null);
     clearResolutionPlayback();
     logMessage(`session reset · ${message.matchId} · turn ${message.turnNumber}`);
     render();
@@ -1060,6 +1139,9 @@ function connectWebSocket(): void {
 
   socket.addEventListener("close", (event) => {
     wsState = "closed";
+    if (event.code !== 4001) {
+      logMessage("link closed");
+    }
     if (event.code !== 4001 && reconnectTimer === null) {
       reconnectTimer = window.setTimeout(() => {
         reconnectTimer = null;
@@ -1073,6 +1155,7 @@ function connectWebSocket(): void {
 
   socket.addEventListener("error", () => {
     wsState = "error";
+    logMessage("link error");
     render();
   });
 }

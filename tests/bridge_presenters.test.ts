@@ -164,7 +164,8 @@ describe("bridge presenters", () => {
       plotSummary,
       outcomePresentation: null,
       playbackStep,
-      plotLocked: true
+      plotLocked: true,
+      wsState: "connected"
     });
 
     expect(presentation.kind).toBe("player");
@@ -199,7 +200,8 @@ describe("bridge presenters", () => {
       plotSummary,
       outcomePresentation: null,
       playbackStep,
-      plotLocked: true
+      plotLocked: true,
+      wsState: "connected"
     });
 
     expect(presentation.kind).toBe("player");
@@ -207,6 +209,28 @@ describe("bridge presenters", () => {
       throw new Error("Expected player presentation");
     }
     expect(presentation.status_label).toContain("resolving turn 1");
+    expect(presentation.controls_locked).toBe(true);
+  });
+
+  it("adds a link-state suffix when the player bridge is disconnected", async () => {
+    const state = await readBattleStateFixture();
+    const session = makeSessionView(state, 1);
+    const plotSummary = summarizePlotDraft(state, createPlotDraft(state, "alpha_ship"));
+    const presentation = getActionStripPresentation({
+      sessionValue: session,
+      identityValue: makePlayerIdentity(),
+      plotSummary,
+      outcomePresentation: null,
+      playbackStep: null,
+      plotLocked: true,
+      wsState: "closed"
+    });
+
+    expect(presentation.kind).toBe("player");
+    if (presentation.kind !== "player") {
+      throw new Error("Expected player presentation");
+    }
+    expect(presentation.status_label).toContain("closed");
     expect(presentation.controls_locked).toBe(true);
   });
 });
