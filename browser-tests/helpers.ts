@@ -85,12 +85,22 @@ export async function startBridgeServer(options: StartedServerOptions = {}): Pro
   };
 }
 
+export type RecordVideoOptions = {
+  dir: string;
+  size?: { width: number; height: number };
+};
+
+export type OpenBridgePageOptions = {
+  expectedTurnLabel?: string;
+  recordVideo?: RecordVideoOptions;
+};
+
 export async function openBridgePage(
   browser: Browser,
   origin: string,
-  options: { expectedTurnLabel?: string } = {}
+  options: OpenBridgePageOptions = {}
 ): Promise<BridgePage> {
-  const context = await browser.newContext();
+  const context = await browser.newContext(options.recordVideo ? { recordVideo: options.recordVideo } : undefined);
   const page = await context.newPage();
 
   await page.goto(origin);

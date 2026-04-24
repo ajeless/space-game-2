@@ -1,6 +1,7 @@
 // Playwright spec that captures portfolio screenshots during a scripted duel.
 // Depends on: browser-tests/helpers.ts, fixtures/. Consumed by: docs/assets/screenshots/.
 // Invariant: running this spec regenerates the README's embedded images from current UI.
+// Gated behind CAPTURE_ASSETS=1 so it does not run during smoke and silently regenerate PNGs.
 
 import { expect, test } from "@playwright/test";
 import {
@@ -12,6 +13,10 @@ import {
 } from "./helpers";
 
 const SCREENSHOT_DIR = "docs/assets/screenshots";
+
+if (process.env.CAPTURE_ASSETS !== "1") {
+  test.skip(true, "CAPTURE_ASSETS=1 required to regenerate portfolio screenshots");
+}
 
 test("captures the four portfolio screenshots for the README", async ({ browser }) => {
   // Stage a close-enough, stationary encounter so the scope, aim arcs, and

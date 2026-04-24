@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/screenshots/01-bridge-start.png" width="90%" alt="Bridge at the start of a match.">
+  <img src="docs/assets/duel-demo.gif" width="90%" alt="A full turn of Burn Vector, plot to debrief.">
 </p>
 
 ## What is Burn Vector?
