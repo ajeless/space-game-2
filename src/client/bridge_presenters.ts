@@ -709,6 +709,7 @@ export function getSelectedSystemPresentation(
       system: ShipSystemConfig;
       integrity_percent: number;
       state_label: ReturnType<typeof getSystemStateAndEffects>["state_label"];
+      effects: ReturnType<typeof getSystemStateAndEffects>["effects"];
     }
   | null {
   if (!sessionValue || !displayed || !selectedSystemId) {
@@ -728,6 +729,7 @@ export function getSelectedSystemPresentation(
     ship: displayed.ship,
     system,
     integrity_percent: (runtimeSystem.current_integrity / system.max_integrity) * 100,
-    state_label: stateAndEffects.state_label
+    state_label: stateAndEffects.state_label,
+    effects: stateAndEffects.effects
   };
 }

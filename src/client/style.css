@@ -325,16 +325,14 @@ body.is-plot-dragging {
 }
 
 .ssd-slider-card span,
-.ssd-inline-field span,
-.ssd-summary-chip span {
+.ssd-inline-field span {
   color: var(--text-2);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.67rem;
 }
 
-.ssd-slider-card strong,
-.ssd-summary-chip strong {
+.ssd-slider-card strong {
   font-size: 0.95rem;
 }
 
@@ -349,31 +347,22 @@ body.is-plot-dragging {
   accent-color: rgba(125, 213, 154, 0.95);
 }
 
-.ssd-control-deck__hint {
+.ssd-control-summary {
   margin: 0;
   color: var(--text-2);
-  font-size: 0.75rem;
-  pointer-events: none;
-}
-
-.ssd-control-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  font-size: 0.74rem;
+  line-height: 1.35;
 }
 
 .ssd-control-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 2px;
 }
 
-.ssd-summary-chip {
-  min-width: 92px;
-  padding: 7px 9px;
-  border: 1px solid rgba(125, 176, 218, 0.14);
-  background: rgba(11, 24, 36, 0.78);
+.ssd-control-actions .action-button {
+  width: 100%;
 }
 
 .ssd-mount-grid {
@@ -421,8 +410,10 @@ body.is-plot-dragging {
 }
 
 .ssd-control-deck__note {
+  margin: 0;
   color: var(--text-1);
   font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .ssd-selected-panel {
@@ -438,36 +429,6 @@ body.is-plot-dragging {
   background: rgba(23, 19, 14, 0.84);
 }
 
-.ssd-selection-banner {
-  padding: 7px 9px;
-  border: 1px solid rgba(125, 176, 218, 0.18);
-  color: var(--text-0);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.ssd-selection-banner--idle {
-  border-color: rgba(125, 176, 218, 0.2);
-  background: rgba(11, 24, 36, 0.78);
-}
-
-.ssd-selection-banner--armed {
-  border-color: rgba(125, 213, 154, 0.46);
-  background: rgba(16, 41, 32, 0.84);
-}
-
-.ssd-selection-banner--warn {
-  border-color: rgba(242, 200, 121, 0.48);
-  background: rgba(52, 34, 12, 0.82);
-}
-
-.ssd-selection-banner--disabled {
-  border-color: rgba(236, 126, 116, 0.4);
-  background: rgba(44, 20, 18, 0.8);
-}
-
 .ssd-selected-panel__header {
   display: flex;
   justify-content: space-between;
@@ -481,21 +442,25 @@ body.is-plot-dragging {
   font-size: 0.95rem;
 }
 
+.ssd-selected-panel__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.ssd-selected-panel__controls .action-button {
+  min-width: 126px;
+}
+
+.ssd-selected-panel__summary,
 .ssd-selected-panel__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.ssd-selected-panel__actions {
-  display: flex;
-  align-items: stretch;
-}
-
-.ssd-selected-panel__actions .action-button {
-  width: 100%;
-}
-
+.ssd-selected-summary,
 .ssd-selected-readout {
   display: grid;
   gap: 4px;
@@ -504,6 +469,7 @@ body.is-plot-dragging {
   background: rgba(7, 18, 29, 0.72);
 }
 
+.ssd-selected-summary span,
 .ssd-selected-readout span {
   color: var(--text-2);
   text-transform: uppercase;
@@ -511,42 +477,45 @@ body.is-plot-dragging {
   font-size: 0.67rem;
 }
 
+.ssd-selected-summary strong,
 .ssd-selected-readout strong {
   font-size: 0.9rem;
+  line-height: 1.25;
 }
 
-.ssd-selected-readout--idle {
+.ssd-selected-summary--idle,
+.ssd-selected-readout {
   border-color: rgba(125, 176, 218, 0.18);
 }
 
-.ssd-selected-readout--idle strong {
+.ssd-selected-summary--idle strong {
   color: rgba(214, 228, 240, 0.98);
 }
 
-.ssd-selected-readout--armed {
+.ssd-selected-summary--armed {
   border-color: rgba(125, 213, 154, 0.28);
   background: rgba(13, 31, 24, 0.76);
 }
 
-.ssd-selected-readout--armed strong {
+.ssd-selected-summary--armed strong {
   color: rgba(125, 213, 154, 0.98);
 }
 
-.ssd-selected-readout--warn {
+.ssd-selected-summary--warn {
   border-color: rgba(242, 200, 121, 0.28);
   background: rgba(38, 26, 15, 0.76);
 }
 
-.ssd-selected-readout--warn strong {
+.ssd-selected-summary--warn strong {
   color: rgba(255, 206, 149, 0.98);
 }
 
-.ssd-selected-readout--disabled {
+.ssd-selected-summary--disabled {
   border-color: rgba(236, 126, 116, 0.24);
   background: rgba(35, 20, 18, 0.76);
 }
 
-.ssd-selected-readout--disabled strong {
+.ssd-selected-summary--disabled strong {
   color: rgba(255, 181, 133, 0.98);
 }
 
@@ -1679,7 +1648,9 @@ body.is-plot-dragging {
 
   .ssd-control-grid,
   .ssd-mount-card__controls,
-  .ssd-selected-panel__grid {
+  .ssd-selected-panel__grid,
+  .ssd-selected-panel__summary,
+  .ssd-selected-panel__controls {
     grid-template-columns: 1fr;
   }
 

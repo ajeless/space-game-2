@@ -1,4 +1,4 @@
-import type { PlotPreviewWeaponCue, ShipRuntimeState } from "../shared/index.js";
+import type { PlotPreviewWeaponCue, ShipRuntimeState, SubsystemState, SystemEffectValues } from "../shared/index.js";
 
 export type WeaponCueEngagementState = "none" | "tracked" | "armed" | "blocked";
 
@@ -48,7 +48,7 @@ export function getWeaponCueEngagementPriority(cue: PlotPreviewWeaponCue | null 
   }
 }
 
-function getWeaponCueBlockedReason(cue: PlotPreviewWeaponCue): string {
+export function getWeaponCueBlockedReason(cue: PlotPreviewWeaponCue): string {
   if (!cue.firing_enabled) {
     return "OFFLINE";
   }
@@ -62,6 +62,66 @@ function getWeaponCueBlockedReason(cue: PlotPreviewWeaponCue): string {
   }
 
   return "NO SHOT";
+}
+
+export function getWeaponCueArcRangeLabel(cue: PlotPreviewWeaponCue | null | undefined): string | null {
+  if (!cue || cue.target_ship_instance_id === null || cue.target_in_arc === null || cue.target_in_range === null) {
+    return null;
+  }
+
+  return `${cue.target_in_arc ? "IN ARC" : "OUT OF ARC"} · ${cue.target_in_range ? "IN RANGE" : "OUT OF RANGE"}`;
+}
+
+export function getWeaponCueSolutionLabel(cue: PlotPreviewWeaponCue | null | undefined): string | null {
+  if (!cue || cue.target_ship_instance_id === null) {
+    return null;
+  }
+
+  if (cue.charge_pips <= 0) {
+    return "HOLD FIRE";
+  }
+
+  if (cue.predicted_hit_probability !== null) {
+    return `${Math.round(cue.predicted_hit_probability * 100)}% · T${cue.best_fire_sub_tick ?? "?"}`;
+  }
+
+  return getWeaponCueBlockedReason(cue);
+}
+
+export function getWeaponMountStateLabel(
+  subsystemState: SubsystemState,
+  effects: SystemEffectValues,
+  cue: PlotPreviewWeaponCue | null | undefined
+): string {
+  if (effects.firing_enabled === false || subsystemState === "offline") {
+    return "OFFLINE";
+  }
+
+  if (subsystemState !== "degraded") {
+    return subsystemState.toUpperCase();
+  }
+
+  const parts = ["DEGRADED"];
+  const chargePenaltyPips = typeof effects.charge_penalty_pips === "number" ? effects.charge_penalty_pips : 0;
+  const trackQualityFactor = typeof effects.track_quality_factor === "number" ? effects.track_quality_factor : 1;
+
+  if (
+    chargePenaltyPips > 0 &&
+    cue &&
+    cue.charge_pips > 0 &&
+    cue.effective_charge_pips !== null &&
+    cue.effective_charge_pips !== cue.charge_pips
+  ) {
+    parts.push(`${cue.charge_pips}P->${cue.effective_charge_pips}P`);
+  } else if (chargePenaltyPips > 0) {
+    parts.push(`-${chargePenaltyPips}P`);
+  }
+
+  if (trackQualityFactor < 1) {
+    parts.push(`TRACK ${Math.round(trackQualityFactor * 100)}%`);
+  }
+
+  return parts.join(" · ");
 }
 
 export function getWeaponCueEngagementLabel(cue: PlotPreviewWeaponCue | null | undefined): string | null {

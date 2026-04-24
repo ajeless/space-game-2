@@ -4,13 +4,18 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlotPreview,
   createPlotDraft,
+  resolve,
+  validatePlotSubmission,
   validateBattleState,
   type ShipRuntimeState
 } from "../src/shared/index.js";
 import {
   getContactTelemetry,
+  getWeaponCueBlockedReason,
   getWeaponCueEngagementLabel,
-  getWeaponCueEngagementState
+  getWeaponCueEngagementState,
+  getWeaponCueSolutionLabel,
+  getWeaponMountStateLabel
 } from "../src/client/combat_readability.js";
 
 async function readJson(relativePath: string): Promise<unknown> {
@@ -20,8 +25,8 @@ async function readJson(relativePath: string): Promise<unknown> {
   return JSON.parse(raw) as unknown;
 }
 
-async function readBattleStateFixture() {
-  return validateBattleState(await readJson("fixtures/battle_states/default_duel_turn_1.json"));
+async function readBattleStateFixture(relativePath = "fixtures/battle_states/default_duel_turn_1.json") {
+  return validateBattleState(await readJson(relativePath));
 }
 
 function cloneShip(ship: ShipRuntimeState): ShipRuntimeState {
@@ -83,6 +88,60 @@ describe("tactical readability", () => {
     expect(cue.predicted_hit_probability).not.toBeNull();
     expect(getWeaponCueEngagementState(cue)).toBe("armed");
     expect(getWeaponCueEngagementLabel(cue)).toContain("ARMED · 3P");
+  });
+
+  it("surfaces blocked reasons and degraded mount penalties for selected-mount readouts", async () => {
+    const state = await readBattleStateFixture();
+
+    state.ships.alpha_ship!.pose.position = { x: 0, y: -90 };
+    state.ships.alpha_ship!.pose.heading_degrees = 0;
+    state.ships.bravo_ship!.pose.position = { x: 0, y: 260 };
+    state.ships.bravo_ship!.pose.heading_degrees = 180;
+
+    const blockedDraft = createPlotDraft(state, "alpha_ship");
+    blockedDraft.weapons[0] = {
+      ...blockedDraft.weapons[0]!,
+      target_ship_instance_id: "bravo_ship",
+      charge_pips: 2
+    };
+
+    const blockedCue = buildPlotPreview(state, blockedDraft).weapon_cues[0]!;
+
+    expect(getWeaponCueBlockedReason(blockedCue)).toBe("OUT OF RANGE");
+    expect(getWeaponCueSolutionLabel(blockedCue)).toBe("OUT OF RANGE");
+
+    const closeActionState = await readBattleStateFixture("fixtures/battle_states/close_action_duel_turn_1.json");
+    const alphaPlot = validatePlotSubmission(await readJson("fixtures/plots/close_action_alpha_turn_1.json"), closeActionState);
+    const bravoPlot = validatePlotSubmission(await readJson("fixtures/plots/close_action_bravo_turn_1.json"), closeActionState);
+    const resolved = resolve({
+      state: structuredClone(closeActionState),
+      plots_by_ship: {
+        alpha_ship: alphaPlot,
+        bravo_ship: bravoPlot
+      },
+      seed: `${closeActionState.match_setup.seed_root}:turn:${closeActionState.turn_number}`
+    });
+    const degradedDraft = createPlotDraft(resolved.next_state, "alpha_ship");
+
+    degradedDraft.weapons[0] = {
+      ...degradedDraft.weapons[0]!,
+      charge_pips: 3,
+      target_ship_instance_id: "bravo_ship"
+    };
+
+    const degradedCue = buildPlotPreview(resolved.next_state, degradedDraft).weapon_cues[0]!;
+
+    expect(
+      getWeaponMountStateLabel(
+        "degraded",
+        {
+          charge_penalty_pips: 1,
+          track_quality_factor: 0.85,
+          firing_enabled: true
+        },
+        degradedCue
+      )
+    ).toBe("DEGRADED · 3P->2P · TRACK 85%");
   });
 
   it("summarizes contact range and closure from relative motion", async () => {

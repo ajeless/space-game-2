@@ -13,6 +13,12 @@ import type {
   SystemId,
   Vector2
 } from "../shared/index.js";
+import {
+  getWeaponCueArcRangeLabel,
+  getWeaponCueBlockedReason,
+  getWeaponMountStateLabel,
+  getWeaponCueSolutionLabel
+} from "./combat_readability.js";
 
 const SCHEMATIC_VIEWPORT = {
   width: 420,
@@ -30,12 +36,9 @@ type WeaponCue = PlotPreview["weapon_cues"][number];
 
 type WeaponIntentPresentation = {
   tone: "idle" | "armed" | "warn" | "disabled";
-  banner_label: string;
-  target_label: string;
   status_label: string;
-  system_meta_label: string;
-  shot_quality_label: string;
-  shot_state_label: string;
+  detail_label: string;
+  note_label: string;
   is_armed: boolean;
 };
 
@@ -50,6 +53,7 @@ type SelectedSystemContext = {
   system: ShipSystemConfig;
   integrity_percent: number;
   state_label: ReturnType<typeof getSystemStateAndEffects>["state_label"];
+  effects: ReturnType<typeof getSystemStateAndEffects>["effects"];
 };
 
 type OutcomePresentation = {
@@ -128,35 +132,31 @@ function getWeaponIntentPresentation(
   getContactLabel: (shipInstanceId: ShipInstanceId | null) => string,
   weaponDraft: PlotDraft["weapons"][number] | undefined,
   cue: WeaponCue | null,
-  firingEnabled: boolean
+  firingEnabled: boolean,
+  subsystemState: SelectedSystemContext["state_label"],
+  effects: SelectedSystemContext["effects"]
 ): WeaponIntentPresentation {
   const chargePips = weaponDraft?.charge_pips ?? 0;
   const targetShipInstanceId = weaponDraft?.target_ship_instance_id ?? null;
   const targetLabel = getContactLabel(targetShipInstanceId);
-  const targetShortLabel = targetLabel.toUpperCase();
   const isArmed = firingEnabled && chargePips > 0 && targetShipInstanceId !== null;
-  const shotQualityLabel =
-    cue?.predicted_hit_probability !== null && cue?.predicted_hit_probability !== undefined
-      ? `${Math.round(cue.predicted_hit_probability * 100)}% at T${cue.best_fire_sub_tick}`
-      : isArmed
-        ? "No legal shot"
-        : "Unarmed";
-  const shotStateLabel =
-    !cue || cue.target_in_arc === null || cue.target_in_range === null
-      ? targetShipInstanceId
-        ? "Selected contact only"
-        : "Await contact selection"
-      : `${cue.target_in_arc ? "in arc" : "out of arc"} · ${cue.target_in_range ? "in range" : "out of range"}`;
+  const shotQualityLabel = getWeaponCueSolutionLabel(cue);
+  const shotStateLabel = getWeaponCueArcRangeLabel(cue);
+  const mountStateLabel = getWeaponMountStateLabel(subsystemState, effects, cue);
+  const mountStateSummary = firingEnabled ? subsystemState.toUpperCase() : "OFFLINE";
+  const mountStateNote = mountStateLabel !== mountStateSummary ? `Mount effect: ${mountStateLabel}. ` : "";
+  const baseGuidanceLabel =
+    targetShipInstanceId === null
+      ? "Click an enemy contact in the tactical plot to lock this mount."
+      : "Click the same contact again or use Clear Target to stand it down.";
+  const noteLabel = `${mountStateNote}${baseGuidanceLabel}`;
 
   if (!firingEnabled) {
     return {
       tone: "disabled",
-      banner_label: "MOUNT DISABLED",
-      target_label: "none",
-      status_label: "Disabled",
-      system_meta_label: "DISABLED",
-      shot_quality_label: "Mount offline",
-      shot_state_label: "No fire control",
+      status_label: "No contact · OFFLINE",
+      detail_label: "OFFLINE · No fire control",
+      note_label: "This mount is offline and cannot accept fire orders.",
       is_armed: false
     };
   }
@@ -164,12 +164,9 @@ function getWeaponIntentPresentation(
   if (!targetShipInstanceId) {
     return {
       tone: "idle",
-      banner_label: "NO TARGET LOCKED",
-      target_label: "none",
-      status_label: "Select contact",
-      system_meta_label: "SAFE",
-      shot_quality_label: "Await contact",
-      shot_state_label: shotStateLabel,
+      status_label: chargePips > 0 ? `No contact · SAFE ${chargePips}P` : "No contact · SAFE HOLD",
+      detail_label: `${mountStateSummary} · Await contact`,
+      note_label: noteLabel,
       is_armed: false
     };
   }
@@ -177,12 +174,9 @@ function getWeaponIntentPresentation(
   if (!isArmed) {
     return {
       tone: "idle",
-      banner_label: `TRACKING ${targetShortLabel}`,
-      target_label: targetLabel,
-      status_label: "Target tracked",
-      system_meta_label: "TRACK",
-      shot_quality_label: "Hold fire",
-      shot_state_label: shotStateLabel,
+      status_label: chargePips > 0 ? `${targetLabel} · TRACKED ${chargePips}P` : `${targetLabel} · TRACKED HOLD`,
+      detail_label: `${mountStateSummary} · ${chargePips > 0 ? "Await fire solution" : "Hold fire"}`,
+      note_label: noteLabel,
       is_armed: false
     };
   }
@@ -190,24 +184,18 @@ function getWeaponIntentPresentation(
   if (cue?.predicted_hit_probability !== null && cue?.predicted_hit_probability !== undefined) {
     return {
       tone: "armed",
-      banner_label: `ARMED ON ${targetShortLabel} · ${chargePips}P`,
-      target_label: targetLabel,
-      status_label: "Shot armed",
-      system_meta_label: `ARM ${chargePips}P`,
-      shot_quality_label: shotQualityLabel,
-      shot_state_label: shotStateLabel,
+      status_label: `${targetLabel} · ARMED ${chargePips}P`,
+      detail_label: `${mountStateSummary} · ${shotQualityLabel ?? "No fire solution"}`,
+      note_label: noteLabel,
       is_armed: true
     };
   }
 
   return {
     tone: "warn",
-    banner_label: `SHOT BLOCKED · ${targetShortLabel}`,
-    target_label: targetLabel,
-    status_label: "Target tracked · blocked",
-    system_meta_label: "NO SHOT",
-    shot_quality_label: shotQualityLabel,
-    shot_state_label: shotStateLabel,
+    status_label: `${targetLabel} · BLOCKED ${chargePips}P`,
+    detail_label: `${mountStateSummary} · ${shotStateLabel ?? (cue ? getWeaponCueBlockedReason(cue) : "NO SHOT")}`,
+    note_label: noteLabel,
     is_armed: false
   };
 }
@@ -399,7 +387,9 @@ function renderSchematicControlDeck(
         getContactLabel,
         weaponDraft,
         cue,
-        mountContext?.firing_enabled ?? false
+        mountContext?.firing_enabled ?? false,
+        selectedSystemContext.state_label,
+        selectedSystemContext.effects
       );
       const canClearTarget = weaponDraft?.target_ship_instance_id !== null || selectedChargePips > 0;
       const chargeOptions = [
@@ -410,11 +400,13 @@ function renderSchematicControlDeck(
       ].join("");
 
       selectedPanel = `
-        <section class="ssd-selected-panel ssd-selected-panel--aim">
+        <section class="ssd-selected-panel ssd-selected-panel--aim" data-selected-panel="${selectedSystemContext.system.id}">
           <div class="ssd-selected-panel__header">
-            <div>
+            <div class="ssd-selected-panel__header-main">
               <span class="section-kicker">Aim Mode</span>
-              <strong>${mountContext?.label ?? selectedSystemContext.system.id}</strong>
+              <strong data-selected-system-state>
+                ${(mountContext?.label ?? selectedSystemContext.system.id).toUpperCase()} · ${selectedSystemContext.state_label.toUpperCase()}
+              </strong>
             </div>
             <button class="action-button action-button--secondary action-button--compact" data-clear-system-selection>
               <span class="action-button__row">
@@ -423,45 +415,34 @@ function renderSchematicControlDeck(
               </span>
             </button>
           </div>
-          <div class="ssd-selection-banner ssd-selection-banner--${intent.tone}">
-            ${intent.banner_label}
-          </div>
-          <div class="ssd-selected-panel__grid">
+          <div class="ssd-selected-panel__controls">
             <label class="ssd-inline-field">
               <span>Charge</span>
               <select data-aim-charge="${selectedSystemContext.system.id}" ${!mountContext?.firing_enabled ? "disabled" : ""}>
                 ${chargeOptions}
               </select>
             </label>
-            <div class="ssd-selected-panel__actions">
-              <button
-                class="action-button action-button--secondary action-button--compact"
-                data-clear-aim-target="${selectedSystemContext.system.id}"
-                ${canClearTarget ? "" : "disabled"}
-              >
-                <span class="action-button__row">
-                  <span class="action-button__label">Clear Target</span>
-                </span>
-              </button>
-            </div>
-            <div class="ssd-selected-readout ssd-selected-readout--${intent.tone}">
-              <span>Target</span>
-              <strong>${intent.target_label}</strong>
-            </div>
-            <div class="ssd-selected-readout ssd-selected-readout--${intent.tone}">
-              <span>Fire Control</span>
+            <button
+              class="action-button action-button--secondary action-button--compact"
+              data-clear-aim-target="${selectedSystemContext.system.id}"
+              ${canClearTarget ? "" : "disabled"}
+            >
+              <span class="action-button__row">
+                <span class="action-button__label">Clear Target</span>
+              </span>
+            </button>
+          </div>
+          <div class="ssd-selected-panel__summary">
+            <div class="ssd-selected-summary ssd-selected-summary--${intent.tone}" data-selected-summary="status">
+              <span>Status</span>
               <strong>${intent.status_label}</strong>
             </div>
-            <div class="ssd-selected-readout ssd-selected-readout--${intent.tone}">
-              <span>Solution</span>
-              <strong>${intent.shot_quality_label}</strong>
-            </div>
-            <div class="ssd-selected-readout ssd-selected-readout--${intent.tone}">
-              <span>Arc / Range</span>
-              <strong>${intent.shot_state_label}</strong>
+            <div class="ssd-selected-summary ssd-selected-summary--${intent.tone}" data-selected-summary="detail">
+              <span>Detail</span>
+              <strong>${intent.detail_label}</strong>
             </div>
           </div>
-          <p class="ssd-control-deck__note">Click an enemy contact in the tactical plot to lock this mount. Click the same contact again or use Clear Target to stand it down.</p>
+          <p class="ssd-control-deck__note" data-selected-system-note>${intent.note_label}</p>
         </section>
       `;
     } else {
@@ -496,7 +477,7 @@ function renderSchematicControlDeck(
   }
 
   return `
-    <div class="ssd-control-deck">
+    <div class="ssd-control-deck" data-schematic-control-deck>
       <div class="ssd-control-deck__header">
         <div>
           <span class="section-kicker">Plot Controls</span>
@@ -506,63 +487,62 @@ function renderSchematicControlDeck(
           ${isPending ? "submitted" : "editing"}
         </span>
       </div>
-      <div class="ssd-control-grid">
-        <label class="ssd-slider-card">
-          <span>Turn</span>
-          <strong>${formatSignedNumber(draft.heading_delta_degrees)}°</strong>
-          <small>End ${desiredHeading.toFixed(0).padStart(3, "0")}°</small>
-          <input
-            type="range"
-            min="${-Math.round(context.effective_turn_cap_degrees)}"
-            max="${Math.round(context.effective_turn_cap_degrees)}"
-            step="1"
-            value="${draft.heading_delta_degrees}"
-            data-plot-heading
-          />
-        </label>
-        <label class="ssd-slider-card">
-          <span>Axial Trim</span>
-          <strong>${formatSignedNumber(draft.thrust_input.axial_fraction * 100)}%</strong>
-          <small>Stern to bow</small>
-          <input
-            type="range"
-            min="-100"
-            max="100"
-            step="5"
-            value="${Math.round(draft.thrust_input.axial_fraction * 100)}"
-            data-plot-axial
-          />
-        </label>
-        <label class="ssd-slider-card">
-          <span>Lateral Trim</span>
-          <strong>${formatSignedNumber(draft.thrust_input.lateral_fraction * 100)}%</strong>
-          <small>Port to starboard</small>
-          <input
-            type="range"
-            min="-100"
-            max="100"
-            step="5"
-            value="${Math.round(draft.thrust_input.lateral_fraction * 100)}"
-            data-plot-lateral
-          />
-        </label>
-      </div>
-      <p class="ssd-control-deck__hint">Primary controls live on the tactical plot. Use these sliders for fine trim.</p>
-      <div class="ssd-control-summary">
-        <div class="ssd-summary-chip"><span>Drive</span><strong>${power.drive_pips}</strong></div>
-        <div class="ssd-summary-chip"><span>Railgun</span><strong>${power.railgun_pips}</strong></div>
-        <div class="ssd-summary-chip"><span>Burn</span><strong>${formatSignedNumber(
-          worldThrust.x,
-          2
-        )}, ${formatSignedNumber(worldThrust.y, 2)}</strong></div>
-      </div>
-      <div class="ssd-control-actions">
-        <button class="action-button action-button--secondary action-button--compact" data-station-keep>
-          <span class="action-button__row">
-            <span class="action-button__label">Station Keep</span>
-          </span>
-          <small class="action-button__hint">Attempt null drift · ${formatNumber(driftSpeed)}</small>
-        </button>
+      <div class="ssd-plot-controls">
+        <div class="ssd-control-grid">
+          <label class="ssd-slider-card">
+            <span>Turn</span>
+            <strong>${formatSignedNumber(draft.heading_delta_degrees)}°</strong>
+            <small>End ${desiredHeading.toFixed(0).padStart(3, "0")}°</small>
+            <input
+              type="range"
+              min="${-Math.round(context.effective_turn_cap_degrees)}"
+              max="${Math.round(context.effective_turn_cap_degrees)}"
+              step="1"
+              value="${draft.heading_delta_degrees}"
+              data-plot-heading
+            />
+          </label>
+          <label class="ssd-slider-card">
+            <span>Axial Trim</span>
+            <strong>${formatSignedNumber(draft.thrust_input.axial_fraction * 100)}%</strong>
+            <small>Stern to bow</small>
+            <input
+              type="range"
+              min="-100"
+              max="100"
+              step="5"
+              value="${Math.round(draft.thrust_input.axial_fraction * 100)}"
+              data-plot-axial
+            />
+          </label>
+          <label class="ssd-slider-card">
+            <span>Lateral Trim</span>
+            <strong>${formatSignedNumber(draft.thrust_input.lateral_fraction * 100)}%</strong>
+            <small>Port to starboard</small>
+            <input
+              type="range"
+              min="-100"
+              max="100"
+              step="5"
+              value="${Math.round(draft.thrust_input.lateral_fraction * 100)}"
+              data-plot-lateral
+            />
+          </label>
+        </div>
+        <p class="ssd-control-summary">
+          Drive ${power.drive_pips} · Railgun ${power.railgun_pips} · Burn ${formatSignedNumber(
+            worldThrust.x,
+            2
+          )}, ${formatSignedNumber(worldThrust.y, 2)}
+        </p>
+        <div class="ssd-control-actions">
+          <button class="action-button action-button--secondary action-button--compact" data-station-keep>
+            <span class="action-button__row">
+              <span class="action-button__label">Station Keep</span>
+              <span class="action-button__hint">Null drift · ${formatNumber(driftSpeed)}</span>
+            </span>
+          </button>
+        </div>
       </div>
       ${selectedPanel}
     </div>
@@ -595,7 +575,15 @@ export function renderSchematicPanel({
     for (const weapon of plotSummary.draft.weapons) {
       const cue = plotPreview?.weapon_cues.find((candidate) => candidate.mount_id === weapon.mount_id) ?? null;
       const mountContext = plotSummary.context.weapon_mounts.find((candidate) => candidate.mount_id === weapon.mount_id);
-      const intent = getWeaponIntentPresentation(getContactLabel, weapon, cue, mountContext?.firing_enabled ?? false);
+      const mountState = getSystemStateAndEffects(sessionValue.battle_state, ship, weapon.mount_id);
+      const intent = getWeaponIntentPresentation(
+        getContactLabel,
+        weapon,
+        cue,
+        mountContext?.firing_enabled ?? false,
+        mountState.state_label,
+        mountState.effects
+      );
 
       weaponIntentByMountId.set(weapon.mount_id, {
         is_armed: intent.is_armed
@@ -655,7 +643,7 @@ export function renderSchematicPanel({
         ${renderHeadingCompass(displayHeadingDegrees)}
       </div>
       <div class="schematic-shell__body">
-        <div class="ssd-viewport">
+        <div class="ssd-viewport" data-schematic-viewport>
           <svg viewBox="0 0 ${SCHEMATIC_VIEWPORT.width} ${SCHEMATIC_VIEWPORT.height}" aria-label="Ship schematic">
             <rect class="ssd-viewport__frame" x="10" y="10" width="${SCHEMATIC_VIEWPORT.width - 20}" height="${
               SCHEMATIC_VIEWPORT.height - 20
