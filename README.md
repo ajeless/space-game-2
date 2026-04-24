@@ -14,6 +14,12 @@
   <img src="docs/assets/screenshots/01-bridge-start.png" width="90%" alt="Bridge at the start of a match.">
 </p>
 
+## Try it live
+
+**[▶ https://ajeless.github.io/burn-vector/?demo=1](https://ajeless.github.io/burn-vector/?demo=1)**
+
+Static deploy running a canned duel — watch a real turn resolve without needing a second player. For a full interactive session, see [Quickstart](#quickstart).
+
 ## What is Burn Vector?
 
 A tactical, turn-based starship-combat duel with a pure shared resolver and a ship-schematic-centric interface. Two identical ships start symmetric; one goes home. Built as a deployable vertical slice — everything you see is wired through a real peer-hosted multiplayer stack.
@@ -25,8 +31,8 @@ It's an homage to tabletop starship combat (Star Fleet Battles, Federation Comma
 Node.js 24+ required.
 
 ```bash
-git clone https://github.com/ajeless/space-game-2.git
-cd space-game-2
+git clone https://github.com/ajeless/burn-vector.git
+cd burn-vector
 npm install
 # In one terminal:
 npm run dev:server

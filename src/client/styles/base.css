@@ -47,3 +47,39 @@ body.is-plot-dragging {
   height: 100vh;
   padding: 10px;
 }
+
+.demo-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 14px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  background: rgba(8, 26, 40, 0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-0);
+  pointer-events: none;
+}
+
+.demo-banner__label {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(184, 144, 72, 0.18);
+  border: 1px solid rgba(184, 144, 72, 0.5);
+  color: #e9c792;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.demo-banner__copy {
+  color: var(--text-1, #c6d1da);
+}

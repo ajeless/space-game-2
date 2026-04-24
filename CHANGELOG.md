@@ -2,7 +2,7 @@
 
 All notable changes to Burn Vector are recorded here. This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0] — in progress
+## [0.3.0] — 2026-04-24
 
 ### Changed
 - Rebranded from `space_game_2` to **Burn Vector**.
@@ -15,7 +15,7 @@ All notable changes to Burn Vector are recorded here. This project follows [Keep
 - `fast-check` property test asserting resolver determinism.
 - Portfolio-grade `README.md` with embedded duel GIF, screenshots, and tech-stack credits.
 - Wordmark SVG logo and favicon.
-- (If deploy succeeds) Static GitHub Pages demo playing a canned duel.
+- Static GitHub Pages demo playing a canned duel (`?demo=1`).
 
 ### Refactored
 - `src/client/style.css` split into layered stylesheets under `src/client/styles/`.

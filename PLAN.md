@@ -3,7 +3,7 @@
 > Canonical backlog and deferred-work capture for the repository after the final `v0.2` stabilization pass.
 > If a task is unfinished, deferred, speculative, or only loosely scheduled, it belongs here rather than in multiple slice-era notes.
 
-**Status:** archived — v0.3 retirement in progress  
+**Status:** archived — v0.3 retirement complete  
 **Current shipped baseline:** `v0.2` duel build on top of the unchanged `sg2/v0.1` rules/contracts  
 **Rule:** preserve the shipped duel behavior unless a real defect forces a change
 

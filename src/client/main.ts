@@ -57,6 +57,7 @@ import {
   getSelectedSystemPresentation,
   isMatchEnded
 } from "./bridge_presenters.js";
+import { buildDemoBootstrap, isDemoModeRequested, mountDemoBanner } from "./demo_mode.js";
 import { renderSchematicPanel } from "./schematic_view.js";
 import { TACTICAL_VIEWPORT, SHOW_TACTICAL_ZOOM_CONTROLS } from "./bridge_ui_config.js";
 import {
@@ -878,14 +879,26 @@ function handleServerMessage(message: ServerToClientMessage): void {
   }
 }
 
-render();
-void loadHealth();
-connection = connectBridgeWebSocket({
-  getReconnectToken: () => readStoredValue(RECONNECT_TOKEN_STORAGE_KEY),
-  onLinkStateChange: (state) => {
-    wsState = state;
-    render();
-  },
-  onServerMessage: handleServerMessage,
-  onLogMessage: logMessage
-});
+if (isDemoModeRequested(window.location.search)) {
+  const bootstrap = buildDemoBootstrap();
+
+  identity = bootstrap.identity;
+  session = bootstrap.session;
+  wsState = "connected";
+  syncResolutionPlayback(session, bootstrap.previousBattleState);
+  mountDemoBanner();
+  logMessage("demo mode · canned duel replay");
+  render();
+} else {
+  render();
+  void loadHealth();
+  connection = connectBridgeWebSocket({
+    getReconnectToken: () => readStoredValue(RECONNECT_TOKEN_STORAGE_KEY),
+    onLinkStateChange: (state) => {
+      wsState = state;
+      render();
+    },
+    onServerMessage: handleServerMessage,
+    onLogMessage: logMessage
+  });
+}
