@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/assets/logo/burn-vector-logo.svg" width="480" alt="Burn Vector">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo/burn-vector-logo-light.svg">
+    <img src="docs/assets/logo/burn-vector-logo.svg" width="560" alt="BURN VECTOR">
+  </picture>
 </p>
 
 <p align="center"><em>A turn-based tactical starship-combat duel. Plot. Commit. Execute. Debrief.</em></p>
@@ -8,17 +11,25 @@
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
   <a href="package.json"><img alt="Node 24+" src="https://img.shields.io/badge/Node-24%2B-5FA04E?logo=nodedotjs&logoColor=white"></a>
   <a href="docs/developer/testing.md"><img alt="Tested with Vitest and Playwright" src="https://img.shields.io/badge/tests-Vitest%20%7C%20Playwright-6E9F18"></a>
+  <a href="CHANGELOG.md"><img alt="v0.3" src="https://img.shields.io/badge/version-0.3-000"></a>
+  <a href="PLAN.md"><img alt="Status: maintenance" src="https://img.shields.io/badge/status-maintenance-888"></a>
 </p>
 
 <p align="center">
-  <img src="docs/assets/duel-demo.gif" width="90%" alt="A full turn of Burn Vector, plot to debrief.">
+  <img src="docs/assets/duel-demo.gif" width="90%" alt="A full turn of Burn Vector — plot to debrief.">
 </p>
+
+---
 
 ## What is Burn Vector?
 
 A tactical, turn-based starship-combat duel with a pure shared resolver and a ship-schematic-centric interface. Two identical ships start symmetric; one goes home. Built as a deployable vertical slice — everything you see is wired through a real peer-hosted multiplayer stack.
 
-It's an homage to tabletop starship combat (Star Fleet Battles, Federation Commander, Attack Vector: Tactical, Full Thrust, Triplanetary, Mayday/Brilliant Lances) that takes full advantage of the digital medium: continuous Newtonian movement, plot-commit-execute-debrief loops, and an SSD that the player plays *with* rather than through.
+It's an homage to tabletop starship combat (Star Fleet Battles, Federation Commander, Attack Vector: Tactical, Full Thrust, Triplanetary, Mayday / Brilliant Lances) that takes full advantage of the digital medium: continuous Newtonian movement, plot-commit-execute-debrief loops, and an SSD that the player plays *with* rather than through.
+
+> **Design thesis** — the Ship System Display is not a skin over a hull bar. It is a map of the ship you are actually flying. Where the reactor sits matters. Where the drive sits matters. A hit *near the bridge* reads differently from a hit *near the mount*.
+
+---
 
 ## Quickstart
 
@@ -34,28 +45,54 @@ npm run dev:server
 npm run dev:client
 ```
 
-Open http://localhost:5173 in two browser tabs to play both sides of a duel.
+Open <kbd>http://localhost:5173</kbd> in two browser tabs to play both sides of a duel.
 
 ### Want to just watch?
 
-Append `?demo=1` to the client URL (http://localhost:5173/?demo=1) to watch a canned turn resolve without needing a second tab or the server. No interactivity — the replay simply plays.
+Append `?demo=1` to the client URL (`http://localhost:5173/?demo=1`) to watch a canned turn resolve without needing a second tab or the server. No interactivity — the replay simply plays.
 
-## Gameplay
+---
 
-<p align="center">
-  <img src="docs/assets/screenshots/02-plotting.png" width="90%" alt="Plotting a burn and aiming a weapon.">
-  <br><em>Plot your burn and aim a weapon from the ship schematic.</em>
-</p>
+## How it plays
 
-<p align="center">
-  <img src="docs/assets/screenshots/03-combat.png" width="90%" alt="Combat in flight.">
-  <br><em>Both plots resolve animated — you watch your decisions play out.</em>
-</p>
+```mermaid
+flowchart LR
+  PLOT["🎯 PLOT<br/>author burn + heading<br/>aim a mount"] --> COMMIT["🔒 COMMIT<br/>submit; controls lock"]
+  COMMIT --> EXECUTE["⚡ EXECUTE<br/>resolver runs<br/>both plots animate"]
+  EXECUTE --> DEBRIEF["📋 DEBRIEF<br/>feed read<br/>next turn ready"]
+  DEBRIEF -.-> PLOT
+```
 
-<p align="center">
-  <img src="docs/assets/screenshots/04-debrief.png" width="90%" alt="Debrief after turn resolution.">
-  <br><em>Debrief sets up the next turn with everything that just happened visible.</em>
-</p>
+<table>
+<tr>
+<td width="33%" valign="top" align="center">
+  <img src="docs/assets/screenshots/02-plotting.png" alt="Plotting a burn and aiming a weapon.">
+  <br><b>PLOT</b>
+  <br><sub>Plot your burn and aim a weapon from the ship schematic.</sub>
+</td>
+<td width="33%" valign="top" align="center">
+  <img src="docs/assets/screenshots/03-combat.png" alt="Combat in flight.">
+  <br><b>EXECUTE</b>
+  <br><sub>Both plots resolve animated — you watch your decisions play out.</sub>
+</td>
+<td width="33%" valign="top" align="center">
+  <img src="docs/assets/screenshots/04-debrief.png" alt="Debrief after turn resolution.">
+  <br><b>DEBRIEF</b>
+  <br><sub>Debrief sets up the next turn with everything that just happened visible.</sub>
+</td>
+</tr>
+</table>
+
+### The turn loop, in detail
+
+| phase       | you do                                    | the game does                                  |
+|-------------|-------------------------------------------|------------------------------------------------|
+| **PLOT**    | set burn, heading, aim intent             | validates against ship contracts               |
+| **COMMIT**  | submit; controls lock                     | waits for opponent                             |
+| **EXECUTE** | watch                                     | resolves both plots with one deterministic seed |
+| **DEBRIEF** | read the feed; next-turn state is ready   | replays events, applies damage, reopens plot   |
+
+---
 
 ## How it works
 
@@ -65,7 +102,39 @@ Three layers:
 - **Shared** — pure logic: contracts, validation, the turn resolver. No DOM, no filesystem, no wall clock.
 - **Server** — Node + `ws`. Peer-authoritative host. Resolves turns and broadcasts results.
 
+```
+┌── CLIENT ──────────────┐   ┌── SHARED ─────────────┐   ┌── SERVER ──────────┐
+│  vanilla TS + DOM      │   │  pure logic · no DOM  │   │  Node + ws         │
+│  tactical camera       │◄─►│  contracts            │◄─►│  peer-authoritative│
+│  SSD renderer          │   │  validation           │   │  turn resolver     │
+│  plot authoring        │   │  resolver/*           │   │  broadcast         │
+└────────────────────────┘   └───────────────────────┘   └────────────────────┘
+```
+
 See [docs/design/architecture.md](docs/design/architecture.md) for layer diagrams and the turn-loop sequence.
+
+---
+
+## Testing
+
+| Tier                | Runner                  | Asserts                                           |
+|:--------------------|:------------------------|:--------------------------------------------------|
+| **Contract**        | Vitest                  | JSON shapes don't regress                         |
+| **Unit**            | Vitest                  | Shared logic, resolver, plot authoring, presenters |
+| **Property**        | Vitest + `fast-check`   | Resolver determinism across arbitrary seeds       |
+| **Browser smoke**   | Playwright              | Real duel flow, end to end                        |
+
+```bash
+npm test                     # Vitest
+npm run test:coverage        # + HTML coverage report
+npm run test:browser:smoke   # Playwright
+npm run check                # typecheck + Vitest
+```
+
+`src/shared/` holds an **85%** line / function / statement threshold.
+See [docs/developer/testing.md](docs/developer/testing.md).
+
+---
 
 ## Built with
 
@@ -87,7 +156,9 @@ See [docs/design/architecture.md](docs/design/architecture.md) for layer diagram
 - [**ws**](https://github.com/websockets/ws) — peer-to-peer WebSocket transport.
 - [**fast-check**](https://github.com/dubzzz/fast-check) — property-based testing for resolver determinism.
 
-## Inspiration
+---
+
+## Lineage
 
 Burn Vector is an homage to the tabletop tactical starship-combat lineage:
 
@@ -100,11 +171,25 @@ Burn Vector is an homage to the tabletop tactical starship-combat lineage:
 
 If you came up on any of those, you'll recognize the DNA.
 
+---
+
 ## Status
 
-**v0.3 — maintenance mode.** Feature development is retired; the project stands as a portfolio artifact showcasing a full-stack TypeScript game prototype with deterministic-resolver architecture, peer-hosted multiplayer, and a comprehensive test suite.
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │  v0.3 · MAINTENANCE MODE                                 │
+  │  Feature development retired.                            │
+  │  Project stands as a portfolio artifact:                 │
+  │    · full-stack strict TypeScript                        │
+  │    · deterministic-resolver architecture                 │
+  │    · peer-hosted multiplayer                             │
+  │    · comprehensive test suite (87 tests)                 │
+  └──────────────────────────────────────────────────────────┘
+```
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and [PLAN.md](PLAN.md) for the parked-work record.
+
+---
 
 ## License
 

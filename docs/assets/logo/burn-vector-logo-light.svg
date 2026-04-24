@@ -1,18 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 180" role="img" aria-label="Burn Vector" color="#E6EDF3">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 180" role="img" aria-label="Burn Vector" color="#1f2328">
   
-  <g fill="currentColor" stroke="currentColor">
-    
-    <line x1="60" y1="22" x2="500" y2="22" stroke-width="1" fill="none"></line>
-    <line x1="60" y1="26" x2="500" y2="26" stroke-width="0.5" fill="none"></line>
-  </g>
-
-  
+  <line x1="60" y1="22" x2="500" y2="22" stroke="currentColor" stroke-width="1"></line>
+  <line x1="60" y1="26" x2="500" y2="26" stroke="currentColor" stroke-width="0.5"></line>
   <text x="280" y="42" text-anchor="middle" font-family="ui-monospace, &#39;SF Mono&#39;, &#39;JetBrains Mono&#39;, monospace" font-size="9" letter-spacing="6" fill="currentColor">A TACTICAL STARSHIP DUEL</text>
-
-  
   <text x="280" y="92" text-anchor="middle" font-family="&#39;Iowan Old Style&#39;, &#39;Palatino&#39;, &#39;Times New Roman&#39;, Georgia, serif" font-size="54" font-style="italic" font-weight="400" fill="currentColor">Burn Vector</text>
-
-  
   <g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
     <line x1="160" y1="108" x2="180" y2="108"></line>
     <line x1="190" y1="108" x2="210" y2="108"></line>
@@ -21,18 +12,12 @@
     <line x1="386" y1="108" x2="406" y2="108"></line>
   </g>
   <path d="M336 104 L346 108 L336 112" fill="currentColor"></path>
-
-  
   <line x1="60" y1="124" x2="500" y2="124" stroke="currentColor" stroke-width="1"></line>
-
-  
   <g font-family="ui-monospace, &#39;SF Mono&#39;, &#39;JetBrains Mono&#39;, monospace" fill="currentColor" font-size="10" letter-spacing="2" opacity="0.9">
     <text x="120" y="146">▌HDG 000</text>
     <text x="232" y="146">▌BRN +03</text>
     <text x="344" y="146">▌AIM LCK</text>
   </g>
-
-  
   <g fill="currentColor" opacity="0.8">
     <rect x="440" y="140" width="3" height="4"></rect>
     <rect x="446" y="137" width="3" height="7"></rect>
@@ -40,8 +25,6 @@
     <rect x="458" y="129" width="3" height="15"></rect>
     <rect x="464" y="125" width="3" height="19"></rect>
   </g>
-
-  
   <text x="280" y="170" text-anchor="middle" font-family="ui-monospace, &#39;SF Mono&#39;, &#39;JetBrains Mono&#39;, monospace" font-size="8.5" fill="currentColor" opacity="0.7" letter-spacing="4">
     PLOT · COMMIT · EXECUTE · DEBRIEF
   </text>
