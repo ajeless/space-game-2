@@ -16,9 +16,26 @@ import {
   type ResolutionPlaybackStep
 } from "./resolution_playback.js";
 import {
+  ADMIN_TOKEN_STORAGE_KEY,
+  getStoredResolutionPlaybackSource,
+  LAST_COMPLETED_RESOLUTION_KEY_STORAGE_KEY,
+  RECONNECT_TOKEN_STORAGE_KEY,
+  writeStoredResolutionPlaybackSource,
+  readStoredValue,
+  writeStoredValue
+} from "./bridge_storage.js";
+import {
   bindRenderedBridgeControls,
   type TacticalDragHandleId
 } from "./bridge_dom_bindings.js";
+import {
+  getPlotLockState,
+  isPlotInteractionLocked,
+  reconcileOptimisticSubmittedPlot,
+  type BridgeLinkState,
+  type OptimisticSubmittedPlot,
+  type PlotLockState
+} from "./bridge_plot_lock.js";
 import {
   capitalizeLabel,
   formatLinkStatusLabel,
@@ -35,7 +52,14 @@ import {
   isMatchEnded
 } from "./bridge_presenters.js";
 import { renderSchematicPanel } from "./schematic_view.js";
-import { renderTacticalBoard, TACTICAL_VIEWPORT } from "./tactical_view.js";
+import { TACTICAL_VIEWPORT, SHOW_TACTICAL_ZOOM_CONTROLS } from "./bridge_ui_config.js";
+import {
+  getDraggedHeadingDegrees,
+  getResolutionPlaybackCamera,
+  getSvgViewportPoint,
+  getThrustDragWorldVector
+} from "./tactical_math.js";
+import { renderTacticalBoard } from "./tactical_view.js";
 import {
   buildPlotPreview,
   buildTacticalCamera,
@@ -48,7 +72,6 @@ import {
   summarizePlotDraft,
   TACTICAL_ZOOM_PRESETS,
   tacticalViewportToWorld,
-  validateBattleState,
   worldToTacticalViewport
 } from "../shared/index.js";
 import type { MatchSessionView, ServerToClientMessage, SessionIdentity } from "../shared/index.js";
@@ -75,12 +98,6 @@ type HealthResponse = {
   reconnectGraceMs: number;
 };
 
-type PlotLockState = {
-  reason: "submitted" | "replay" | "link";
-  status_label: string;
-  note_label: string;
-};
-
 function getRootElement(): HTMLDivElement {
   const candidate = document.querySelector<HTMLDivElement>("#app");
 
@@ -92,13 +109,9 @@ function getRootElement(): HTMLDivElement {
 }
 
 const root = getRootElement();
-const RECONNECT_TOKEN_STORAGE_KEY = "sg2_reconnect_token";
-const ADMIN_TOKEN_STORAGE_KEY = "sg2_admin_token";
-const LAST_COMPLETED_RESOLUTION_KEY_STORAGE_KEY = "sg2_last_completed_resolution_key";
-const LAST_RESOLUTION_SOURCE_STORAGE_KEY = "sg2_last_resolution_source_state";
 
 let health: HealthResponse | null = null;
-let wsState: "connecting" | "connected" | "closed" | "error" = "connecting";
+let wsState: BridgeLinkState = "connecting";
 let identity: SessionIdentity | null = null;
 let session: MatchSessionView | null = null;
 let socket: WebSocket | null = null;
@@ -116,87 +129,7 @@ let resolutionPlayback: ResolutionPlaybackState | null = null;
 let resolutionPlaybackTimer: number | null = null;
 let lastCompletedResolutionKey: string | null = readStoredValue(LAST_COMPLETED_RESOLUTION_KEY_STORAGE_KEY);
 let hostToolsOpen = false;
-let optimisticSubmittedPlot: {
-  ship_instance_id: ShipInstanceId;
-  turn_number: number;
-} | null = null;
-// Keep discrete zoom support wired up, but hide the controls until tactical scale tuning resumes.
-const SHOW_TACTICAL_ZOOM_CONTROLS = false;
-
-function readStoredValue(key: string): string | null {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredValue(key: string, value: string | null): void {
-  try {
-    if (value === null) {
-      window.localStorage.removeItem(key);
-      return;
-    }
-
-    window.localStorage.setItem(key, value);
-  } catch {
-    // ignore storage failures in v0.1
-  }
-}
-
-function readStoredResolutionPlaybackSource(): {
-  key: string;
-  battle_state: BattleState;
-} | null {
-  const raw = readStoredValue(LAST_RESOLUTION_SOURCE_STORAGE_KEY);
-
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as {
-      key?: unknown;
-      battle_state?: unknown;
-    };
-
-    if (typeof parsed.key !== "string" || !parsed.battle_state) {
-      return null;
-    }
-
-    return {
-      key: parsed.key,
-      battle_state: validateBattleState(parsed.battle_state)
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredResolutionPlaybackSource(key: string | null, battleState: BattleState | null): void {
-  if (!key || !battleState) {
-    writeStoredValue(LAST_RESOLUTION_SOURCE_STORAGE_KEY, null);
-    return;
-  }
-
-  try {
-    writeStoredValue(
-      LAST_RESOLUTION_SOURCE_STORAGE_KEY,
-      JSON.stringify({
-        key,
-        battle_state: battleState
-      })
-    );
-  } catch {
-    writeStoredValue(LAST_RESOLUTION_SOURCE_STORAGE_KEY, null);
-  }
-}
-
-function getStoredResolutionPlaybackSource(key: string): BattleState | null {
-  const stored = readStoredResolutionPlaybackSource();
-
-  return stored?.key === key ? stored.battle_state : null;
-}
+let optimisticSubmittedPlot: OptimisticSubmittedPlot | null = null;
 
 function logMessage(message: string): void {
   messages.unshift(message);
@@ -204,17 +137,6 @@ function logMessage(message: string): void {
 }
 
 type RectangleBoundary = Extract<BattleBoundary, { kind: "rectangle" }>;
-
-const TACTICAL_PLOT_HANDLES = {
-  thrustRadiusPx: 72,
-  headingRadiusPx: 44,
-  deadzonePx: 8
-} as const;
-
-function normalizeDegrees(angle: number): number {
-  const normalized = angle % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
-}
 
 function hasLocalHostResetAccess(): boolean {
   if (!health?.resetEnabled) {
@@ -329,87 +251,6 @@ function getCurrentResolutionPlaybackStepForSession(
   return getCurrentResolutionPlaybackStep(resolutionPlayback, sessionValue);
 }
 
-function reconcileOptimisticSubmittedPlot(
-  sessionValue: MatchSessionView | null,
-  identityValue: SessionIdentity | null,
-  playbackStep: ResolutionPlaybackStep | null
-): void {
-  if (!optimisticSubmittedPlot) {
-    return;
-  }
-
-  if (!sessionValue || !identityValue || identityValue.role !== "player" || !identityValue.ship_instance_id) {
-    clearOptimisticSubmittedPlot();
-    return;
-  }
-
-  if (
-    identityValue.ship_instance_id !== optimisticSubmittedPlot.ship_instance_id ||
-    sessionValue.battle_state.turn_number !== optimisticSubmittedPlot.turn_number ||
-    sessionValue.pending_plot_ship_ids.includes(identityValue.ship_instance_id) ||
-    playbackStep
-  ) {
-    clearOptimisticSubmittedPlot();
-  }
-}
-
-function getPlotLockState(
-  sessionValue: MatchSessionView | null,
-  identityValue: SessionIdentity | null,
-  playbackStep: ResolutionPlaybackStep | null,
-  linkState: "connecting" | "connected" | "closed" | "error" = wsState
-): PlotLockState | null {
-  if (!sessionValue || !identityValue || identityValue.role !== "player" || !identityValue.ship_instance_id) {
-    return null;
-  }
-
-  if (linkState !== "connected") {
-    return {
-      reason: "link",
-      status_label: "Host link unavailable",
-      note_label: "Host link unavailable. Plot controls stay paused until the bridge reconnects."
-    };
-  }
-
-  const shipInstanceId = identityValue.ship_instance_id;
-  const hasOptimisticSubmit =
-    optimisticSubmittedPlot?.ship_instance_id === shipInstanceId &&
-    optimisticSubmittedPlot.turn_number === sessionValue.battle_state.turn_number;
-
-  if (sessionValue.pending_plot_ship_ids.includes(shipInstanceId) || hasOptimisticSubmit) {
-    return {
-      reason: "submitted",
-      status_label: "Orders submitted",
-      note_label: "Orders are committed. Plot controls stay locked until the turn replay completes."
-    };
-  }
-
-  if (playbackStep) {
-    return {
-      reason: "replay",
-      status_label: "Replay in progress",
-      note_label: "The previous exchange is still replaying. Plot controls unlock when replay completes."
-    };
-  }
-
-  return null;
-}
-
-function isPlotInteractionLocked(
-  sessionValue: MatchSessionView | null = session,
-  identityValue: SessionIdentity | null = identity,
-  playbackStep: ResolutionPlaybackStep | null = getCurrentResolutionPlaybackStepForSession(sessionValue),
-  linkState: "connecting" | "connected" | "closed" | "error" = wsState
-): boolean {
-  return getPlotLockState(sessionValue, identityValue, playbackStep, linkState) !== null;
-}
-
-function smoothstep(value: number): number {
-  const clamped = Math.min(1, Math.max(0, value));
-
-  return clamped * clamped * (3 - 2 * clamped);
-}
-
 function getPlayerPlotSummary(
   sessionValue: MatchSessionView | null,
   identityValue: SessionIdentity | null
@@ -481,13 +322,34 @@ function getPlayerTacticalAuthoringContext():
   };
 }
 
-function getSvgViewportPoint(svg: SVGSVGElement, clientX: number, clientY: number): Vector2 {
-  const bounds = svg.getBoundingClientRect();
+function getCurrentPlotLockState(
+  sessionValue: MatchSessionView | null = session,
+  identityValue: SessionIdentity | null = identity,
+  playbackStep: ResolutionPlaybackStep | null = getCurrentResolutionPlaybackStepForSession(sessionValue),
+  linkState: BridgeLinkState = wsState
+): PlotLockState | null {
+  return getPlotLockState({
+    sessionValue,
+    identityValue,
+    playbackStep,
+    linkState,
+    optimisticSubmittedPlot
+  });
+}
 
-  return {
-    x: ((clientX - bounds.left) / bounds.width) * TACTICAL_VIEWPORT.width,
-    y: ((clientY - bounds.top) / bounds.height) * TACTICAL_VIEWPORT.height
-  };
+function getCurrentPlotInteractionLocked(
+  sessionValue: MatchSessionView | null = session,
+  identityValue: SessionIdentity | null = identity,
+  playbackStep: ResolutionPlaybackStep | null = getCurrentResolutionPlaybackStepForSession(sessionValue),
+  linkState: BridgeLinkState = wsState
+): boolean {
+  return isPlotInteractionLocked({
+    sessionValue,
+    identityValue,
+    playbackStep,
+    linkState,
+    optimisticSubmittedPlot
+  });
 }
 
 function getTacticalPointerPoint(clientX: number, clientY: number): Vector2 | null {
@@ -497,7 +359,7 @@ function getTacticalPointerPoint(clientX: number, clientY: number): Vector2 | nu
     return null;
   }
 
-  return getSvgViewportPoint(svg, clientX, clientY);
+  return getSvgViewportPoint(svg.getBoundingClientRect(), clientX, clientY);
 }
 
 function getSelectedSystemContext(
@@ -530,7 +392,7 @@ function updatePlotDraft(mutator: (draft: PlotDraft) => PlotDraft): void {
     return;
   }
 
-  if (isPlotInteractionLocked(session, identity)) {
+  if (getCurrentPlotInteractionLocked(session, identity)) {
     return;
   }
 
@@ -550,7 +412,7 @@ function applyTacticalDrag(clientX: number, clientY: number): void {
     return;
   }
 
-  if (isPlotInteractionLocked(session, identity)) {
+  if (getCurrentPlotInteractionLocked(session, identity)) {
     return;
   }
 
@@ -565,40 +427,29 @@ function applyTacticalDrag(clientX: number, clientY: number): void {
 
   if (activeTacticalDrag.handle_id === "thrust") {
     const shipAnchor = worldToTacticalViewport(context.camera, context.displayed.ship.pose.position);
-    const delta = {
-      x: pointer.x - shipAnchor.x,
-      y: pointer.y - shipAnchor.y
-    };
-    const distance = Math.hypot(delta.x, delta.y);
-    const scale = distance <= TACTICAL_PLOT_HANDLES.deadzonePx ? 0 : Math.min(1, distance / TACTICAL_PLOT_HANDLES.thrustRadiusPx);
-    const worldDelta = {
-      x: pointerWorld.x - context.displayed.ship.pose.position.x,
-      y: pointerWorld.y - context.displayed.ship.pose.position.y
-    };
-    const worldDistance = Math.hypot(worldDelta.x, worldDelta.y);
-    const direction = worldDistance > 0 ? { x: worldDelta.x / worldDistance, y: worldDelta.y / worldDistance } : { x: 0, y: 0 };
+    const thrustVector = getThrustDragWorldVector({
+      shipAnchor,
+      shipPosition: context.displayed.ship.pose.position,
+      pointer,
+      pointerWorld
+    });
 
     updatePlotDraft((draft) =>
-      setPlotDraftWorldThrust(context.sessionValue.battle_state, draft, {
-        x: direction.x * scale,
-        y: direction.y * scale
-      })
+      setPlotDraftWorldThrust(context.sessionValue.battle_state, draft, thrustVector)
     );
 
     return;
   }
 
-  const delta = {
-    x: pointerWorld.x - context.plotPreview.projected_pose.position.x,
-    y: pointerWorld.y - context.plotPreview.projected_pose.position.y
-  };
-  const distance = Math.hypot(delta.x, delta.y) / context.camera.world_units_per_px;
+  const desiredHeadingDegrees = getDraggedHeadingDegrees({
+    pointerWorld,
+    projectedPosition: context.plotPreview.projected_pose.position,
+    worldUnitsPerPx: context.camera.world_units_per_px
+  });
 
-  if (distance <= TACTICAL_PLOT_HANDLES.deadzonePx) {
+  if (desiredHeadingDegrees === null) {
     return;
   }
-
-  const desiredHeadingDegrees = normalizeDegrees((Math.atan2(delta.x, delta.y) * 180) / Math.PI);
 
   updatePlotDraft((draft) => setPlotDraftDesiredEndHeading(context.sessionValue.battle_state, draft, desiredHeadingDegrees));
 }
@@ -662,67 +513,6 @@ function getTacticalCamera(
   });
 }
 
-function withTacticalCameraView(
-  camera: TacticalCamera,
-  centerWorld: Vector2,
-  viewRotationDegrees: number
-): TacticalCamera {
-  const visibleHalfWidth = camera.world_units_per_px * (camera.drawable.width / 2);
-  const visibleHalfHeight = camera.world_units_per_px * (camera.drawable.height / 2);
-
-  return {
-    ...camera,
-    center_world: centerWorld,
-    view_rotation_degrees: normalizeDegrees(viewRotationDegrees),
-    visible_world_bounds: {
-      min: {
-        x: centerWorld.x - visibleHalfWidth,
-        y: centerWorld.y - visibleHalfHeight
-      },
-      max: {
-        x: centerWorld.x + visibleHalfWidth,
-        y: centerWorld.y + visibleHalfHeight
-      }
-    }
-  };
-}
-
-function getResolutionPlaybackCamera(
-  camera: TacticalCamera | null,
-  playbackState: ResolutionPlaybackState | null,
-  playbackStep: ResolutionPlaybackStep | null,
-  preferredShipInstanceId: ShipInstanceId | null
-): TacticalCamera | null {
-  if (!camera || !playbackState || !playbackStep || camera.selection.mode_id !== "player_centered") {
-    return camera;
-  }
-
-  const viewpointShipId = preferredShipInstanceId ?? camera.viewpoint_ship_instance_id;
-
-  if (!viewpointShipId) {
-    return camera;
-  }
-
-  const initialPose = playbackState.steps[0]?.ship_poses[viewpointShipId];
-  const finalPose = playbackState.steps.at(-1)?.ship_poses[viewpointShipId];
-
-  if (!initialPose || !finalPose) {
-    return camera;
-  }
-
-  const transitionRatio = smoothstep(playbackStep.camera_transition_ratio);
-  const currentPose = playbackStep.ship_poses[viewpointShipId] ?? finalPose;
-
-  return withTacticalCameraView(
-    camera,
-    {
-      x: initialPose.position.x + (finalPose.position.x - initialPose.position.x) * transitionRatio,
-      y: initialPose.position.y + (finalPose.position.y - initialPose.position.y) * transitionRatio
-    },
-    currentPose.heading_degrees
-  );
-}
-
 function clearSelectedSystem(): void {
   if (selectedSystemId === null) {
     return;
@@ -737,7 +527,7 @@ function resetCurrentPlotDraft(): void {
     return;
   }
 
-  if (isPlotInteractionLocked(session, identity)) {
+  if (getCurrentPlotInteractionLocked(session, identity)) {
     return;
   }
 
@@ -750,7 +540,7 @@ function submitCurrentPlot(): void {
     return;
   }
 
-  if (isPlotInteractionLocked(session, identity)) {
+  if (getCurrentPlotInteractionLocked(session, identity)) {
     return;
   }
 
@@ -810,7 +600,7 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (isPlotInteractionLocked(session, identity)) {
+  if (getCurrentPlotInteractionLocked(session, identity)) {
     return;
   }
 
@@ -827,7 +617,7 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
 }
 
 function toggleSelectedSystem(systemId: SystemId): void {
-  if (isPlotInteractionLocked(session, identity)) {
+  if (getCurrentPlotInteractionLocked(session, identity)) {
     return;
   }
 
@@ -839,9 +629,14 @@ function render(): void {
   const sessionValue = session;
   const playbackStep = getCurrentResolutionPlaybackStepForSession(sessionValue);
 
-  reconcileOptimisticSubmittedPlot(sessionValue, identity, playbackStep);
+  optimisticSubmittedPlot = reconcileOptimisticSubmittedPlot({
+    optimisticSubmittedPlot,
+    sessionValue,
+    identityValue: identity,
+    playbackStep
+  });
 
-  const plotLockState = getPlotLockState(sessionValue, identity, playbackStep, wsState);
+  const plotLockState = getCurrentPlotLockState(sessionValue, identity, playbackStep, wsState);
   const displayed = getDisplayedShipContext(sessionValue, identity);
   const plotSummary = getPlayerPlotSummary(sessionValue, identity);
   const selectedSystemContext = getSelectedSystemContext(sessionValue, identity);
@@ -857,12 +652,12 @@ function render(): void {
     plotPreview,
     displayed?.ship.ship_instance_id ?? null
   );
-  const camera = getResolutionPlaybackCamera(
-    baseCamera,
-    resolutionPlayback,
+  const camera = getResolutionPlaybackCamera({
+    camera: baseCamera,
+    playbackState: resolutionPlayback,
     playbackStep,
-    displayed?.ship.ship_instance_id ?? null
-  );
+    preferredShipInstanceId: displayed?.ship.ship_instance_id ?? null
+  });
   const playbackEvent = playbackStep?.focus_event ?? null;
   const outcomePresentation = getMatchOutcomePresentation(sessionValue, identity);
   const focusedMountId = isAimMode ? selectedSystemContext.system.id : null;
@@ -978,7 +773,7 @@ function render(): void {
     onToggleSystemSelection: toggleSelectedSystem,
     onClearSystemSelection: clearSelectedSystem,
     onStartTacticalDrag: (handleId, pointerId, clientX, clientY) => {
-      if (isPlotInteractionLocked(session, identity)) {
+      if (getCurrentPlotInteractionLocked(session, identity)) {
         return;
       }
 

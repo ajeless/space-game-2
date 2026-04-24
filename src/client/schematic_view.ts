@@ -1,4 +1,5 @@
 import { getAvailableReactorPips, getSystemStateAndEffects } from "../shared/index.js";
+import { SCHEMATIC_VIEWPORT } from "./bridge_ui_config.js";
 import type {
   MatchSessionView,
   PlotDraft,
@@ -20,18 +21,7 @@ import {
   getWeaponMountStateLabel,
   getWeaponCueSolutionLabel
 } from "./combat_readability.js";
-
-const SCHEMATIC_VIEWPORT = {
-  width: 420,
-  height: 620,
-  centerX: 210,
-  centerY: 262,
-  scalePx: 208,
-  hitWidth: 108,
-  hitHeight: 38,
-  bodyWidth: 76,
-  bodyHeight: 28
-} as const;
+import { normalizeDegrees } from "./tactical_math.js";
 
 type WeaponCue = PlotPreview["weapon_cues"][number];
 
@@ -80,11 +70,6 @@ type RenderSchematicPanelArgs = {
   outcomePresentation: OutcomePresentation;
   getContactLabel: (shipInstanceId: ShipInstanceId | null) => string;
 };
-
-function normalizeDegrees(angle: number): number {
-  const normalized = angle % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
-}
 
 function formatNumber(value: number): string {
   return value.toFixed(3);

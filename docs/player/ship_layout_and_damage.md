@@ -1,8 +1,10 @@
 # Ship Layout And Damage
 
 **Audience:** players, playtesters, curious readers
-**Status:** player-facing design explainer
-**Last updated:** 2026-04-21
+**Status:** current player-facing explainer
+**Last updated:** 2026-04-24
+
+This still describes the shipped duel build. `v0.2` did not change the underlying hit-layout model; it only improved presentation and workflow around it.
 
 ## What the SSD is supposed to mean
 
@@ -147,9 +149,9 @@ This **should** change gameplay:
 
 That distinction is important for both players and developers.
 
-## What to expect from `v0.1`
+## What to expect from the shipped duel
 
-`v0.1` will still be simple.
+The shipped duel is still intentionally simple.
 
 Do not expect:
 
@@ -158,7 +160,7 @@ Do not expect:
 - detailed crew routing
 - advanced repair gameplay
 
-But do expect the first slice to start laying the foundation:
+But do expect the current build to lay the foundation:
 
 - systems have locations
 - hits can matter locally

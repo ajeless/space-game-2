@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  formatBridgeMessage,
   formatResolutionEventSummary,
   getActionStripPresentation,
   getMatchOutcomePresentation,
@@ -153,6 +154,16 @@ describe("bridge presenters", () => {
     );
     expect(formatResolutionEventSummary(session, identity, hitEvent)).toBe("Direct hit on contact · drive");
     expect(formatResolutionEventSummary(session, identity, damageEvent)).toBe("Contact drive degraded");
+  });
+
+  it("maps bridge status messages through the shared presentation table", () => {
+    const playerIdentity = makePlayerIdentity();
+
+    expect(formatBridgeMessage(undefined, playerIdentity)).toBe("Ship controls live.");
+    expect(formatBridgeMessage("hello received · alpha", playerIdentity)).toBe("Bridge station assigned.");
+    expect(formatBridgeMessage("session reset requested · turn 1", playerIdentity)).toBe("Reset request sent to host.");
+    expect(formatBridgeMessage("link closed", playerIdentity)).toBe("Host link lost. Reconnecting when available.");
+    expect(formatBridgeMessage("plot rejected: invalid heading", playerIdentity)).toBe("Plot rejected: invalid heading");
   });
 
   it("tightens match-end detail for victory and defeat states", async () => {

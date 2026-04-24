@@ -103,59 +103,74 @@ export function getBridgeStationLabel(
   return shipName ? `Observer view · ${shipName}` : "Observer view";
 }
 
+type BridgeMessageRule = {
+  matches: (message: string) => boolean;
+  label: (identityValue: SessionIdentity | null) => string;
+};
+
+function getDefaultBridgeMessage(identityValue: SessionIdentity | null): string {
+  return identityValue?.role === "player" ? "Ship controls live." : "Spectator feed live.";
+}
+
+const BRIDGE_MESSAGE_RULES: BridgeMessageRule[] = [
+  {
+    matches: (message) => message.startsWith("hello received"),
+    label: (identityValue) =>
+      identityValue?.role === "player" ? "Bridge station assigned." : "Spectator feed connected."
+  },
+  {
+    matches: (message) => message.startsWith("submitted direct plot"),
+    label: () => "Plot sent to host."
+  },
+  {
+    matches: (message) => message.startsWith("plot accepted"),
+    label: () => "Plot accepted by host."
+  },
+  {
+    matches: (message) => message.startsWith("session updated"),
+    label: () => "Turn state updated."
+  },
+  {
+    matches: (message) => message.startsWith("session reset requested"),
+    label: () => "Reset request sent to host."
+  },
+  {
+    matches: (message) => message.startsWith("session reset"),
+    label: () => "Match reset."
+  },
+  {
+    matches: (message) => message.startsWith("claim requested"),
+    label: () => "Seat claim sent."
+  },
+  {
+    matches: (message) => message.startsWith("session resumed in another browser tab"),
+    label: () => "This bridge resumed in another tab."
+  },
+  {
+    matches: (message) => message.startsWith("link closed"),
+    label: () => "Host link lost. Reconnecting when available."
+  },
+  {
+    matches: (message) => message.startsWith("link error"),
+    label: () => "Host link error. Reconnecting when available."
+  }
+];
+
 export function formatBridgeMessage(
   message: string | undefined,
   identityValue: SessionIdentity | null
 ): string {
   if (!message) {
-    return identityValue?.role === "player" ? "Ship controls live." : "Spectator feed live.";
-  }
-
-  if (message.startsWith("hello received")) {
-    return identityValue?.role === "player" ? "Bridge station assigned." : "Spectator feed connected.";
-  }
-
-  if (message.startsWith("submitted direct plot")) {
-    return "Plot sent to host.";
-  }
-
-  if (message.startsWith("plot accepted")) {
-    return "Plot accepted by host.";
-  }
-
-  if (message.startsWith("session updated")) {
-    return "Turn state updated.";
-  }
-
-  if (message.startsWith("session reset requested")) {
-    return "Reset request sent to host.";
-  }
-
-  if (message.startsWith("session reset")) {
-    return "Match reset.";
-  }
-
-  if (message.startsWith("claim requested")) {
-    return "Seat claim sent.";
-  }
-
-  if (message.startsWith("session resumed in another browser tab")) {
-    return "This bridge resumed in another tab.";
-  }
-
-  if (message.startsWith("link closed")) {
-    return "Host link lost. Reconnecting when available.";
-  }
-
-  if (message.startsWith("link error")) {
-    return "Host link error. Reconnecting when available.";
+    return getDefaultBridgeMessage(identityValue);
   }
 
   if (message.includes("failed") || message.includes("error") || message.startsWith("plot rejected")) {
     return capitalizeLabel(message);
   }
 
-  return identityValue?.role === "player" ? "Ship controls live." : "Spectator feed live.";
+  const rule = BRIDGE_MESSAGE_RULES.find((candidate) => candidate.matches(message));
+
+  return rule ? rule.label(identityValue) : getDefaultBridgeMessage(identityValue);
 }
 
 function getRecentResolutionEvents(sessionValue: MatchSessionView | null): ResolverEvent[] {

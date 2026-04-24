@@ -2,19 +2,25 @@
 
 ## Purpose
 
-This repository is building the `v0.1` vertical slice of `space_game_2`: a deployable, internet-playable, peer-hosted duel with a pure shared resolver and SSD-centric UI.
+This repository now carries the shipped `v0.2` duel build of `space_game_2`: a deployable, internet-playable, peer-hosted duel with a pure shared resolver and SSD-centric UI.
+
+`v0.2` shipped as a stabilization pass over the original `v0.1` rules/contracts. Unless a real defect forces it, keep gameplay behavior inside those existing invariants.
 
 ## Canonical docs
 
 Read these first before changing rules or contracts:
 
 - `README.md`
+- `PLAN.md`
 - `docs/design/stack_decision.md`
 - `docs/design/resolver_design.md`
+- `docs/design/ssd_layout.md`
+- `docs/design/planner_ui_and_tactical_camera.md`
 - `docs/design/ship_definition_format.md`
 - `docs/design/v0_1_data_contracts.md`
 - `docs/design/v0_1_tuning_baseline.md`
 - `docs/developer/layout_and_hit_model.md`
+- `docs/developer/remote_play_runbook.md`
 
 ## Non-negotiable v0.1 invariants
 
@@ -49,7 +55,9 @@ Read these first before changing rules or contracts:
 - `npm install`
 - `npm run dev:server`
 - `npm run dev:client`
+- `npm run typecheck`
 - `npm run test`
+- `npm run test:browser:smoke`
 - `npm run build`
 - `npm run check`
 

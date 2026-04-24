@@ -1,196 +1,74 @@
-# Planner UI and Tactical Camera — v0.1
+# Planner UI And Tactical Camera
 
-> Created in this repository on 2026-04-21.
-> This doc records the planner-control and tactical-camera decisions that sit beside the core combat contracts.
+> Shipped planner/control behavior and the seams that keep it separate from resolver contracts.
 
-**Status:** decided (direction), working contract draft  
-**Scope:** v0.1 planner UI, tactical camera, and player-facing terminology  
-**Last updated:** 2026-04-22
+**Status:** shipped `v0.2` presentation behavior  
+**Scope:** client-side plotting controls, tactical camera behavior, and current config ownership  
+**Last updated:** 2026-04-24
 
 ## Summary
 
-The planner UI should be data-driven, but it should not be folded into resolver rules or battle-state payloads. `MatchRulesConfig`, `ShipConfig`, `BattleState`, and `PlotSubmission` remain the combat contracts. A separate planner/UI data layer defines how those contracts are exposed to the player: control labels, widget types, step sizes, grouping, ordering, zoom presets, and other presentational affordances.
+The duel still uses the `v0.1` combat contracts, but the player does not interact with those contracts directly. The browser client exposes them through a bridge shell:
 
-The tactical viewport should behave like a relative sensor scope rather than a tiny absolute map. In normal play, the player's ship stays centered and bow-up on screen, contacts are shown relative to it, zoom is chosen from discrete player-controlled levels, and off-screen contacts are represented with edge markers rather than continuous autoscaling.
+- tactical drag handles for burn and heading
+- SSD trim sliders and a `Station Keep` shortcut
+- SSD aim mode for weapon intent and charge selection
+- a player-relative tactical scope with replay-aware camera settling
 
-## Decisions
+These are client concerns, not resolver rules. The important seam remains intact: the shared plot-authoring and preview logic own the actual authored values, while the browser client owns widgets, layout, and presentation tuning.
 
-1. **Planner controls are configurable from data.** Labels, units, widget types, increments, visibility, and grouping should come from a data file, not from hard-coded UI-only assumptions.
-2. **Planner UI config is separate from resolver config.** Combat math does not need to know whether a value came from a slider, stepper, toggle, keyboard shortcut, or other widget.
-3. **The tactical view is player-relative by default.** The ship being piloted anchors the tactical scope, remains centered, and stays bow-up on screen; the scope is not an absolute world map.
-4. **Zoom is discrete and player-controlled.** No continuous auto-rescale during plotting or aim mode.
-5. **Off-screen contacts stay represented.** If a contact is outside the current zoom window, the UI shows an edge marker with range and bearing rather than silently losing it.
-6. **Boundary rules still exist in world space.** A relative camera does not remove disengagement or battlefield geometry from the simulation.
-7. **`Lateral Burn` replaces `Beam Trim`.** The old term was too easy to misread as a weapon or optics adjustment rather than sideways translational thrust.
-8. **Alternate camera modes remain implementation options, not primary player UI.** Replay, observer, or later configurable views may still use fit/world cameras, but the normal player flow should emphasize the ship-relative scope.
+## Current shipped planner behavior
 
-## Planner UI data layer
+### Movement authoring
 
-The planner UI should eventually load from its own config file, likely one per ruleset or ship family. The shape below is intentionally a companion contract, not a resolver input contract.
+- Drag the thrust handle on the tactical scope to author world-space burn.
+- Drag the heading handle on the projected ghost to set end-of-turn heading.
+- Use the SSD `Turn`, `Axial Trim`, and `Lateral Trim` sliders for fine adjustment.
+- Use `Station Keep` to null out drift with the current ship state.
 
-```typescript
-type PlannerWidgetKind = "slider" | "stepper" | "toggle" | "select";
+### Weapon authoring
 
-interface PlannerUiConfig {
-  schema_version: "sg2/v0.1";
-  id: string;
-  terminology: {
-    heading_delta_label: string;
-    axial_thrust_label: string;
-    lateral_thrust_label: string;
-  };
-  control_groups: PlannerControlGroup[];
-  tactical_camera: TacticalCameraConfig;
-}
+- Select a weapon mount on the SSD to enter `AIM MODE`.
+- Click a tactical contact to assign or clear target lock for the selected mount.
+- Set charge from the selected mount panel.
+- Use `Clear Target` or `Esc` to stand the mount down or leave the panel.
 
-interface PlannerControlGroup {
-  id: string;
-  label: string;
-  order: number;
-  controls: PlannerControl[];
-}
+### Plot lock behavior
 
-interface PlannerControlBase {
-  id: string;
-  label: string;
-  widget: PlannerWidgetKind;
-  binding:
-    | "heading_delta_degrees"
-    | "thrust_input.axial_fraction"
-    | "thrust_input.lateral_fraction"
-    | `weapon.${string}.charge_pips`
-    | `weapon.${string}.fire_intent`;
-  help_text?: string;
-  visible_when?: string;
-}
+- Once a plot is submitted, plotting stays locked until the replay for that exchange finishes.
+- Replay lock and host-link loss both surface explicit notes in the SSD control deck.
+- Non-weapon systems remain read-only in the shipped duel build.
 
-interface PlannerSliderControl extends PlannerControlBase {
-  widget: "slider";
-  min: number;
-  max: number;
-  step: number;
-  snap_points?: number[];
-  units?: string;
-}
+## Current shipped camera behavior
 
-interface PlannerStepperControl extends PlannerControlBase {
-  widget: "stepper";
-  values: number[];
-  units?: string;
-}
+- The tactical scope is player-relative and bow-up.
+- The piloted ship stays centered on screen during normal plotting.
+- Off-screen contacts stay visible through edge markers rather than camera autoscaling.
+- A scale bar stays visible on the tactical scope.
+- During replay, the player-centered camera eases from the resolved exchange back onto the live plotting frame instead of snapping abruptly.
 
-interface PlannerToggleControl extends PlannerControlBase {
-  widget: "toggle";
-}
+## Current config seams
 
-interface PlannerSelectControl extends PlannerControlBase {
-  widget: "select";
-  options: Array<{ value: string; label: string }>;
-}
+These files are the relevant sources of truth:
 
-type PlannerControl =
-  | PlannerSliderControl
-  | PlannerStepperControl
-  | PlannerToggleControl
-  | PlannerSelectControl;
-```
+- `src/shared/tactical_camera.ts`
+  Owns camera modes, zoom-preset math, and world-to-viewport transforms.
+- `src/shared/plot_authoring.ts` and `src/shared/plot_preview.ts`
+  Own authored plot normalization and preview logic.
+- `src/client/bridge_ui_config.ts`
+  Owns the current shipped schematic/tactical viewport sizes and tactical drag-handle radii.
+- `src/client/bridge_dom_bindings.ts`
+  Owns the mapping between rendered controls and plot-authoring mutations.
 
-### What belongs in planner UI data
+The current build does **not** load planner config from an external JSON file. The shipped seam is local code config, not resolver data.
 
-- labels, units, and help text
-- widget kind
-- min / max / step
-- snap points or enumerated choices
-- control ordering and grouping
-- default visibility and mode-specific visibility
-- zoom presets and camera defaults
+## Zoom status
 
-### What does not belong in planner UI data
-
-- hit probability math
-- damage rules
-- turn cap math
-- weapon timing rules
-- arbitrary executable expressions
-- battle-state authority or networking rules
-
-The important seam is this: the planner UI config chooses how to present a control, but the shared plot-authoring logic still owns validation and normalization.
-
-## Tactical camera policy
-
-### Relative scope
-
-The main tactical view should show the world relative to the player's ship. During plot phase and aim mode:
-
-- the player's ship stays at the center of the tactical viewport
-- the player's ship stays facing viewport-up while the world rotates around it
-- enemy contacts are rendered at relative positions and velocities
-- projected motion and shot overlays are drawn in the same relative frame
-
-The simulation still runs in absolute world coordinates. The relative scope is a view transform, not a simulation change.
-
-### Discrete zoom
-
-The player should choose zoom from a small set of stable presets rather than by continuous frame-to-frame autoscaling.
-
-Recommended v0.1 direction:
-
-- default zoom preset: `medium`
-- additional presets: `close` and `wide`
-- zoom remains stable during the current plot / aim / execute cycle unless the player explicitly changes it
-
-This preserves spatial legibility. If scale changes every time the target drifts slightly, the player loses the ability to build intuition about motion and range.
-
-### Off-screen contacts
-
-When a contact would leave the visible scope at the chosen zoom:
-
-- show an edge marker on the viewport frame
-- indicate bearing relative to the player's ship
-- show current range to the contact
-- keep the contact selectable when interaction mode makes that necessary
-
-This is the preferred answer to "enemy drifted out of frame," not silent rescaling and not removing boundaries from the game.
-
-### Battlefield boundary cues
-
-If the match uses a disengagement boundary, the tactical UI should still expose it even in a player-centered scope. Good v0.1 cues include:
-
-- boundary direction from the player ship
-- distance to nearest boundary edge
-- a boundary warning state when plotted motion would cross it
-
-The camera should not pretend the boundary no longer exists just because the player ship is centered.
-
-## Terminology
-
-### `Turn`
-
-Rotational command. Changes heading only.
-
-### `Axial Burn`
-
-Fore-aft translational thrust along the ship's longitudinal axis.
-
-### `Lateral Burn`
-
-Port-starboard translational thrust across the ship's beam. This replaces `Beam Trim` in the player-facing UI.
-
-### `Viewport-up reference`
-
-The tactical display still has an up direction on screen, but that is a display convention, not "north in space." Heading is a 0-360 degree value relative to that display reference.
+Discrete zoom presets still exist in shared camera code, but the shipped bridge hides the zoom controls and runs on one stable player-facing scale. That keeps the tactical picture steady while leaving a clear seam for later work if zoom control earns its place again.
 
 ## Deferred
 
-- exact file location and loading rules for planner UI config
-- whether zoom presets are numeric scale factors, named presets, or both
-- whether execute phase keeps the player's chosen zoom or offers an optional replay-only fit mode
-- how alternate tactical views become configurable later without reintroducing player-facing camera clutter
-- exact off-screen marker art and interaction affordances
-- whether a secondary mini-scope or inset radar is worth the additional chrome in v0.1
-
-## Related docs
-
-- `v0_1_data_contracts.md` — combat contracts that the planner UI edits and displays
-- `ssd_layout.md` — structural UI layout and interaction model
-- `ship_definition_format.md` — ship data that drives schematic rendering
+- external planner/UI config files, if multiple rulesets or ship families ever need them
+- replay-only camera modes or replay transport controls
+- a decision on whether SSD trim sliders remain permanent, shrink, or disappear
+- alternative tactical views or station-specific workspaces

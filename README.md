@@ -15,6 +15,14 @@ Primary interface: the Ship System Display (SSD). Energy allocation, damage, sub
 
 Movement model: continuous Newtonian physics with rich digital planning UI (velocity arrows, ghost projections, reachable-region envelopes, quantized effect thresholds for ranges and arcs).
 
+## Current status
+
+The current repository state is the shipped `v0.2` duel build.
+
+- `v0.1` rules, contracts, ship data, and resolver invariants remain the gameplay baseline.
+- `v0.2` shipped the remote-play hardening pass, combat-presentation pass, and final maintenance/docs cleanup.
+- The playable browser build supports two-player peer-hosted duels, spectator/reclaim flow, replay-locked plotting, and host-authenticated match reset.
+
 ## What this project is not
 
 - Not a 4X or empire game.
@@ -54,34 +62,27 @@ The sequence in which capabilities are added matters. These are the ordering com
 - **Dedicated server comes when peer-hosting is the actual bottleneck.** Not before. The game must be good enough that the friction of peer-hosting is a real problem players complain about.
 - **Campaign, persistence, and other single-player modes come later still.** Each is earned.
 
-## Current design docs
+## Current docs
 
 - [Stack decision](docs/design/stack_decision.md)
 - [Resolver design](docs/design/resolver_design.md)
 - [Ship definition format](docs/design/ship_definition_format.md)
 - [SSD layout](docs/design/ssd_layout.md)
+- [Planner UI and tactical camera](docs/design/planner_ui_and_tactical_camera.md)
 - [v0.1 data contracts](docs/design/v0_1_data_contracts.md)
 - [v0.1 tuning baseline](docs/design/v0_1_tuning_baseline.md)
+- [Plan and deferred work](PLAN.md)
 
-## Audience docs
+## Guides
 
 - [Developer: layout and hit model](docs/developer/layout_and_hit_model.md)
 - [Developer: remote play runbook](docs/developer/remote_play_runbook.md)
-- [Developer: v0.2 cleanup slices](docs/developer/v0_2_cleanup_slices.md)
 - [Player: ship layout and damage](docs/player/ship_layout_and_damage.md)
 - [Player: user manual](docs/player/user_manual.md)
 
-## Research questions (deferred)
+## Deferred work
 
-To be revisited once the core game is playable. The AI landscape moves fast; any recommendation captured now will be partially stale by the time it's needed. Capture the questions, search fresh when the time comes.
-
-- What is the state of classical tactical game AI — MCTS, policy networks, learned opponent models — for WEGO-style games with large plot-space and imperfect information?
-- What is the state of hybrid architectures that combine classical game AI for decisions with LLMs for explanation, personality, and flavor? (The Meta CICERO Diplomacy work is probably the closest published analog.)
-- What is the right split between deterministic tactical AI (for the opponent's moves) and LLM-driven presentation (for briefings, debriefs, captain-voice narration, faction-flavored text)?
-- How can an AI opponent be made to feel like a *person* commanding a ship, with personality and voice, without the LLM being on the critical path for tactical decisions?
-- What can procedural content generation contribute to scenario design, mission generation, or dynamic campaign events?
-- What does imitation learning from player data look like once there's enough player data to learn from?
-- What safeguards and design choices are needed to keep an AI opponent challenging without cheating (perfect information access, unrealistic reaction speed, etc.)?
+Backlog, deferred design questions, and post-`v0.2` work now live in [PLAN.md](PLAN.md). Keeping that material in one place is intentional; the rest of the docs describe shipped behavior and current contracts.
 
 ## Preserved prior ideation
 

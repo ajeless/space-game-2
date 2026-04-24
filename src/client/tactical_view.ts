@@ -7,6 +7,7 @@ import {
   isWorldPointVisibleInTacticalCamera,
   worldToTacticalViewport
 } from "../shared/index.js";
+import { TACTICAL_PLOT_HANDLES, TACTICAL_VIEWPORT } from "./bridge_ui_config.js";
 import type {
   BattleState,
   MatchSessionView,
@@ -28,23 +29,10 @@ import {
   getWeaponCueEngagementState,
   type ContactTelemetry
 } from "./combat_readability.js";
+import { normalizeDegrees } from "./tactical_math.js";
 import type { ResolutionPlaybackStep } from "./resolution_playback.js";
 
-export const TACTICAL_VIEWPORT = {
-  width: 960,
-  height: 860,
-  padding: 20,
-  hullScalePx: 44,
-  headingVectorLengthPx: 28,
-  markerInsetPx: 22,
-  scaleBarTargetPx: 112
-} as const;
-
-const TACTICAL_PLOT_HANDLES = {
-  thrustRadiusPx: 72,
-  headingRadiusPx: 44,
-  deadzonePx: 8
-} as const;
+export { TACTICAL_VIEWPORT } from "./bridge_ui_config.js";
 
 type WeaponCue = PlotPreview["weapon_cues"][number];
 
@@ -60,11 +48,6 @@ type RenderTacticalBoardArgs = {
   playbackStep: ResolutionPlaybackStep | null;
   playbackEvent: ResolverEvent | null;
 };
-
-function normalizeDegrees(angle: number): number {
-  const normalized = angle % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
-}
 
 function getShortestSignedAngleDelta(fromDegrees: number, toDegrees: number): number {
   const delta = (toDegrees - fromDegrees + 540) % 360 - 180;
