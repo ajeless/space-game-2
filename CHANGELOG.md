@@ -15,7 +15,7 @@ All notable changes to Burn Vector are recorded here. This project follows [Keep
 - `fast-check` property test asserting resolver determinism.
 - Portfolio-grade `README.md` with embedded duel GIF, screenshots, and tech-stack credits.
 - Wordmark SVG logo and favicon.
-- Static GitHub Pages demo playing a canned duel (`?demo=1`).
+- Local demo mode (`?demo=1`) that plays a canned duel without requiring a second player.
 
 ### Refactored
 - `src/client/style.css` split into layered stylesheets under `src/client/styles/`.
